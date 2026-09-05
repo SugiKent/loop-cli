@@ -51,9 +51,8 @@ type Model struct {
 	errText  string
 	partial  string
 
-	width       int
-	height      int
-	showPreview bool
+	width  int
+	height int
 
 	screen   screen
 	detail   detailState
@@ -233,11 +232,6 @@ func (m Model) updateKey(key string) (tea.Model, tea.Cmd) {
 	case "tab":
 		m.tab = tabOrder[(m.tabIndex()+1)%len(tabOrder)]
 		m.clampCursor()
-	case "p":
-		// 2 ペインでは表もプレビューも出ているので何もしない。
-		if !m.twoPane() {
-			m.showPreview = !m.showPreview
-		}
 	case "enter":
 		return m.openDetail(), nil
 	case "R":
@@ -268,6 +262,3 @@ func (m *Model) clampCursor() {
 		m.cursor = 0
 	}
 }
-
-// twoPane は表とプレビューを同時に出せる端末かを返す。
-func (m Model) twoPane() bool { return m.width >= 80 && m.height >= 20 }

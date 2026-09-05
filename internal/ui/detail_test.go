@@ -649,14 +649,30 @@ func TestFooterWithoutPRs(t *testing.T) {
 
 func TestNarrowTerminalKeepsOnePane(t *testing.T) {
 	m, _ := send(detailModel(60, 40, exampleResult(t).Cards), enterKey)
-	text := plainText(m)
-	for _, want := range []string{"org/app #108", "PR#131", "認証まわりの仕様を決めたい"} {
-		if !strings.Contains(text, want) {
-			t.Errorf("狭い端末の詳細に %q が無い:\n%s", want, text)
+	lines := plain(m)
+	text := strings.Join(lines, "\n")
+
+	seps := 0
+	sep := -1
+	for i, l := range lines {
+		if strings.HasPrefix(l, "──") {
+			seps++
+			sep = i
 		}
 	}
-	if strings.Contains(text, "p プレビュー") {
-		t.Error("詳細にプレビュー切替のヒントがある")
+	if seps != 1 {
+		t.Fatalf("区切り線が %d 本ある, want 1（ヘッダ領域 / 区切り線 / 本文領域 の 1 ペイン）:\n%s", seps, text)
+	}
+
+	// ヘッダ領域は区切り線の上、本文は下。
+	for _, want := range []string{"org/app #108", "PR#131"} {
+		i, ok := indexOf(lines, want)
+		if !ok || i > sep {
+			t.Errorf("%q が区切り線(%d)より上に無い（添字 %d, 見つかった %v）:\n%s", want, sep, i, ok, text)
+		}
+	}
+	if i, ok := indexOf(lines, "認証まわりの仕様を決めたい"); !ok || i < sep {
+		t.Errorf("本文が区切り線(%d)より下に無い（添字 %d, 見つかった %v）:\n%s", sep, i, ok, text)
 	}
 }
 

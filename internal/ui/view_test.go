@@ -248,50 +248,42 @@ func TestTwoPaneShowsTableAndPreview(t *testing.T) {
 	}
 }
 
-func TestNarrowTerminalTogglesWithP(t *testing.T) {
-	// 幅 79 は 2 ペインの下限（80）を下回る 1 ペイン。ヒント全体が切られない幅を選ぶ。
+func TestNarrowTerminalStillShowsBothPanes(t *testing.T) {
+	// 幅 79 は以前の 2 ペインの下限（80）を下回るが、常に 2 ペインで描く。
 	m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at}, tea.WindowSizeMsg{Width: 79, Height: 40})
 
 	text := plainText(m)
-	if !strings.Contains(text, "PR131") || strings.Contains(text, "issue #108 の提案") {
-		t.Errorf("狭い端末で表だけになっていない: %q", text)
+	if !strings.Contains(text, "PR131") || !strings.Contains(text, "issue #108 の提案") {
+		t.Errorf("狭い端末で表とプレビューの両方が出ていない: %q", text)
 	}
-	if !strings.Contains(text, "p プレビュー") {
-		t.Errorf("フッタに p プレビュー が無い: %q", text)
-	}
-
-	m, _ = send(m, runeKey('p'))
-
-	text = plainText(m)
-	if strings.Contains(text, "PR131") || !strings.Contains(text, "issue #108 の提案") {
-		t.Errorf("p でプレビューに切り替わっていない: %q", text)
-	}
-	if !strings.Contains(text, "p 一覧") {
-		t.Errorf("フッタに p 一覧 が無い: %q", text)
+	if strings.Contains(text, "p プレビュー") || strings.Contains(text, "p 一覧") {
+		t.Errorf("フッタに p のヒントが残っている: %q", text)
 	}
 }
 
-func TestShortTerminalIsOnePane(t *testing.T) {
+func TestShortTerminalStillShowsBothPanes(t *testing.T) {
 	m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at}, tea.WindowSizeMsg{Width: 120, Height: 15})
 
 	text := plainText(m)
 
-	if !strings.Contains(text, "PR131") || strings.Contains(text, "issue #108 の提案") {
-		t.Errorf("低い端末で 1 ペインになっていない: %q", text)
+	if !strings.Contains(text, "PR131") || !strings.Contains(text, "issue #108 の提案") {
+		t.Errorf("低い端末で表とプレビューの両方が出ていない: %q", text)
 	}
 }
 
-func TestPDoesNothingInTwoPane(t *testing.T) {
-	m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at}, tea.WindowSizeMsg{Width: 120, Height: 40})
-	before := plainText(m)
+func TestPDoesNothing(t *testing.T) {
+	for _, size := range []tea.WindowSizeMsg{{Width: 120, Height: 40}, {Width: 79, Height: 40}} {
+		m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at}, size)
+		before := plainText(m)
 
-	after, cmd := send(m, runeKey('p'))
+		after, cmd := send(m, runeKey('p'))
 
-	if cmd != nil {
-		t.Errorf("2 ペインの p でコマンドが返った: %T", cmd())
-	}
-	if plainText(after) != before {
-		t.Errorf("2 ペインの p で View が変わった:\n%q\n%q", before, plainText(after))
+		if cmd != nil {
+			t.Errorf("幅 %d の p でコマンドが返った: %T", size.Width, cmd())
+		}
+		if plainText(after) != before {
+			t.Errorf("幅 %d の p で View が変わった:\n%q\n%q", size.Width, before, plainText(after))
+		}
 	}
 }
 
@@ -381,16 +373,38 @@ func TestHintIsHorizontallyCentered(t *testing.T) {
 	}
 }
 
-func TestPreviewPaneShowsNoHint(t *testing.T) {
+// TestEmptyTabShowsHintAndEmptyPreview は空タブで、表の領域にヒントが出て、
+// 同時にプレビュー領域の空文言も出ることを検証する。
+func TestEmptyTabShowsHintAndEmptyPreview(t *testing.T) {
 	m, _ := send(newModel(nil), fetchedMsg{res: &fetch.Result{}, at: at},
-		tea.WindowSizeMsg{Width: 60, Height: 40}, tea.KeyPressMsg{Code: 'p', Text: "p"})
+		tea.WindowSizeMsg{Width: 60, Height: 40})
 
-	if !m.showPreview {
-		t.Fatal("プレビューに切り替わっていない")
+	lines := plain(m)
+	hint, ok := indexOf(lines, "routines-setup")
+	if !ok {
+		t.Fatalf("ヒントの行が無い:\n%s", strings.Join(lines, "\n"))
 	}
-	if text := plainText(m); strings.Contains(text, "routines-setup") {
-		t.Errorf("プレビュー中にヒントが出ている:\n%s", text)
+	sep, ok := indexOf(lines, "──")
+	if !ok {
+		t.Fatalf("区切り線が無い:\n%s", strings.Join(lines, "\n"))
 	}
+	empty, ok := indexOf(lines, "（このタブにはカードがありません）")
+	if !ok {
+		t.Fatalf("プレビュー領域の空文言が無い:\n%s", strings.Join(lines, "\n"))
+	}
+	if !(hint < sep && sep < empty) {
+		t.Errorf("ヒント(%d) / 区切り線(%d) / 空文言(%d) の順序が違う:\n%s", hint, sep, empty, strings.Join(lines, "\n"))
+	}
+}
+
+// indexOf は s を含む最初の行の添字を返す。
+func indexOf(lines []string, s string) (int, bool) {
+	for i, l := range lines {
+		if strings.Contains(l, s) {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 // TestHintWidths はフッタのヒントが既定幅 80 に収まる設計どおりの表示幅であることを検証する。

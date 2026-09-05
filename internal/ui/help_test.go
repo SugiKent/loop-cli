@@ -187,8 +187,8 @@ func TestHelpListsImplementedKeys(t *testing.T) {
 	m, _ = send(m, tea.WindowSizeMsg{Width: 80, Height: 24}, questionKey)
 
 	body := helpBody(t, m)
-	if len(body) != 15 {
-		t.Fatalf("キーの行数 = %d, want 15:\n%s", len(body), strings.Join(body, "\n"))
+	if len(body) != 14 {
+		t.Fatalf("キーの行数 = %d, want 14:\n%s", len(body), strings.Join(body, "\n"))
 	}
 	if !strings.Contains(body[0], "j / k / ↑ / ↓") || !strings.Contains(body[0], "行移動（キュー）/ スクロール（詳細）") {
 		t.Errorf("1 行目 = %q", body[0])
@@ -198,7 +198,7 @@ func TestHelpListsImplementedKeys(t *testing.T) {
 		{"o", "ブラウザで開く"},
 		{"R", "全件再取得（キュー）"},
 		{"?", "ヘルプを開く / 閉じる"},
-		{"p", "表とプレビューの切替"},
+		{"PgUp / PgDn", "ページ単位のスクロール（詳細）"},
 	}
 	i := 1
 	for _, want := range wants {
@@ -216,7 +216,7 @@ func TestHelpListsImplementedKeys(t *testing.T) {
 	}
 
 	text := plainText(m)
-	for _, ng := range []string{"merge", "新規", "即着手", "カンバン", "絞り込み", "review thread"} {
+	for _, ng := range []string{"merge", "新規", "即着手", "カンバン", "絞り込み", "review thread", "表とプレビューの切替"} {
 		if strings.Contains(text, ng) {
 			t.Errorf("未実装のキーの %q が出ている:\n%s", ng, text)
 		}
@@ -251,8 +251,8 @@ func TestHelpCutsTailOnShortTerminal(t *testing.T) {
 		t.Errorf("最終行 = %q", lines[9])
 	}
 	for _, l := range lines {
-		if strings.HasPrefix(l, "p ") {
-			t.Errorf("切られるはずの p の行が出ている: %q", l)
+		if strings.HasPrefix(l, "PgUp / PgDn") {
+			t.Errorf("切られるはずの PgUp / PgDn の行が出ている: %q", l)
 		}
 	}
 }

@@ -55,20 +55,11 @@ func (m Model) render() string {
 		return m.renderHelp()
 	}
 	lines := []string{m.header()}
-	if m.twoPane() {
-		rest := max(m.height-3, 0)
-		tableH := (rest + 1) / 2
-		lines = append(lines, m.tableLines(tableH)...)
-		lines = append(lines, strings.Repeat("─", max(m.width, 0)))
-		lines = append(lines, m.previewLines(rest-tableH)...)
-	} else {
-		rest := max(m.height-2, 0)
-		if m.showPreview {
-			lines = append(lines, m.previewLines(rest)...)
-		} else {
-			lines = append(lines, m.tableLines(rest)...)
-		}
-	}
+	rest := max(m.height-3, 0)
+	tableH := (rest + 1) / 2
+	lines = append(lines, m.tableLines(tableH)...)
+	lines = append(lines, strings.Repeat("─", max(m.width, 0)))
+	lines = append(lines, m.previewLines(rest-tableH)...)
 	return strings.Join(append(lines, m.footer(m.queueHint())), "\n")
 }
 
@@ -87,14 +78,7 @@ func (m Model) renderDetail() string {
 // queueHint はキュー画面のフッタ左。
 func (m Model) queueHint() string {
 	// 移動系のキー（j / k / 1–4 / Tab）は出さず `?` のヘルプに委ねる（既定幅 80 に収めるため）。
-	hint := "Enter 開く  a 回答  t todo  o ブラウザ  R 更新  ? ヘルプ  q 終了"
-	if m.twoPane() {
-		return hint
-	}
-	if m.showPreview {
-		return hint + "  p 一覧"
-	}
-	return hint + "  p プレビュー"
+	return "Enter 開く  a 回答  t todo  o ブラウザ  R 更新  ? ヘルプ  q 終了"
 }
 
 // header はアプリ名・4 タブの件数・最終更新時刻を 1 行で書く。

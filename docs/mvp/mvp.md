@@ -75,7 +75,7 @@ issue-driven-sdd（Claude Code Routines が GitHub Issue のラベルで propose
 - 上段: キュー（タブで 4 分類）。行の色は種別で固定（質問=マゼンタ、方針=赤、merge=緑、todo 候補=シアン、異常=黄背景）。
   GitHub 側のラベル色（`question` D876E3、`blocked` B60205、`propose` 0E8A16 など）と揃える。
 - 下段: 選択行のプレビュー。Issue 本文 / PR 本文を Markdown レンダリングし、コメントは AI 発を左バーで区別する。
-- 狭い端末では上下を切り替える 1 ペイン表示にフォールバックする。
+- 端末サイズによらず常に上下 2 ペインで出す。狭い端末では表とプレビューがそれぞれ短くなる。
 
 ### カード詳細（Enter）
 
