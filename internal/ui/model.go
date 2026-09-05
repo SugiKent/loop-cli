@@ -43,6 +43,9 @@ type Model struct {
 	height      int
 	showPreview bool
 
+	screen screen
+	detail detailState
+
 	spinner spinner.Model
 }
 
@@ -75,6 +78,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		if m.screen != screenQueue {
+			m.refreshDetail()
+		}
 		return m, nil
 
 	case spinner.TickMsg:
@@ -105,15 +111,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyPressMsg:
-		return m.updateKey(msg)
+		key := msg.String()
+		if key == "q" || key == "ctrl+c" {
+			return m, tea.Quit
+		}
+		if m.screen != screenQueue {
+			return m.updateDetailKey(key), nil
+		}
+		return m.updateKey(key)
 	}
 	return m, nil
 }
 
-func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "q", "ctrl+c":
-		return m, tea.Quit
+// updateKey はキュー画面のキーを扱う。表に無いキーと後続 change のキーは何もしない。
+func (m Model) updateKey(key string) (tea.Model, tea.Cmd) {
+	switch key {
 	case "j", "down":
 		if m.cursor < len(m.rows[m.tab])-1 {
 			m.cursor++
@@ -123,7 +135,7 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.cursor--
 		}
 	case "1", "2", "3", "4":
-		m.tab = tabOrder[msg.String()[0]-'1']
+		m.tab = tabOrder[key[0]-'1']
 		m.clampCursor()
 	case "tab":
 		m.tab = tabOrder[(m.tabIndex()+1)%len(tabOrder)]
@@ -133,6 +145,8 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if !m.twoPane() {
 			m.showPreview = !m.showPreview
 		}
+	case "enter":
+		return m.openDetail(), nil
 	}
 	return m, nil
 }

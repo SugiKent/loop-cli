@@ -87,12 +87,12 @@ func TestFooterShowsOnlyImplementedKeys(t *testing.T) {
 	lines := plain(New(nil))
 	footer := lines[len(lines)-1]
 
-	for _, want := range []string{"j/k 移動", "1-4/Tab タブ", "q 終了"} {
+	for _, want := range []string{"j/k 移動", "1-4/Tab タブ", "Enter 開く", "q 終了"} {
 		if !strings.Contains(footer, want) {
 			t.Errorf("フッタに %q が無い: %q", want, footer)
 		}
 	}
-	for _, ng := range []string{"a 回答", "m merge", "Enter 開く"} {
+	for _, ng := range []string{"a 回答", "m merge", "Esc 戻る"} {
 		if strings.Contains(footer, ng) {
 			t.Errorf("フッタに未実装のキー %q がある: %q", ng, footer)
 		}

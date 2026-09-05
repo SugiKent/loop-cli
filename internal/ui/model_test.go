@@ -87,16 +87,20 @@ func TestUnimplementedKeysDoNothing(t *testing.T) {
 	base, _ = send(base, runeKey('j'))
 
 	keys := map[string]tea.Msg{
-		"enter": codeKey(tea.KeyEnter),
-		"a":     runeKey('a'), "t": runeKey('t'), "o": runeKey('o'), "R": runeKey('R'),
+		"esc": codeKey(tea.KeyEscape),
+		"a":   runeKey('a'), "t": runeKey('t'), "o": runeKey('o'), "R": runeKey('R'),
 		"?": runeKey('?'), "v": runeKey('v'), "m": runeKey('m'), "n": runeKey('n'),
-		"s": runeKey('s'), "A": runeKey('A'), "g": runeKey('g'), "/": runeKey('/'),
+		"s": runeKey('s'), "A": runeKey('A'), "g": runeKey('g'), "x": runeKey('x'),
+		"/": runeKey('/'),
 	}
 	for name, k := range keys {
 		t.Run(name, func(t *testing.T) {
 			got, cmd := send(base, k)
 			if cmd != nil {
 				t.Errorf("%s でコマンドが返った: %T", name, cmd())
+			}
+			if got.screen != screenQueue {
+				t.Errorf("%s で画面が変わった: screen=%d", name, got.screen)
 			}
 			if got.tab != base.tab || got.cursor != base.cursor || len(got.cards) != len(base.cards) {
 				t.Errorf("%s で状態が変わった: tab=%q cursor=%d cards=%d", name, got.tab, got.cursor, len(got.cards))

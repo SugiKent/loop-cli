@@ -1,0 +1,394 @@
+package ui
+
+import (
+	"fmt"
+	"regexp"
+	"slices"
+	"sort"
+	"strconv"
+	"strings"
+
+	"charm.land/bubbles/v2/viewport"
+
+	"github.com/SugiKent/sugi-loop/internal/classify"
+	"github.com/SugiKent/sugi-loop/internal/fetch"
+	"github.com/SugiKent/sugi-loop/internal/gh"
+	"github.com/SugiKent/sugi-loop/internal/model"
+)
+
+// screen は画面の状態。詳細は Model の中の状態で持ち、別 Model に委譲しない。
+type screen int
+
+const (
+	screenQueue screen = iota
+	screenCard
+	screenPR
+)
+
+// detailState は開いている詳細。Card は開いた時点のコピーで、取得完了では差し替えない。
+type detailState struct {
+	card       model.Card
+	prIdx      int
+	expanded   bool
+	fromDetail bool // PR 詳細にカード詳細から入ったか
+	vp         viewport.Model
+}
+
+// dependsOnRe は mvp.md の `depends on #m`。書式が定まっていないので行頭に限定しない。
+var dependsOnRe = regexp.MustCompile(`(?i)depends on #(\d+)`)
+
+// dependsOn は本文から depends on の issue 番号を出現順に返す。
+func dependsOn(body string) []int {
+	var out []int
+	for _, m := range dependsOnRe.FindAllStringSubmatch(body, -1) {
+		n, err := strconv.Atoi(m[1])
+		if err != nil {
+			continue
+		}
+		out = append(out, n)
+	}
+	return out
+}
+
+// prStageOrder は PR 一覧に常に出す 3 段階。
+var prStageOrder = []string{model.LabelPropose, model.LabelApply, model.LabelArchive}
+
+// openDetail は選択行の Card の詳細を開く。Issue が無ければ PR 詳細を直接開く。
+func (m Model) openDetail() Model {
+	rows := m.rows[m.tab]
+	if m.cursor >= len(rows) {
+		return m
+	}
+	card := rows[m.cursor].card
+	if card.Issue == nil && len(card.PRs) == 0 {
+		return m
+	}
+	m.detail = detailState{card: card, vp: viewport.New()}
+	if card.Issue == nil {
+		m.screen = screenPR
+	} else {
+		m.screen = screenCard
+	}
+	m.refreshDetail()
+	m.detail.vp.GotoTop()
+	return m
+}
+
+// updateDetailKey は詳細画面のキーを扱う（q / Ctrl+C は Update が先に処理する）。
+func (m Model) updateDetailKey(key string) Model {
+	switch key {
+	case "j", "down":
+		m.detail.vp.ScrollDown(1)
+	case "k", "up":
+		m.detail.vp.ScrollUp(1)
+	case "pgdown":
+		m.detail.vp.PageDown()
+	case "pgup":
+		m.detail.vp.PageUp()
+	case "x":
+		m.detail.expanded = !m.detail.expanded
+		m.refreshDetail()
+	case "esc":
+		if m.screen == screenPR && m.detail.fromDetail {
+			m.screen = screenCard
+			m.refreshDetail()
+			m.detail.vp.GotoTop()
+			break
+		}
+		m.screen = screenQueue
+	case "tab":
+		if m.screen == screenCard && len(m.detail.card.PRs) > 0 {
+			m.detail.prIdx = (m.detail.prIdx + 1) % len(m.detail.card.PRs)
+		}
+	case "enter", "g":
+		if m.screen == screenCard {
+			if len(m.detail.card.PRs) == 0 {
+				break
+			}
+			m.screen = screenPR
+			m.detail.fromDetail = true
+		} else {
+			// PR 詳細では g だけがカード詳細へ戻る。Enter は何もしない。
+			if key != "g" || m.detail.card.Issue == nil {
+				break
+			}
+			m.screen = screenCard
+		}
+		m.refreshDetail()
+		m.detail.vp.GotoTop()
+	}
+	return m
+}
+
+// refreshDetail は本文領域の内容と大きさを作り直す。View では作らない（Glamour を毎フレーム呼ばない）。
+func (m *Model) refreshDetail() {
+	_, bodyH := m.detailHeader()
+	m.detail.vp.SetWidth(max(m.width, 0))
+	m.detail.vp.SetHeight(bodyH)
+	if m.screen == screenPR {
+		m.detail.vp.SetContentLines(m.prBodyLines())
+		return
+	}
+	m.detail.vp.SetContentLines(m.cardBodyLines())
+}
+
+// detailHeader はヘッダ領域の行と本文領域の高さを返す。
+// 本文 1 行を確保できないときはカード詳細の PR 一覧を末尾から落とす。
+func (m Model) detailHeader() ([]string, int) {
+	var fixed, prs []string
+	if m.screen == screenPR {
+		fixed = m.prHeaderLines()
+	} else {
+		fixed, prs = m.cardHeaderLines(), m.prListLines()
+	}
+	keep := min(len(prs), max(m.height-2-len(fixed)-1, 0))
+	header := append(fixed, prs[:keep]...)
+	return header, max(m.height-2-len(header), 1)
+}
+
+// cardHeaderLines はカード詳細のヘッダ行（PR 一覧を除く）を mvp.md の順で作る。
+func (m Model) cardHeaderLines() []string {
+	card := m.detail.card
+	issue := card.Issue
+	lines := []string{fmt.Sprintf("%s #%d  %s", issue.Repo, issue.Number, issue.Title)}
+	if card.Result.Summary != "" {
+		lines = append(lines, card.Result.Summary)
+	}
+
+	stage := "段階なし"
+	if st := model.IssueStages(issue.Labels); len(st) > 0 {
+		stage = "段階: " + strings.Join(st, " ")
+	}
+	for _, badge := range []string{model.LabelBlocked, model.LabelWip, model.LabelQuestion} {
+		if model.HasLabel(issue.Labels, badge) {
+			stage += " [" + badge + "]"
+		}
+	}
+	lines = append(lines, stage)
+
+	if ns := dependsOn(issue.Body); len(ns) > 0 {
+		refs := make([]string, len(ns))
+		for i, n := range ns {
+			refs[i] = fmt.Sprintf("#%d", n)
+		}
+		lines = append(lines, "depends on: "+strings.Join(refs, " "))
+	}
+	return lines
+}
+
+// prListLines は紐づく PR を段階順に 1 行ずつ並べる。無い段階は `なし`、段階ラベルの無い PR は末尾。
+func (m Model) prListLines() []string {
+	prs := m.detail.card.PRs
+	var lines []string
+	for _, stage := range prStageOrder {
+		found := false
+		for i, pr := range prs {
+			if st := model.PRStages(pr.Labels); len(st) == 0 || st[0] != stage {
+				continue
+			}
+			found = true
+			lines = append(lines, m.prListRow(i, stage, pr))
+		}
+		if !found {
+			lines = append(lines, "  ["+stage+"] なし")
+		}
+	}
+	for i, pr := range prs {
+		if len(model.PRStages(pr.Labels)) == 0 {
+			lines = append(lines, m.prListRow(i, "-", pr))
+		}
+	}
+	return lines
+}
+
+// prListRow は PR 一覧の 1 行。選択中の PR には ▶ を付ける。
+func (m Model) prListRow(i int, stage string, pr model.PR) string {
+	mark := "  "
+	if i == m.detail.prIdx {
+		mark = "▶ "
+	}
+	line := fmt.Sprintf("%s[%s] PR#%d %s", mark, stage, pr.Number, prState(pr.State))
+	if pr.Canonical {
+		line += "（最新・正本）"
+	}
+	if n, ok := model.ParseUndecided(pr.Body); ok {
+		line += fmt.Sprintf(" 未確定 %d 件", n)
+	} else {
+		line += " 1 行目なし"
+	}
+	line += " labels: " + strings.Join(pr.Labels, " ")
+	switch {
+	case pr.MergeState == nil:
+		line += " checks 未取得 mergeable 未取得"
+	case classify.ChecksGreen(pr.MergeState):
+		line += " checks 緑 mergeable " + pr.MergeState.Mergeable
+	default:
+		line += " checks 緑以外 mergeable " + pr.MergeState.Mergeable
+	}
+	return line
+}
+
+// prState は PR の状態の表記。
+func prState(state string) string {
+	switch state {
+	case "OPEN":
+		return "open"
+	case "MERGED":
+		return "merged"
+	case "CLOSED":
+		return "closed"
+	}
+	return strings.ToLower(state)
+}
+
+// cardBodyLines は Issue 本文・最新 blocked-by の要約・コメント時系列を並べる。
+func (m Model) cardBodyLines() []string {
+	issue := m.detail.card.Issue
+	lines := renderMarkdown(issue.Body, m.width)
+	if c, value, ok := model.LatestBlockedBy(issue.Comments); ok {
+		lines = append(lines, "blocked-by: "+value)
+		if value == "human" {
+			lines = append(lines, questionLines(c.Body)...)
+		}
+	}
+	return append(lines, m.commentSection(issue.Comments)...)
+}
+
+// questionLines は blocked-by: human のコメントから質問と選択肢を作る。
+// 質問が 1 件も無ければ、マーカー行と blocked-by: 行を除いた本文をそのまま出す。
+func questionLines(body string) []string {
+	qs := model.ParseQuestions(body)
+	if len(qs) == 0 {
+		var rest []string
+		for _, l := range strings.Split(stripMarkers(body), "\n") {
+			if strings.HasPrefix(strings.TrimSpace(l), "blocked-by:") {
+				continue
+			}
+			rest = append(rest, l)
+		}
+		return rest
+	}
+	var lines []string
+	for _, q := range qs {
+		lines = append(lines, fmt.Sprintf("Q%d. %s", q.Number, q.Title))
+		for _, o := range q.Options {
+			if o.Recommended {
+				lines = append(lines, "  "+o.Letter+"（推奨）: "+o.Text)
+			} else {
+				lines = append(lines, "  "+o.Letter+": "+o.Text)
+			}
+		}
+	}
+	return lines
+}
+
+// commentSection はコメント時系列。nil は未取得、長さ 0 はなし（s05 が表示に委ねた区別）。
+func (m Model) commentSection(comments []model.Comment) []string {
+	if comments == nil {
+		return []string{"コメント: 未取得"}
+	}
+	if len(comments) == 0 {
+		return []string{"コメント: なし"}
+	}
+	var lines []string
+	for _, c := range comments {
+		lines = append(lines, commentBlock(c.Author, c.Body, c.CreatedAt, c.AI, m.location(), m.width, m.detail.expanded)...)
+	}
+	return lines
+}
+
+// currentPR は詳細で選択中の PR。
+func (m Model) currentPR() model.PR { return m.detail.card.PRs[m.detail.prIdx] }
+
+// prHeaderLines は PR 詳細のヘッダ 2 行。
+func (m Model) prHeaderLines() []string {
+	pr := m.currentPR()
+	stage := "-"
+	if st := model.PRStages(pr.Labels); len(st) > 0 {
+		stage = st[0]
+	}
+	return []string{
+		fmt.Sprintf("%s PR#%d  %s", pr.Repo, pr.Number, pr.Title),
+		fmt.Sprintf("[%s] %s  labels: %s", stage, prState(pr.State), strings.Join(pr.Labels, " ")),
+	}
+}
+
+// prBodyLines は 1 行目判定・紐づけ・checks・本文・会話・review thread を並べる。
+func (m Model) prBodyLines() []string {
+	pr := m.currentPR()
+	var lines []string
+	if n, ok := model.ParseUndecided(pr.Body); ok {
+		lines = append(lines, fmt.Sprintf("未確定の判断: %d 件", n))
+	} else {
+		lines = append(lines, "1 行目に未確定の判断が無い")
+	}
+	if n, ok := fetch.LinkedIssue(pr.Title, pr.Body); ok {
+		lines = append(lines, fmt.Sprintf("紐づく issue: #%d", n))
+	} else {
+		lines = append(lines, "紐づく issue: なし")
+	}
+	lines = append(lines, checkLines(pr.MergeState)...)
+	lines = append(lines, renderMarkdown(pr.Body, m.width)...)
+	lines = append(lines, m.commentSection(pr.Comments)...)
+	return append(lines, m.reviewThreadLines(pr.ReviewThreads)...)
+}
+
+// checkLines は merge 状態と checks。nil は未取得（s07 は merge 候補にしか取らない）。
+func checkLines(ms *gh.PRMergeState) []string {
+	if ms == nil {
+		return []string{"checks: 未取得"}
+	}
+	lines := []string{strings.TrimSpace("mergeable: " + ms.Mergeable + " " + ms.MergeStateStatus)}
+	if len(ms.StatusCheckRollup) == 0 {
+		return append(lines, "  checks: なし")
+	}
+	for _, c := range ms.StatusCheckRollup {
+		switch c.Typename {
+		case "CheckRun":
+			state := c.Conclusion
+			if state == "" {
+				state = c.Status
+			}
+			lines = append(lines, "  "+c.Name+": "+state)
+		case "StatusContext":
+			lines = append(lines, "  "+c.Context+": "+c.State)
+		}
+	}
+	return lines
+}
+
+// reviewThreadLines は review thread を未 resolve 先頭で並べる。thread のコメントは畳まない。
+func (m Model) reviewThreadLines(threads []gh.ReviewThread) []string {
+	if threads == nil {
+		return []string{"review thread: 未取得"}
+	}
+	if len(threads) == 0 {
+		return []string{"review thread: なし"}
+	}
+	sorted := slices.Clone(threads)
+	sort.SliceStable(sorted, func(i, j int) bool { return !sorted[i].IsResolved && sorted[j].IsResolved })
+
+	var lines []string
+	for _, th := range sorted {
+		head := "thread 未 resolve"
+		if th.IsResolved {
+			head = "thread resolved"
+		}
+		lines = append(lines, head)
+		for _, c := range th.Comments {
+			lines = append(lines, commentBlock(c.Author.Login, c.Body, c.CreatedAt, model.IsAI(c.Body), m.location(), m.width, true)...)
+		}
+	}
+	return lines
+}
+
+// detailHint は詳細画面のフッタ左。動くキーだけを出す。
+func (m Model) detailHint() string {
+	if m.screen == screenPR {
+		return "Esc 戻る  x 展開  g issue へ  j/k スクロール  q 終了"
+	}
+	if len(m.detail.card.PRs) == 0 {
+		return "Esc 戻る  x 展開  j/k スクロール  q 終了"
+	}
+	return "Esc 戻る  Tab PR 選択  Enter PR を開く  x 展開  g PR へ  j/k スクロール  q 終了"
+}

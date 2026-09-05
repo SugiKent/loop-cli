@@ -42,6 +42,9 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) render() string {
+	if m.screen != screenQueue {
+		return m.renderDetail()
+	}
 	lines := []string{m.header()}
 	if m.twoPane() {
 		rest := max(m.height-3, 0)
@@ -57,7 +60,31 @@ func (m Model) render() string {
 			lines = append(lines, m.tableLines(rest)...)
 		}
 	}
-	return strings.Join(append(lines, m.footer()), "\n")
+	return strings.Join(append(lines, m.footer(m.queueHint())), "\n")
+}
+
+// renderDetail は詳細画面を ヘッダ領域 / 区切り線 / 本文領域 / フッタ の順に描く。
+func (m Model) renderDetail() string {
+	header, _ := m.detailHeader()
+	lines := make([]string, 0, len(header)+2)
+	for _, l := range header {
+		lines = append(lines, ansi.Truncate(l, m.width, "…"))
+	}
+	lines = append(lines, strings.Repeat("─", max(m.width, 0)))
+	lines = append(lines, strings.Split(m.detail.vp.View(), "\n")...)
+	return strings.Join(append(lines, m.footer(m.detailHint())), "\n")
+}
+
+// queueHint はキュー画面のフッタ左。
+func (m Model) queueHint() string {
+	hint := "j/k 移動  1-4/Tab タブ  Enter 開く  q 終了"
+	if m.twoPane() {
+		return hint
+	}
+	if m.showPreview {
+		return hint + "  p 一覧"
+	}
+	return hint + "  p プレビュー"
 }
 
 // header はアプリ名・4 タブの件数・最終更新時刻を 1 行で書く。
@@ -141,16 +168,7 @@ func (m Model) tableRow(r row, selected bool) string {
 }
 
 // footer は左にキーヒント、右に取得状態を出す。両方が入らなければ状態を優先する。
-func (m Model) footer() string {
-	hint := "j/k 移動  1-4/Tab タブ  q 終了"
-	if !m.twoPane() {
-		if m.showPreview {
-			hint += "  p 一覧"
-		} else {
-			hint += "  p プレビュー"
-		}
-	}
-
+func (m Model) footer(hint string) string {
 	var status string
 	switch {
 	case m.fetching:
