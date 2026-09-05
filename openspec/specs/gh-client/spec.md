@@ -160,7 +160,7 @@ TBD - created by archiving change s03-gh-client. Update Purpose after archive.
 - **THEN** タイムアウト後にエラーが返り、`errors.Is(err, context.DeadlineExceeded)` が真である
 
 ### Requirement: 起動前に gh の存在と認証を確認する
-`Client` はメソッド `Check(ctx) error` を MUST 提供する。`gh` が PATH に無ければ、`gh` のインストールを促す文言を含むエラーを返す。次に `gh auth status` を実行し、非 0 で終了すれば、その stderr を含む `*Error` を返す。どちらも通れば nil を返す。`gh auth status` の実行は他のメソッドと同じ実行関数を通り、テストで差し替えられる。`Check` を呼ぶのは起動時の s07 であり、`Client` の各メソッドは毎回 `Check` を呼ばない。
+`Client` はメソッド `Check(ctx) error` を MUST 提供する。`gh` が PATH に無ければ、`gh` のインストールを促す文言を含むエラーを返す。次に `gh auth status` を実行し、非 0 で終了すれば、その stderr を含む `*Error` を返す。どちらも通れば nil を返す。`gh auth status` の実行は他のメソッドと同じ実行関数を通り、テストで差し替えられる。`Check` を呼ぶのは起動時の `cmd/sugi-loop`（s08-queue-screen が配線する。s07 は配線しなかった）であり、`Client` の各メソッドは毎回 `Check` を呼ばない。
 
 #### Scenario: gh が PATH に無い
 - **WHEN** `PATH` に `gh` が存在しない状態で `Check` を呼ぶ
