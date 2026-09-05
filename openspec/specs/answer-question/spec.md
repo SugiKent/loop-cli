@@ -9,7 +9,7 @@ TBD - created by archiving change s10-answer-question. Update Purpose after arch
 - キュー画面: 選択行の主体（s08 `Subject`。`isPR` が対象の `IsPR`）。選択行が無ければ何もしない
 - カード詳細画面: 詳細の対象の `Card.Issue`（`IsPR` は false）
 - PR 詳細画面: 詳細の対象の PR（`IsPR` は true）
-対象に `question` ラベルが付いているかどうかは問わない（mvp.md キーバインド表の `a` は「回答・コメント」であり、`question` 無しの対象へのコメントを禁じる記述が docs に無い。design.md の未決事項）。対象の `Comments` が nil（未取得）ならテンプレートは空である。書き込み（投稿・ラベル切り替え）の結果を待っている間（Requirement「投稿の結果をステータスに出し、再取得しない」、s11 `todo-toggle`「書き込み中は t と a を受け付けない」）は `a` / `t` を無視する。
+対象に `question` ラベルが付いているかどうかは問わない（mvp.md キーバインド表の `a` は「回答・コメント」であり、`question` 無しの対象へのコメントを禁じる記述が docs に無い。design.md の未決事項）。対象の `Comments` が nil（s20 以降は取得に失敗したときだけ起きる）ならテンプレートは空である。書き込み（投稿・ラベル切り替え）の結果を待っている間（Requirement「投稿の結果をステータスに出し、再取得しない」、s11 `todo-toggle`「書き込み中は t と a を受け付けない」）は `a` / `t` を無視する。
 エディタが動いている間、`Model` はキー入力を受けない（端末はエディタが使う。Bubble Tea の外部プロセス実行の仕組みに従う）。
 
 #### Scenario: キュー画面で a を押すと主体のテンプレートでエディタが開く
@@ -25,7 +25,7 @@ TBD - created by archiving change s10-answer-question. Update Purpose after arch
 - **THEN** 1 つ目の対象は `Target{Repo: "org/app", Number: 108, IsPR: false}`、2 つ目の対象は `Target{Repo: "org/app", Number: 131, IsPR: true}` であり、どちらもスタブに渡る `initial` は空文字列である（`example` のコメントは `## Q1.` の見出し形式ではない）
 
 #### Scenario: question の無い issue にも a でコメントできる
-- **WHEN** `example` の `Result` を渡してバックログタブ（issue 140。`Labels` 空、`Comments` nil）を選んだ `Model` に `a` を与える
+- **WHEN** `example` の `Result` を渡してバックログタブ（issue 140。`Labels` 空。s20 で全 issue のコメントを取るので `Comments` は長さ 0 の非 nil）を選んだ `Model` に `a` を与える
 - **THEN** コマンドが返り、対象は `Target{Repo: "org/app", Number: 140, IsPR: false}`、スタブに渡る `initial` は空文字列である
 
 ### Requirement: ExternalEditor は設定のエディタを一時ファイルで開く

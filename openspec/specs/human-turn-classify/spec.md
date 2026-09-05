@@ -9,7 +9,7 @@ TBD - created by archiving change s05-classify. Update Purpose after archive.
 2. 判定表の行を A → B → C → D → E → F → G の順（issue に当たり得るのは B / E / F、PR に当たり得るのは A / C / D / F / G）
 3. フォールバック: open PR は「その他」、issue は `question` と `blocked` の両方があれば「その他」、それ以外は「進行中」（Requirement「どの行にも当たらないものはその他バケットに入れる」）
 
-入力の前提: `Comments` / `MergeState` / `ReviewThreads` の詳細は D-001 の遅延取得に従って s07 が入れる。詳細が nil のときは、その詳細を必要とする条件は成立しない（nil の `Comments` は「最新コメントが AI」も「最新コメントが人」も偽、nil の `MergeState` は「mergeable かつ checks 緑」が偽、nil の `ReviewThreads` は「未 resolve の thread がある」が偽）。空の `Comments`（長さ 0）も同じ扱いにする。
+入力の前提: `Comments` / `MergeState` / `ReviewThreads` の詳細は、s20 `card-fetch`「Fetch は open の全 issue / 全 PR の詳細を取得する」に従って s07 が全件入れる。詳細が nil になるのは取得に失敗したときだけであり、そのときは、その詳細を必要とする条件は成立しない（nil の `Comments` は「最新コメントが AI」も「最新コメントが人」も偽、nil の `MergeState` は「mergeable かつ checks 緑」が偽、nil の `ReviewThreads` は「未 resolve の thread がある」が偽）。空の `Comments`（長さ 0）も同じ扱いにする。
 「最新コメント」は `Comments` の末尾の要素である。`PR()` は `State` が `OPEN` の PR に対して使う。`MERGED` / `CLOSED` の PR は Requirement「同段階の merge 済み PR は最新が正本」で扱い、`PR()` を呼んだ場合はゼロ値の `Situation`（`""`）を返す。
 
 #### Scenario: 進行中の除外が判定表より先に評価される
@@ -188,7 +188,7 @@ TBD - created by archiving change s05-classify. Update Purpose after archive.
 - **WHEN** `Labels` が `retro` の open PR を `PR()` に渡す
 - **THEN** `Situation` は `other` である
 
-#### Scenario: question と blocked があるのにコメント未取得の issue
+#### Scenario: question と blocked があるのにコメントが nil の issue
 - **WHEN** `Labels` が `stage:propose` と `blocked` と `question`、`Comments` が nil の issue を `Issue()` に渡す
 - **THEN** `Situation` は `other`、`Priority` は 6、`Tab` は `今やる`、`Summary` は `#<n> はどの局面にも当たらない` である（B は成立せず、進行中にも落とさない）
 
