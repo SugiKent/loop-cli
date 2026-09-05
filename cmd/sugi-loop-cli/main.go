@@ -15,6 +15,11 @@ const usage = `sugi-loop-cli は sugi-loop の動作確認用 CLI です。
   sugi-loop-cli fixture capture --repo owner/name --alias <alias>
       指定リポジトリの open issue / PR を採取し、伏せ字にして
       internal/gh/testdata/fixtures/<alias>/ に保存する（リポジトリのルートで実行する）
+  sugi-loop-cli classify --fixture <alias>
+      internal/gh/testdata/fixtures/<alias>/ の open issue / PR を分類し、4 タブ別に
+      優先 / 種別 / リポジトリ / 番号 / タイトル / 経過 をタブ区切りで出す（リポジトリのルートで実行する）
+  sugi-loop-cli notify test
+      デスクトップ通知を 1 件出す
 `
 
 func main() {
@@ -23,17 +28,27 @@ func main() {
 
 func run(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 || args[0] == "help" || args[0] == "-h" || args[0] == "--help" {
-		fmt.Fprint(stdout, usage)
+		_, _ = fmt.Fprint(stdout, usage)
 		return 0
 	}
-	if args[0] == "fixture" && len(args) > 1 && args[1] == "capture" {
-		if err := fixtureCapture(args[2:], stdout, stderr); err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		return 0
+	switch {
+	case args[0] == "fixture" && len(args) > 1 && args[1] == "capture":
+		return runSub(stderr, func() error { return fixtureCapture(args[2:], stdout, stderr) })
+	case args[0] == "classify":
+		return runSub(stderr, func() error { return classifyFixture(args[1:], stdout, stderr) })
+	case args[0] == "notify" && len(args) > 1 && args[1] == "test":
+		return runSub(stderr, func() error { return notifyTest(stdout) })
 	}
-	fmt.Fprintf(stderr, "unknown command: %s\n", args[0])
-	fmt.Fprint(stderr, usage)
+	_, _ = fmt.Fprintf(stderr, "unknown command: %s\n", args[0])
+	_, _ = fmt.Fprint(stderr, usage)
 	return 1
+}
+
+// runSub はサブコマンドを実行し、失敗を標準エラーに書いて終了コードにする。
+func runSub(stderr io.Writer, f func() error) int {
+	if err := f(); err != nil {
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
+	}
+	return 0
 }

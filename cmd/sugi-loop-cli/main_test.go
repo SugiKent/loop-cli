@@ -19,7 +19,7 @@ func TestRunHelp(t *testing.T) {
 		if code != 0 {
 			t.Errorf("%v: 終了コード = %d, want 0", args, code)
 		}
-		for _, want := range []string{"fixture capture", "--repo", "--alias"} {
+		for _, want := range []string{"fixture capture", "--repo", "--alias", "classify --fixture", "notify test"} {
 			if !strings.Contains(stdout, want) {
 				t.Errorf("%v: 標準出力に %q が無い:\n%s", args, want, stdout)
 			}
@@ -35,11 +35,15 @@ func TestRunUnknownCommand(t *testing.T) {
 		"frobnicate":  {"frobnicate"},
 		"fixture 単独":  {"fixture"},
 		"fixture foo": {"fixture", "foo"},
+		"notify 単独":   {"notify"},
+		"notify foo":  {"notify", "foo"},
 	}
 	want := map[string]string{
 		"frobnicate":  "unknown command: frobnicate",
 		"fixture 単独":  "unknown command: fixture",
 		"fixture foo": "unknown command: fixture",
+		"notify 単独":   "unknown command: notify",
+		"notify foo":  "unknown command: notify",
 	}
 	for label, args := range cases {
 		code, stdout, stderr := runCLI(t, args...)

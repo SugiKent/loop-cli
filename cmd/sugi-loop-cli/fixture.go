@@ -44,7 +44,7 @@ func fixtureCapture(args []string, stdout, stderr io.Writer) error {
 	if err := client.Check(ctx); err != nil {
 		return err
 	}
-	files, err := client.Capture(ctx, *repo, func(n string) { fmt.Fprintln(stderr, n) })
+	files, err := client.Capture(ctx, *repo, func(n string) { _, _ = fmt.Fprintln(stderr, n) })
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func fixtureCapture(args []string, stdout, stderr io.Writer) error {
 		return errors.Join(err, os.RemoveAll(dir))
 	}
 
-	fmt.Fprintf(stdout, "%s に %d ファイルを書きました（issue %d / PR %d / 伏せた login %d）\n",
+	_, _ = fmt.Fprintf(stdout, "%s に %d ファイルを書きました（issue %d / PR %d / 伏せた login %d）\n",
 		dir, len(redacted), issues, prs, logins)
 	return nil
 }
