@@ -108,7 +108,7 @@ docs に記述が無く、この change の実装者が選ぶ点。既定値を 
 | 初期フレームの内容 | 1 行目 `sugi-loop`、2 行目 `q で終了` | テストで assert できる最小 |
 | `Ctrl+C` での終了 | 終了する | 端末ツールの慣習 |
 | golangci-lint のメジャーバージョンと設定ファイル名 | v2 系、`.golangci.yml` | 現行系。設定形式が v1 と異なるので明示 |
-| golangci-lint の固定バージョン | v2.x.y（実装時にリリース一覧で確認した最新安定版を 1 つ書き、手元と CI で同一にする） | 手元と CI で結果が一致するように 1 つに固定する。`latest` は CI が突然壊れるので使わない |
+| golangci-lint の固定バージョン | v2.13.2（実装時点のリリース一覧で確認した最新安定版。手元と CI で同一にする） | 手元と CI で結果が一致するように 1 つに固定する。`latest` は CI が突然壊れるので使わない |
 | CI で golangci-lint を回すか | 回す | lint 導入が範囲内で、CI が通ることが観測手段 |
 | CI のトリガーと runner | `main` への push / `main` 向け pull_request、`ubuntu-latest` | 最小構成 |
 | `go` ディレクティブ | `go mod init` が書き出す `1.26.6` のまま | 手で `1.26` に丸めない。toolchain 解決を Go に任せる |
