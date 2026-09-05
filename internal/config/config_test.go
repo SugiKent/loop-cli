@@ -247,3 +247,16 @@ func TestDefaultPathWithoutHome(t *testing.T) {
 		t.Errorf("エラー時にパスが返った: %q", got)
 	}
 }
+
+func TestIsRepoName(t *testing.T) {
+	for _, name := range []string{"org/app"} {
+		if !config.IsRepoName(name) {
+			t.Errorf("config.IsRepoName(%q) = false, want true", name)
+		}
+	}
+	for _, name := range []string{"app", "org/app/extra", "/app", "org/", "org/ app"} {
+		if config.IsRepoName(name) {
+			t.Errorf("config.IsRepoName(%q) = true, want false", name)
+		}
+	}
+}

@@ -285,3 +285,101 @@ func TestPDoesNothingInTwoPane(t *testing.T) {
 		t.Errorf("2 ペインの p で View が変わった:\n%q\n%q", before, plainText(after))
 	}
 }
+
+// hintLine2 は空キューのヒントの 2 行目。
+const hintLine2 = "issue-driven-sdd の routines-setup を回したリポジトリを設定してください"
+
+func TestEmptyQueueShowsHint(t *testing.T) {
+	m, _ := send(newModel(nil), fetchedMsg{res: &fetch.Result{}, at: at})
+
+	text := plainText(m)
+	for _, want := range []string{"stage:* ラベルの無いリポジトリは何も出ません。", hintLine2} {
+		if !strings.Contains(text, want) {
+			t.Errorf("画面に %q が無い:\n%s", want, text)
+		}
+	}
+	if !strings.Contains(plain(m)[0], "[1]今やる 0") {
+		t.Errorf("ヘッダが従来どおりでない: %q", plain(m)[0])
+	}
+	if !strings.Contains(text, "q 終了") {
+		t.Error("フッタのキーヒントが無い")
+	}
+}
+
+func TestFetchingShowsNoHint(t *testing.T) {
+	text := plainText(newModel(nil))
+
+	if strings.Contains(text, "routines-setup") {
+		t.Errorf("取得中にヒントが出ている:\n%s", text)
+	}
+	if !strings.Contains(text, "取得中") {
+		t.Error("フッタに 取得中 が無い")
+	}
+}
+
+func TestFetchErrorShowsNoHint(t *testing.T) {
+	m, _ := send(newModel(nil), fetchedMsg{err: errors.New("search issues: gh search issues: exit 1: rate limited")})
+
+	text := plainText(m)
+	if strings.Contains(text, "routines-setup") {
+		t.Errorf("取得失敗でヒントが出ている:\n%s", text)
+	}
+	if !strings.Contains(text, "rate limited") {
+		t.Error("フッタに取得失敗が無い")
+	}
+}
+
+func TestCardsPresentShowNoHint(t *testing.T) {
+	m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at})
+
+	text := plainText(m)
+	if strings.Contains(text, "routines-setup") {
+		t.Errorf("Card があるのにヒントが出ている:\n%s", text)
+	}
+	if _, ok := lineWith(plain(m), "PR131"); !ok {
+		t.Error("表に PR131 の行が無い")
+	}
+}
+
+func TestPartialFailureWithNoCardsShowsHint(t *testing.T) {
+	res := &fetch.Result{Errors: []error{errors.New("ViewPR org/app#131: open pr-131.json: no such file")}}
+	m, _ := send(newModel(nil), fetchedMsg{res: res, at: at})
+
+	text := plainText(m)
+	for _, want := range []string{"stage:* ラベルの無いリポジトリは何も出ません。", hintLine2} {
+		if !strings.Contains(text, want) {
+			t.Errorf("画面に %q が無い:\n%s", want, text)
+		}
+	}
+	if !strings.Contains(text, "詳細取得の失敗 1 件") {
+		t.Error("フッタに部分失敗が無い")
+	}
+}
+
+func TestHintIsHorizontallyCentered(t *testing.T) {
+	m, _ := send(newModel(nil), fetchedMsg{res: &fetch.Result{}, at: at}, tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	line, ok := lineWith(plain(m), "routines-setup")
+	if !ok {
+		t.Fatal("ヒントの行が無い")
+	}
+	want := (120 - ansi.StringWidth(strings.TrimSpace(line))) / 2
+	if got := len(line) - len(strings.TrimLeft(line, " ")); got != want {
+		t.Errorf("左の空白 = %d, want %d: %q", got, want, line)
+	}
+	if strings.HasSuffix(line, " ") {
+		t.Errorf("行末に空白がある: %q", line)
+	}
+}
+
+func TestPreviewPaneShowsNoHint(t *testing.T) {
+	m, _ := send(newModel(nil), fetchedMsg{res: &fetch.Result{}, at: at},
+		tea.WindowSizeMsg{Width: 60, Height: 40}, tea.KeyPressMsg{Code: 'p', Text: "p"})
+
+	if !m.showPreview {
+		t.Fatal("プレビューに切り替わっていない")
+	}
+	if text := plainText(m); strings.Contains(text, "routines-setup") {
+		t.Errorf("プレビュー中にヒントが出ている:\n%s", text)
+	}
+}

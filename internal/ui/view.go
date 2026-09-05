@@ -130,14 +130,37 @@ func (m Model) headerLeft(shortened int, styled bool) string {
 	return "sugi-loop  " + strings.Join(parts, "  ")
 }
 
-// tableLines は現在タブの行を h 行ぶん返す。
+// emptyHint は取得成功で 0 件のときに表の領域へ出す 2 行（mvp.md「初回起動（onboarding）」）。
+var emptyHint = []string{
+	"stage:* ラベルの無いリポジトリは何も出ません。",
+	"issue-driven-sdd の routines-setup を回したリポジトリを設定してください",
+}
+
+// tableLines は現在タブの行を h 行ぶん返す。取得成功で 0 件ならヒントを縦横中央に出す。
 func (m Model) tableLines(h int) []string {
+	if len(m.cards) == 0 && !m.fetching && m.errText == "" {
+		return cut(m.emptyHintLines(h), h)
+	}
 	rows := m.rows[m.tab]
 	lines := make([]string, 0, len(rows))
 	for i, r := range rows {
 		lines = append(lines, m.tableRow(r, i == m.cursor))
 	}
 	return cut(lines, h)
+}
+
+// emptyHintLines はヒントの 2 行を上に空行を置いて縦中央にし、各行を横中央に置く。
+// 右側には空白を足さない（Lip Gloss の配置関数は右詰めの空白を足すので使わない）。
+func (m Model) emptyHintLines(h int) []string {
+	lines := make([]string, 0, h)
+	for range max((h-len(emptyHint))/2, 0) {
+		lines = append(lines, "")
+	}
+	for _, hint := range emptyHint {
+		line := strings.Repeat(" ", max((m.width-ansi.StringWidth(hint))/2, 0)) + hint
+		lines = append(lines, ansi.Truncate(line, m.width, ""))
+	}
+	return lines
 }
 
 // tableRow は 1 行を 優先 / 種別 / リポジトリ / # / タイトル / 経過 の順に組み、種別の色を付ける。

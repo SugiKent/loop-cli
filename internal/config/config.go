@@ -115,7 +115,7 @@ func validate(cfg *Config) error {
 		return errors.New("repos が空です")
 	}
 	for i, repo := range cfg.Repos {
-		if !isOwnerName(repo.Name) {
+		if !IsRepoName(repo.Name) {
 			return fmt.Errorf("repos[%d] %q: owner/name 形式ではありません", i, repo.Name)
 		}
 	}
@@ -133,7 +133,8 @@ func validate(cfg *Config) error {
 	return nil
 }
 
-func isOwnerName(name string) bool {
+// IsRepoName は owner/name 形式かを返す。Load の検証と onboarding のフォームが同じ規則を使う。
+func IsRepoName(name string) bool {
 	owner, repo, found := strings.Cut(name, "/")
 	return found && owner != "" && repo != "" && !strings.Contains(repo, "/") && !strings.ContainsAny(name, " \t")
 }
