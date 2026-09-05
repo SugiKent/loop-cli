@@ -23,6 +23,7 @@ const (
 	screenQueue screen = iota
 	screenCard
 	screenPR
+	screenConfirm
 )
 
 // detailState は開いている詳細。Card は開いた時点のコピーで、取得完了では差し替えない。
@@ -385,10 +386,10 @@ func (m Model) reviewThreadLines(threads []gh.ReviewThread) []string {
 // detailHint は詳細画面のフッタ左。動くキーだけを出す。
 func (m Model) detailHint() string {
 	if m.screen == screenPR {
-		return "Esc 戻る  x 展開  g issue へ  j/k スクロール  q 終了"
+		return "Esc 戻る  x 展開  g issue へ  a 回答  j/k スクロール  q 終了"
 	}
 	if len(m.detail.card.PRs) == 0 {
-		return "Esc 戻る  x 展開  j/k スクロール  q 終了"
+		return "Esc 戻る  x 展開  a 回答  j/k スクロール  q 終了"
 	}
-	return "Esc 戻る  Tab PR 選択  Enter PR を開く  x 展開  g PR へ  j/k スクロール  q 終了"
+	return "Esc 戻る  Tab PR 選択  Enter PR を開く  x 展開  g PR へ  a 回答  j/k スクロール  q 終了"
 }

@@ -21,7 +21,7 @@ var (
 
 // detailModel は幅 w・高さ h のサイズを与え、cards を取得完了として渡したキュー画面を返す。
 func detailModel(w, h int, cards []model.Card) Model {
-	m, _ := send(New(nil), tea.WindowSizeMsg{Width: w, Height: h}, fetchedMsg{res: &fetch.Result{Cards: cards}, at: at})
+	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: w, Height: h}, fetchedMsg{res: &fetch.Result{Cards: cards}, at: at})
 	return m
 }
 
@@ -540,7 +540,7 @@ func TestDetailFooters(t *testing.T) {
 
 	lines := linesOf(m)
 	footer := lines[len(lines)-1]
-	for _, want := range []string{"Esc 戻る", "Tab PR 選択", "x 展開", "q 終了"} {
+	for _, want := range []string{"Esc 戻る", "Tab PR 選択", "x 展開", "a 回答", "q 終了"} {
 		if !strings.Contains(footer, want) {
 			t.Errorf("カード詳細のフッタに %q が無い: %q", want, footer)
 		}

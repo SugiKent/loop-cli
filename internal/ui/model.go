@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/SugiKent/sugi-loop/internal/fetch"
+	"github.com/SugiKent/sugi-loop/internal/gh"
 	"github.com/SugiKent/sugi-loop/internal/model"
 )
 
@@ -28,6 +29,8 @@ var tabOrder = []model.Tab{model.TabNow, model.TabBacklog, model.TabInProgress, 
 // Model は今やるキュー画面。壁時計は読まず、経過は最後の取得完了時刻を基準にする。
 type Model struct {
 	fetcher Fetcher
+	client  gh.GHClient
+	editor  Editor
 	cards   []model.Card
 	rows    map[model.Tab][]row
 
@@ -46,13 +49,21 @@ type Model struct {
 	screen screen
 	detail detailState
 
+	answer          answerState
+	posting         bool
+	answerStatus    string
+	answerStatusErr bool
+
 	spinner spinner.Model
 }
 
 // New は取得前の Model を返す。初期状態は常に「これから取得する」。
-func New(fetcher Fetcher) Model {
+// client は回答の投稿に、editor は下書きの編集に使う。
+func New(fetcher Fetcher, client gh.GHClient, editor Editor) Model {
 	return Model{
 		fetcher:  fetcher,
+		client:   client,
+		editor:   editor,
 		rows:     buildRows(nil),
 		tab:      model.TabNow,
 		fetching: true,
@@ -78,7 +89,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		if m.screen != screenQueue {
+		if m.screen == screenCard || m.screen == screenPR {
 			m.refreshDetail()
 		}
 		return m, nil
@@ -110,10 +121,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.clampCursor()
 		return m, nil
 
+	case editedMsg:
+		return m.updateEdited(msg)
+
+	case postedMsg:
+		return m.updatePosted(msg), nil
+
 	case tea.KeyPressMsg:
 		key := msg.String()
 		if key == "q" || key == "ctrl+c" {
 			return m, tea.Quit
+		}
+		if m.screen == screenConfirm {
+			return m.updateConfirmKey(key)
+		}
+		// a は 3 画面すべてで効き、対象は画面が見せているものに決まる。
+		if key == "a" {
+			return m.answerKey()
 		}
 		if m.screen != screenQueue {
 			return m.updateDetailKey(key), nil

@@ -2,9 +2,12 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
+
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/SugiKent/sugi-loop/internal/fetch"
 	"github.com/SugiKent/sugi-loop/internal/gh"
@@ -13,6 +16,29 @@ import (
 
 // at は画面のテストで使う取得完了時刻（mvp.md の画面例の 12:04）。
 var at = time.Date(2026, 9, 5, 12, 4, 0, 0, time.FixedZone("JST", 9*3600))
+
+// fixtureDir は example fixture の場所。
+const fixtureDir = "../gh/testdata/fixtures/example"
+
+// newModel は回答を使わない画面のテスト用の Model。
+// エディタは押されない前提だが、nil で落ちないようにエラーを返すスタブを入れる。
+func newModel(fetcher Fetcher) Model {
+	return New(fetcher, gh.NewFake(fixtureDir), (&stubEditor{msg: editedMsg{err: errors.New("使わない")}}).Editor)
+}
+
+// stubEditor はエディタを起動せず固定の結果を返す Editor。渡された下書きを記録する。
+type stubEditor struct {
+	initial string
+	calls   int
+	msg     editedMsg
+}
+
+func (s *stubEditor) Editor(initial string) tea.Cmd {
+	s.initial = initial
+	s.calls++
+	msg := s.msg
+	return func() tea.Msg { return msg }
+}
 
 // exampleResult は example fixture から s07 の Fetch で作った Result。
 func exampleResult(t *testing.T) *fetch.Result {

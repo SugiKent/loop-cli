@@ -41,9 +41,10 @@ func run() error {
 		repos[i] = r.Name
 	}
 
+	// editor が空でも起動は失敗させない（a を押したときにフッタにエラーが出る）。
 	m := ui.New(func(ctx context.Context) (*fetch.Result, error) {
 		return fetch.Fetch(ctx, client, repos)
-	})
+	}, client, ui.ExternalEditor(cfg.Editor))
 	_, err = tea.NewProgram(m).Run()
 	return err
 }

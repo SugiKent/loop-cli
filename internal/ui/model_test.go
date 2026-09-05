@@ -31,7 +31,7 @@ func send(m Model, msgs ...tea.Msg) (Model, tea.Cmd) {
 
 // loaded は Card 群を取得完了として渡した Model を返す。
 func loaded(cards []model.Card) Model {
-	m, _ := send(New(nil), fetchedMsg{res: &fetch.Result{Cards: cards}, at: at})
+	m, _ := send(newModel(nil), fetchedMsg{res: &fetch.Result{Cards: cards}, at: at})
 	return m
 }
 
@@ -70,7 +70,7 @@ func TestCursorStopsAtEnds(t *testing.T) {
 }
 
 func TestTabSwitching(t *testing.T) {
-	m := New(nil)
+	m := newModel(nil)
 
 	keys := []tea.Msg{runeKey('2'), runeKey('4'), codeKey(tea.KeyTab), runeKey('1'), runeKey('3')}
 	want := []model.Tab{model.TabBacklog, model.TabAbnormal, model.TabNow, model.TabNow, model.TabInProgress}
@@ -88,7 +88,7 @@ func TestUnimplementedKeysDoNothing(t *testing.T) {
 
 	keys := map[string]tea.Msg{
 		"esc": codeKey(tea.KeyEscape),
-		"a":   runeKey('a'), "t": runeKey('t'), "o": runeKey('o'), "R": runeKey('R'),
+		"t":   runeKey('t'), "o": runeKey('o'), "R": runeKey('R'),
 		"?": runeKey('?'), "v": runeKey('v'), "m": runeKey('m'), "n": runeKey('n'),
 		"s": runeKey('s'), "A": runeKey('A'), "g": runeKey('g'), "x": runeKey('x'),
 		"/": runeKey('/'),
@@ -115,7 +115,7 @@ func TestQuitKeys(t *testing.T) {
 		"ctrl+c": key(tea.Key{Code: 'c', Mod: tea.ModCtrl}),
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, cmd := send(New(nil), k)
+			_, cmd := send(newModel(nil), k)
 			if cmd == nil {
 				t.Fatalf("%s で終了コマンドが返らなかった", name)
 			}
@@ -157,7 +157,7 @@ func TestFetchCmdRunsFetcherOnce(t *testing.T) {
 	if !ok {
 		t.Fatalf("返ったメッセージが fetchedMsg でない: %T", msg)
 	}
-	m, _ := send(New(fetcher), fetched)
+	m, _ := send(newModel(fetcher), fetched)
 	if len(m.cards) != len(res.Cards) {
 		t.Errorf("Cards が入っていない: %d 件, want %d 件", len(m.cards), len(res.Cards))
 	}
@@ -167,7 +167,7 @@ func TestFetchCmdRunsFetcherOnce(t *testing.T) {
 }
 
 func TestFetchErrorKeepsPreviousCards(t *testing.T) {
-	m, _ := send(New(nil), fetchedMsg{res: exampleResult(t), at: at})
+	m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at})
 	before := len(m.cards)
 
 	m, _ = send(m, fetchedMsg{err: errors.New("search issues: gh search issues: exit 1: rate limited"), at: at.Add(time.Hour)})
@@ -184,7 +184,7 @@ func TestFetchErrorKeepsPreviousCards(t *testing.T) {
 }
 
 func TestFirstFetchError(t *testing.T) {
-	m, _ := send(New(nil), fetchedMsg{err: errors.New("boom"), at: at})
+	m, _ := send(newModel(nil), fetchedMsg{err: errors.New("boom"), at: at})
 
 	if len(m.cards) != 0 {
 		t.Errorf("初回失敗で Cards が入った: %d 件", len(m.cards))

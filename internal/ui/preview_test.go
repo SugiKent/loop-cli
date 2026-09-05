@@ -13,7 +13,7 @@ import (
 // wide は 2 ペインが崩れない大きさで example を読み込んだ Model を返す。
 func wide(t *testing.T) Model {
 	t.Helper()
-	m, _ := send(New(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: exampleResult(t), at: at})
+	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: exampleResult(t), at: at})
 	return m
 }
 
@@ -50,7 +50,7 @@ func TestPreviewOfHumanCommentHasNoBar(t *testing.T) {
 	card := nowCard("org/app", 1, 1, at)
 	card.Issue.Body = "本文"
 	card.Issue.Comments = []model.Comment{{Author: "user-2", Body: "Q1: A", CreatedAt: at, AI: false}}
-	m, _ := send(New(nil), tea.WindowSizeMsg{Width: 120, Height: 40},
+	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: 120, Height: 40},
 		fetchedMsg{res: &fetch.Result{Cards: []model.Card{card}}, at: at})
 
 	lines := plain(m)

@@ -44,7 +44,7 @@ func order(t *testing.T, s string, subs ...string) {
 }
 
 func TestHeaderCountsAndTime(t *testing.T) {
-	m, _ := send(New(nil), fetchedMsg{res: exampleResult(t), at: at})
+	m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at})
 
 	header := plain(m)[0]
 
@@ -56,7 +56,7 @@ func TestHeaderCountsAndTime(t *testing.T) {
 }
 
 func TestHeaderShortensTabNamesFromRight(t *testing.T) {
-	m, _ := send(New(nil), fetchedMsg{res: exampleResult(t), at: at}, tea.WindowSizeMsg{Width: 60, Height: 40})
+	m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at}, tea.WindowSizeMsg{Width: 60, Height: 40})
 
 	header := plain(m)[0]
 
@@ -73,7 +73,7 @@ func TestHeaderShortensTabNamesFromRight(t *testing.T) {
 }
 
 func TestHeaderBeforeFirstFetch(t *testing.T) {
-	header := plain(New(nil))[0]
+	header := plain(newModel(nil))[0]
 
 	if !strings.Contains(header, "sugi-loop") {
 		t.Errorf("ヘッダにアプリ名が無い: %q", header)
@@ -84,15 +84,15 @@ func TestHeaderBeforeFirstFetch(t *testing.T) {
 }
 
 func TestFooterShowsOnlyImplementedKeys(t *testing.T) {
-	lines := plain(New(nil))
+	lines := plain(newModel(nil))
 	footer := lines[len(lines)-1]
 
-	for _, want := range []string{"j/k 移動", "1-4/Tab タブ", "Enter 開く", "q 終了"} {
+	for _, want := range []string{"j/k 移動", "1-4/Tab タブ", "Enter 開く", "a 回答", "q 終了"} {
 		if !strings.Contains(footer, want) {
 			t.Errorf("フッタに %q が無い: %q", want, footer)
 		}
 	}
-	for _, ng := range []string{"a 回答", "m merge", "Esc 戻る"} {
+	for _, ng := range []string{"m merge", "Esc 戻る"} {
 		if strings.Contains(footer, ng) {
 			t.Errorf("フッタに未実装のキー %q がある: %q", ng, footer)
 		}
@@ -101,7 +101,7 @@ func TestFooterShowsOnlyImplementedKeys(t *testing.T) {
 
 func TestRowOfQuestionCard(t *testing.T) {
 	res := exampleResult(t)
-	m, _ := send(New(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: res, at: at})
+	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: res, at: at})
 
 	line, ok := lineWith(plain(m), "PR131")
 	if !ok {
@@ -111,7 +111,7 @@ func TestRowOfQuestionCard(t *testing.T) {
 }
 
 func TestRowOfBacklogCard(t *testing.T) {
-	m, _ := send(New(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: exampleResult(t), at: at}, runeKey('2'))
+	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: exampleResult(t), at: at}, runeKey('2'))
 
 	line, ok := lineWith(plain(m), "#140")
 	if !ok {
@@ -123,7 +123,7 @@ func TestRowOfBacklogCard(t *testing.T) {
 func TestLongTitleIsTruncated(t *testing.T) {
 	card := nowCard("org/app", 1, 1, at)
 	card.Issue.Title = strings.Repeat("長いタイトル", 40)
-	m, _ := send(New(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: &fetch.Result{Cards: []model.Card{card}}, at: at})
+	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: &fetch.Result{Cards: []model.Card{card}}, at: at})
 
 	line, ok := lineWith(plain(m), "長いタイトル")
 	if !ok {
@@ -139,7 +139,7 @@ func TestLongTitleIsTruncated(t *testing.T) {
 
 func TestSelectedRowHasMarker(t *testing.T) {
 	cards := threeNowCards()[:2]
-	m, _ := send(New(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: &fetch.Result{Cards: cards}, at: at})
+	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: &fetch.Result{Cards: cards}, at: at})
 
 	lines := plain(m)
 	first, second := lines[1], lines[2]
@@ -155,7 +155,7 @@ func TestSelectedRowHasMarker(t *testing.T) {
 func TestElapsedColumnUsesFetchTime(t *testing.T) {
 	fetchedAt := time.Date(2026, 9, 5, 12, 4, 0, 0, time.UTC)
 	card := nowCard("org/app", 7, 1, time.Date(2026, 9, 5, 9, 0, 0, 0, time.UTC))
-	m, _ := send(New(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: &fetch.Result{Cards: []model.Card{card}}, at: fetchedAt})
+	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: &fetch.Result{Cards: []model.Card{card}}, at: fetchedAt})
 
 	line, ok := lineWith(plain(m), "#7")
 	if !ok {
@@ -167,7 +167,7 @@ func TestElapsedColumnUsesFetchTime(t *testing.T) {
 }
 
 func TestFooterShowsSpinnerBeforeFirstFetch(t *testing.T) {
-	m := New(nil)
+	m := newModel(nil)
 	m.Init()
 
 	lines := plain(m)
@@ -181,7 +181,7 @@ func TestFooterShowsSpinnerBeforeFirstFetch(t *testing.T) {
 }
 
 func TestFooterAfterSuccessHasNoSpinner(t *testing.T) {
-	m, _ := send(New(nil), fetchedMsg{res: exampleResult(t), at: at})
+	m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at})
 
 	if strings.Contains(plainText(m), "取得中") {
 		t.Errorf("取得完了後に 取得中 が残っている: %q", plainText(m))
@@ -189,7 +189,7 @@ func TestFooterAfterSuccessHasNoSpinner(t *testing.T) {
 }
 
 func TestFooterShowsFetchError(t *testing.T) {
-	m, _ := send(New(nil),
+	m, _ := send(newModel(nil),
 		fetchedMsg{res: exampleResult(t), at: at},
 		fetchedMsg{err: errors.New("search issues: gh search issues: exit 1: rate limited"), at: at.Add(time.Hour)})
 
@@ -218,7 +218,7 @@ func TestFooterShowsPartialFailure(t *testing.T) {
 			errors.New("ViewIssue org/app#108: open issue-108.json: no such file"),
 		},
 	}
-	m, _ := send(New(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: res, at: at})
+	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: res, at: at})
 
 	lines := plain(m)
 	if _, ok := lineWith(lines, "#1"); !ok {
@@ -230,7 +230,7 @@ func TestFooterShowsPartialFailure(t *testing.T) {
 }
 
 func TestTwoPaneShowsTableAndPreview(t *testing.T) {
-	m, _ := send(New(nil), fetchedMsg{res: exampleResult(t), at: at}, tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at}, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	text := plainText(m)
 
@@ -240,7 +240,8 @@ func TestTwoPaneShowsTableAndPreview(t *testing.T) {
 }
 
 func TestNarrowTerminalTogglesWithP(t *testing.T) {
-	m, _ := send(New(nil), fetchedMsg{res: exampleResult(t), at: at}, tea.WindowSizeMsg{Width: 60, Height: 40})
+	// 幅 79 は 2 ペインの下限（80）を下回る 1 ペイン。ヒント全体が切られない幅を選ぶ。
+	m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at}, tea.WindowSizeMsg{Width: 79, Height: 40})
 
 	text := plainText(m)
 	if !strings.Contains(text, "PR131") || strings.Contains(text, "issue #108 の提案") {
@@ -262,7 +263,7 @@ func TestNarrowTerminalTogglesWithP(t *testing.T) {
 }
 
 func TestShortTerminalIsOnePane(t *testing.T) {
-	m, _ := send(New(nil), fetchedMsg{res: exampleResult(t), at: at}, tea.WindowSizeMsg{Width: 120, Height: 15})
+	m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at}, tea.WindowSizeMsg{Width: 120, Height: 15})
 
 	text := plainText(m)
 
@@ -272,7 +273,7 @@ func TestShortTerminalIsOnePane(t *testing.T) {
 }
 
 func TestPDoesNothingInTwoPane(t *testing.T) {
-	m, _ := send(New(nil), fetchedMsg{res: exampleResult(t), at: at}, tea.WindowSizeMsg{Width: 120, Height: 40})
+	m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at}, tea.WindowSizeMsg{Width: 120, Height: 40})
 	before := plainText(m)
 
 	after, cmd := send(m, runeKey('p'))
