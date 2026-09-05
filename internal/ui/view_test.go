@@ -417,3 +417,21 @@ func TestHintWidths(t *testing.T) {
 		t.Errorf("カード詳細の `? ヘルプ` が %d 列目で終わる, want 65: %q", end, hint)
 	}
 }
+
+// TestViewRequestsAltScreen は再描画でフレームが積み上がらないよう、
+// View が alt screen を要求することを検証する。
+func TestViewRequestsAltScreen(t *testing.T) {
+	m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at})
+
+	if !m.View().AltScreen {
+		t.Error("キュー画面の View が alt screen を要求していない")
+	}
+
+	m, _ = send(m, questionKey)
+	if m.screen != screenHelp {
+		t.Fatalf("画面 = %d, want ヘルプ", m.screen)
+	}
+	if !m.View().AltScreen {
+		t.Error("ヘルプ画面の View が alt screen を要求していない")
+	}
+}

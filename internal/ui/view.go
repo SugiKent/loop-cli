@@ -38,7 +38,11 @@ var (
 )
 
 func (m Model) View() tea.View {
-	return tea.NewView(m.render())
+	// v2 では alt screen を tea.View で要求する。インライン描画のままだと
+	// 端末高と同じ高さのフレームが再描画のたびに積み上がる。
+	v := tea.NewView(m.render())
+	v.AltScreen = true
+	return v
 }
 
 func (m Model) render() string {
