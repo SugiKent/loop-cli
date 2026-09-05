@@ -127,7 +127,7 @@ type Comment struct {
 	AI        bool
 }
 
-// Issue は分類対象の issue。Comments は作成順で末尾が最新、nil は詳細未取得。
+// Issue は分類対象の issue。Comments は作成順で末尾が最新、nil は詳細の取得失敗。
 type Issue struct {
 	Repo      string
 	Number    int
@@ -141,7 +141,7 @@ type Issue struct {
 }
 
 // PR は分類対象の PR。State は OPEN / MERGED / CLOSED。
-// MergeState / ReviewThreads の nil は詳細未取得。Canonical は同段階の merge 済み PR の正本の印。
+// MergeState / ReviewThreads の nil は詳細の取得失敗。Canonical は同段階の merge 済み PR の正本の印。
 type PR struct {
 	Repo          string
 	Number        int
