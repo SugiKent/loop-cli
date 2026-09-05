@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -88,8 +89,7 @@ func TestUnimplementedKeysDoNothing(t *testing.T) {
 
 	keys := map[string]tea.Msg{
 		"esc": codeKey(tea.KeyEscape),
-		"o":   runeKey('o'), "R": runeKey('R'),
-		"?": runeKey('?'), "v": runeKey('v'), "m": runeKey('m'), "n": runeKey('n'),
+		"v":   runeKey('v'), "m": runeKey('m'), "n": runeKey('n'),
 		"s": runeKey('s'), "A": runeKey('A'), "g": runeKey('g'), "x": runeKey('x'),
 		"/": runeKey('/'),
 	}
@@ -194,5 +194,200 @@ func TestFirstFetchError(t *testing.T) {
 	}
 	if m.errText != "boom" {
 		t.Errorf("errText = %q, want %q", m.errText, "boom")
+	}
+}
+
+// countingFetcher は呼ばれた回数を数えて res を返す Fetcher を作る。
+func countingFetcher(res *fetch.Result, n *int) Fetcher {
+	return func(context.Context) (*fetch.Result, error) {
+		*n++
+		return res, nil
+	}
+}
+
+// runBatch はコマンドを実行し、複数コマンドの束ならその各コマンドも実行してメッセージを返す。
+func runBatch(t *testing.T, cmd tea.Cmd) []tea.Msg {
+	t.Helper()
+	if cmd == nil {
+		t.Fatal("コマンドが返っていない")
+	}
+	msg := cmd()
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		return []tea.Msg{msg}
+	}
+	var msgs []tea.Msg
+	for _, c := range batch {
+		msgs = append(msgs, c())
+	}
+	return msgs
+}
+
+// fetchedOf は束のメッセージから取得完了を 1 つ取り出す。
+func fetchedOf(t *testing.T, msgs []tea.Msg) fetchedMsg {
+	t.Helper()
+	for _, msg := range msgs {
+		if f, ok := msg.(fetchedMsg); ok {
+			return f
+		}
+	}
+	t.Fatalf("束に fetchedMsg が無い: %T", msgs)
+	return fetchedMsg{}
+}
+
+var rKey = runeKey('R')
+
+// TestRefreshFetchesAgain は R で Fetcher がもう一度呼ばれ、結果が反映されることを検証する。
+func TestRefreshFetchesAgain(t *testing.T) {
+	res := exampleResult(t)
+	n := 0
+	m, _ := send(newModel(countingFetcher(res, &n)), fetchedMsg{res: &fetch.Result{}, at: at})
+	if n != 0 {
+		t.Fatalf("前提が崩れている: Fetcher 呼び出し = %d", n)
+	}
+
+	m, cmd := send(m, rKey)
+	if cmd == nil {
+		t.Fatal("R でコマンドが返っていない")
+	}
+	if !m.fetching {
+		t.Error("R の後に fetching が false")
+	}
+	if !strings.Contains(plainText(m), "取得中") {
+		t.Errorf("取得中が出ていない: %q", footerOf(plainText(m)))
+	}
+
+	m, _ = send(m, fetchedOf(t, runBatch(t, cmd)))
+
+	if n != 1 {
+		t.Errorf("Fetcher 呼び出し = %d, want 1", n)
+	}
+	if len(m.cards) != len(res.Cards) {
+		t.Errorf("Cards = %d 件, want %d 件", len(m.cards), len(res.Cards))
+	}
+	if m.fetching {
+		t.Error("取得完了後も fetching が true")
+	}
+}
+
+// TestRefreshIsIgnoredWhileFetching は取得中の R が多重発行しないことを検証する。
+func TestRefreshIsIgnoredWhileFetching(t *testing.T) {
+	n := 0
+	fetcher := countingFetcher(exampleResult(t), &n)
+
+	if _, cmd := send(newModel(fetcher), rKey); cmd != nil {
+		t.Errorf("初回取得中の R でコマンドが返った: %T", cmd())
+	}
+
+	m, _ := send(newModel(fetcher), fetchedMsg{res: &fetch.Result{}, at: at})
+	m, cmd := send(m, rKey)
+	if cmd == nil {
+		t.Fatal("1 回目の R でコマンドが返っていない")
+	}
+	if _, second := send(m, rKey); second != nil {
+		t.Errorf("取得中の R でコマンドが返った: %T", second())
+	}
+	if n != 0 {
+		t.Errorf("コマンドを実行していないのに Fetcher が呼ばれた: %d 回", n)
+	}
+}
+
+// TestRefreshClearsErrorAndWriteStatus は R が前回のエラーと書き込みステータスを消し、
+// 前回結果は取得の完了まで残すことを検証する。
+func TestRefreshClearsErrorAndWriteStatus(t *testing.T) {
+	m, _ := exampleTodoModel(t)
+	m, _ = send(m, fetchedMsg{err: errors.New("search issues: gh search issues: exit 1: rate limited"), at: at})
+	m, _ = send(m, runeKey('2'))
+	m, cmd := send(m, tKey)
+	m, _ = runCmd(t, m, cmd)
+	if !strings.Contains(plainText(m), "付けました") {
+		t.Fatalf("前提が崩れている: %q", footerOf(plainText(m)))
+	}
+
+	m, _ = send(m, runeKey('1'), rKey)
+
+	text := plainText(m)
+	if !strings.Contains(text, "取得中") {
+		t.Errorf("取得中が出ていない: %q", footerOf(text))
+	}
+	for _, ng := range []string{"rate limited", "付けました"} {
+		if strings.Contains(text, ng) {
+			t.Errorf("R の後に %q が残っている: %q", ng, footerOf(text))
+		}
+	}
+	for _, want := range []string{"PR131", "↻ 12:04"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("前回結果の %q が消えた", want)
+		}
+	}
+}
+
+// TestRefreshFailureKeepsPreviousResult は再取得の失敗が前回結果を残すことを検証する。
+func TestRefreshFailureKeepsPreviousResult(t *testing.T) {
+	m, _ := exampleTodoModel(t)
+	m, _ = send(m, runeKey('2'))
+	m, cmd := send(m, tKey)
+	m, _ = runCmd(t, m, cmd)
+
+	m, _ = send(m, runeKey('1'), rKey,
+		fetchedMsg{err: errors.New("search issues: gh search issues: exit 1: rate limited"), at: at.Add(time.Hour)})
+
+	text := plainText(m)
+	for _, want := range []string{"PR131", "↻ 12:04", "rate limited"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("%q が無い: %q", want, footerOf(text))
+		}
+	}
+	for _, ng := range []string{"付けました", "取得中"} {
+		if strings.Contains(text, ng) {
+			t.Errorf("失敗の後に %q が残っている: %q", ng, footerOf(text))
+		}
+	}
+}
+
+// TestRefreshKeepsCursor は再取得で選択行が先頭に戻らないことを検証する。
+func TestRefreshKeepsCursor(t *testing.T) {
+	cards := threeNowCards()
+	m := loaded(cards)
+	m, _ = send(m, runeKey('j'), runeKey('j'))
+	if m.cursor != 2 {
+		t.Fatalf("前提が崩れている: cursor = %d", m.cursor)
+	}
+
+	m, _ = send(m, rKey, fetchedMsg{res: &fetch.Result{Cards: cards}, at: at.Add(time.Hour)})
+
+	if m.cursor != 2 {
+		t.Errorf("再取得で選択行が動いた: cursor = %d, want 2", m.cursor)
+	}
+}
+
+// TestRefreshDoesNothingOutsideQueue はキュー画面以外の R が何もしないことを検証する。
+func TestRefreshDoesNothingOutsideQueue(t *testing.T) {
+	res := exampleResult(t)
+	n := 0
+	base, _ := send(newModel(countingFetcher(res, &n)),
+		tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: res, at: at})
+
+	card, _ := send(base, enterKey)
+	pr, _ := send(card, enterKey)
+	help, _ := send(base, questionKey)
+	confirm, _ := confirmModel(t)
+
+	for name, m := range map[string]Model{"カード詳細": card, "PR 詳細": pr, "ヘルプ": help, "確認": confirm} {
+		t.Run(name, func(t *testing.T) {
+			got, cmd := send(m, rKey)
+			if cmd != nil {
+				t.Errorf("R でコマンドが返った: %T", cmd())
+			}
+			if got.screen != m.screen {
+				t.Errorf("R で画面が変わった: screen = %d", got.screen)
+			}
+			if got.fetching {
+				t.Error("R で fetching が true になった")
+			}
+		})
+	}
+	if n != 0 {
+		t.Errorf("Fetcher が呼ばれた: %d 回", n)
 	}
 }

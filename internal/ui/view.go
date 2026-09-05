@@ -47,6 +47,8 @@ func (m Model) render() string {
 		return m.renderConfirm()
 	case screenCard, screenPR:
 		return m.renderDetail()
+	case screenHelp:
+		return m.renderHelp()
 	}
 	lines := []string{m.header()}
 	if m.twoPane() {
@@ -80,7 +82,8 @@ func (m Model) renderDetail() string {
 
 // queueHint はキュー画面のフッタ左。
 func (m Model) queueHint() string {
-	hint := "j/k 移動  1-4/Tab タブ  Enter 開く  a 回答  t todo  q 終了"
+	// 移動系のキー（j / k / 1–4 / Tab）は出さず `?` のヘルプに委ねる（既定幅 80 に収めるため）。
+	hint := "Enter 開く  a 回答  t todo  o ブラウザ  R 更新  ? ヘルプ  q 終了"
 	if m.twoPane() {
 		return hint
 	}

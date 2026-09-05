@@ -110,8 +110,12 @@ func TestEnterOnEmptyTabDoesNothing(t *testing.T) {
 
 func TestQueueKeysDoNothingInDetail(t *testing.T) {
 	m, _ := send(detailModel(120, 40, exampleResult(t).Cards), enterKey)
-	for _, k := range []tea.Msg{runeKey('2'), runeKey('4'), runeKey('p')} {
-		m, _ = send(m, k)
+	for _, k := range []tea.Msg{runeKey('2'), runeKey('4'), runeKey('p'), runeKey('R')} {
+		var cmd tea.Cmd
+		m, cmd = send(m, k)
+		if cmd != nil {
+			t.Fatalf("詳細でキュー画面のキーがコマンドを返した: %T", cmd())
+		}
 		if m.screen != screenCard {
 			t.Fatalf("詳細でキュー画面のキーが効いた: screen %d", m.screen)
 		}
@@ -536,28 +540,30 @@ func TestScrollResetsWhenMovingBetweenScreens(t *testing.T) {
 }
 
 func TestDetailFooters(t *testing.T) {
-	m, _ := send(detailModel(100, 20, []model.Card{longBodyCard()}), enterKey)
+	m, _ := send(detailModel(120, 40, []model.Card{longBodyCard()}), enterKey)
 
 	lines := linesOf(m)
 	footer := lines[len(lines)-1]
-	for _, want := range []string{"Esc 戻る", "Tab PR 選択", "x 展開", "a 回答", "t todo", "q 終了"} {
+	for _, want := range []string{"Esc 戻る", "Tab PR 選択", "x 展開", "a 回答", "t todo", "o ブラウザ", "? ヘルプ", "q 終了"} {
 		if !strings.Contains(footer, want) {
 			t.Errorf("カード詳細のフッタに %q が無い: %q", want, footer)
 		}
 	}
-	if strings.Contains(footer, "1-4/Tab タブ") {
-		t.Errorf("カード詳細のフッタにキュー画面のヒントがある: %q", footer)
+	for _, ng := range []string{"1-4/Tab タブ", "R 更新", "j/k スクロール"} {
+		if strings.Contains(footer, ng) {
+			t.Errorf("カード詳細のフッタに %q がある: %q", ng, footer)
+		}
 	}
 
 	m, _ = send(m, enterKey)
 	lines = linesOf(m)
 	footer = lines[len(lines)-1]
-	for _, want := range []string{"Esc 戻る", "g issue へ"} {
+	for _, want := range []string{"Esc 戻る", "g issue へ", "a 回答", "o ブラウザ", "? ヘルプ", "q 終了"} {
 		if !strings.Contains(footer, want) {
 			t.Errorf("PR 詳細のフッタに %q が無い: %q", want, footer)
 		}
 	}
-	for _, ng := range []string{"Tab PR 選択", "t todo"} {
+	for _, ng := range []string{"Tab PR 選択", "t todo", "R 更新"} {
 		if strings.Contains(footer, ng) {
 			t.Errorf("PR 詳細のフッタに %q がある: %q", ng, footer)
 		}
@@ -573,7 +579,7 @@ func TestFooterWithoutPRs(t *testing.T) {
 
 	lines := linesOf(m)
 	footer := lines[len(lines)-1]
-	for _, want := range []string{"Esc 戻る", "x 展開", "t todo"} {
+	for _, want := range []string{"Esc 戻る", "x 展開", "t todo", "o ブラウザ"} {
 		if !strings.Contains(footer, want) {
 			t.Errorf("フッタに %q が無い: %q", want, footer)
 		}

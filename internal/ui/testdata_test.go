@@ -70,3 +70,14 @@ func nowCard(repo string, number int, priority int, updatedAt time.Time) model.C
 }
 
 func contains(s, sub string) bool { return strings.Contains(s, sub) }
+
+// confirmModel は s10 の手順（blocked-by 行のある下書き）で確認画面に移った Model と投稿先の Fake を返す。
+func confirmModel(t *testing.T) (Model, *gh.Fake) {
+	t.Helper()
+	m, fake := answerModel([]model.Card{prCard(nil)}, &stubEditor{msg: editedMsg{text: "Q1: A\n  blocked-by: human"}})
+	m, _ = answer(t, m)
+	if m.screen != screenConfirm {
+		t.Fatalf("確認画面に移っていない: screen = %d", m.screen)
+	}
+	return m, fake
+}

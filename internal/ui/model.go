@@ -46,8 +46,9 @@ type Model struct {
 	height      int
 	showPreview bool
 
-	screen screen
-	detail detailState
+	screen   screen
+	detail   detailState
+	helpFrom screen // ヘルプ画面を開いた画面。? / Esc で戻る先
 
 	answer         answerState
 	writing        bool
@@ -82,6 +83,16 @@ func fetchCmd(fetcher Fetcher) tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
+	return tea.Batch(m.spinner.Tick, fetchCmd(m.fetcher))
+}
+
+// startFetch は 2 回目以降の取得を始める。R（s12）と自動更新（s13）が使う共通の経路で、
+// 取得中かどうかは見ない（呼び手が fetching を見てから呼ぶ）。
+func (m *Model) startFetch() tea.Cmd {
+	m.fetching = true
+	m.errText = ""
+	m.partial = ""
+	m.writeStatus, m.writeStatusErr = "", false
 	return tea.Batch(m.spinner.Tick, fetchCmd(m.fetcher))
 }
 
@@ -130,6 +141,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case toggledMsg:
 		return m.updateToggled(msg), nil
 
+	case browsedMsg:
+		return m.updateBrowsed(msg), nil
+
 	case tea.KeyPressMsg:
 		key := msg.String()
 		if key == "q" || key == "ctrl+c" {
@@ -138,6 +152,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.screen == screenConfirm {
 			return m.updateConfirmKey(key)
 		}
+		// ヘルプ画面は a / t / o より先に振り分ける（後ろだと閉じずに書き込みが起きる）。
+		if m.screen == screenHelp {
+			return m.updateHelpKey(key), nil
+		}
 		// a は 3 画面すべてで効き、対象は画面が見せているものに決まる。
 		if key == "a" {
 			return m.answerKey()
@@ -145,6 +163,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// t の対象は常に Issue で、キュー画面とカード詳細の 2 画面で効く。
 		if key == "t" {
 			return m.todoKey()
+		}
+		// o と ? も 3 画面すべてで効く。updateDetailKey は Cmd を返せないのでここに置く。
+		if key == "o" {
+			return m.browseKey()
+		}
+		if key == "?" {
+			m.helpFrom = m.screen
+			m.screen = screenHelp
+			return m, nil
 		}
 		if m.screen != screenQueue {
 			return m.updateDetailKey(key), nil
@@ -178,6 +205,11 @@ func (m Model) updateKey(key string) (tea.Model, tea.Cmd) {
 		}
 	case "enter":
 		return m.openDetail(), nil
+	case "R":
+		if m.fetching {
+			return m, nil
+		}
+		return m, m.startFetch()
 	}
 	return m, nil
 }

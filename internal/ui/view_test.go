@@ -87,14 +87,23 @@ func TestFooterShowsOnlyImplementedKeys(t *testing.T) {
 	lines := plain(newModel(nil))
 	footer := lines[len(lines)-1]
 
-	for _, want := range []string{"j/k 移動", "1-4/Tab タブ", "Enter 開く", "a 回答", "t todo", "q 終了"} {
-		if !strings.Contains(footer, want) {
-			t.Errorf("フッタに %q が無い: %q", want, footer)
+	order(t, footer, "Enter 開く", "a 回答", "t todo", "o ブラウザ", "R 更新", "? ヘルプ", "q 終了")
+	for _, ng := range []string{"j/k 移動", "1-4/Tab タブ", "m merge", "Esc 戻る"} {
+		if strings.Contains(footer, ng) {
+			t.Errorf("フッタに出さないキー %q がある: %q", ng, footer)
 		}
 	}
-	for _, ng := range []string{"m merge", "Esc 戻る"} {
-		if strings.Contains(footer, ng) {
-			t.Errorf("フッタに未実装のキー %q がある: %q", ng, footer)
+}
+
+// TestFooterFitsHintAndSpinnerAtWidth80 は既定幅 80 の初回取得中でもヒントが消えないことを検証する。
+// s01 tui-entrypoint の「初期フレームに q 終了」が取得中でも成り立つ幅の担保である。
+func TestFooterFitsHintAndSpinnerAtWidth80(t *testing.T) {
+	lines := plain(newModel(nil))
+	footer := lines[len(lines)-1]
+
+	for _, want := range []string{"Enter 開く", "q 終了", "取得中"} {
+		if !strings.Contains(footer, want) {
+			t.Errorf("幅 80 の取得中のフッタに %q が無い: %q", want, footer)
 		}
 	}
 }
@@ -381,5 +390,30 @@ func TestPreviewPaneShowsNoHint(t *testing.T) {
 	}
 	if text := plainText(m); strings.Contains(text, "routines-setup") {
 		t.Errorf("プレビュー中にヒントが出ている:\n%s", text)
+	}
+}
+
+// TestHintWidths はフッタのヒントが既定幅 80 に収まる設計どおりの表示幅であることを検証する。
+// キューは 64 列（取得中でも 64 + 1 + 8 = 73 で両方出る）、カード詳細は 101 列だが
+// `? ヘルプ` が 65 列目で終わるのでヘルプの入口は幅 80 でも見える。
+func TestHintWidths(t *testing.T) {
+	card := Model{screen: screenCard, detail: detailState{card: model.Card{PRs: []model.PR{{Number: 131}}}}}
+	cases := map[string]struct {
+		hint string
+		want int
+	}{
+		"キュー":   {newModel(nil).queueHint(), 64},
+		"PR 詳細": {Model{screen: screenPR}.detailHint(), 66},
+		"カード詳細": {card.detailHint(), 101},
+	}
+	for name, tc := range cases {
+		if got := ansi.StringWidth(tc.hint); got != tc.want {
+			t.Errorf("%s のヒントの表示幅 = %d, want %d: %q", name, got, tc.want, tc.hint)
+		}
+	}
+
+	hint := card.detailHint()
+	if end := ansi.StringWidth(hint[:strings.Index(hint, "? ヘルプ")]) + ansi.StringWidth("? ヘルプ"); end != 65 {
+		t.Errorf("カード詳細の `? ヘルプ` が %d 列目で終わる, want 65: %q", end, hint)
 	}
 }
