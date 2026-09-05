@@ -5,6 +5,7 @@ go 1.26.6
 require (
 	charm.land/bubbletea/v2 v2.0.9
 	charm.land/lipgloss/v2 v2.0.6
+	go.yaml.in/yaml/v3 v3.0.5
 )
 
 require (

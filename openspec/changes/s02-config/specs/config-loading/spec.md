@@ -49,16 +49,17 @@
 - **WHEN** 環境変数 `EDITOR` が `nvim` の状態で `editor: $EDITOR` と書いたファイルを `Load` に渡す
 - **THEN** `Editor` は `nvim` になる
 
-#### Scenario: EDITOR が未設定でも Load は成功する
-- **WHEN** 環境変数 `EDITOR` が未設定の状態で `editor` を省略したファイルを `Load` に渡す
+#### Scenario: EDITOR が未設定または空でも Load は成功する
+- **WHEN** 環境変数 `EDITOR` が未設定または空の状態で `editor` を省略したファイルを `Load` に渡す
 - **THEN** `Load` はエラーを返さず、`Editor` は空文字列になる
 
 ### Requirement: 不正な設定はパスと原因を含むエラーになる
 `Load` は次の場合にエラーを MUST 返す。エラー文字列にはファイルパスと、どの項目がなぜ不正かを含める。エラー時に `Config` は返さない。
 - ファイルが存在しない
 - `repos` が無い、または空（ファイルが空の場合を含む）
+- `repos` の要素が「文字列」でも「`name` を持つマッピング」でもない
 - `repos` の要素が `owner/name` 形式でない。判定は「`/` がちょうど 1 つ、その両側が空でない、空白を含まない」に限る
-- `merge_method`（グローバル・リポジトリ別とも）が `squash` / `merge` / `rebase` 以外
+- `merge_method`（グローバル・リポジトリ別とも）が `squash` / `merge` / `rebase` 以外（リポジトリ別の空文字列は未指定扱いで対象外）
 - `refresh_interval_sec` が 1 未満
 - 未知のキーがある（トップレベル、および `repos` 要素のマッピング内のどちらも）
 
@@ -90,9 +91,13 @@
 - **WHEN** `repos` の要素に `{name: org/web, merge_methd: rebase}`（正しくは `merge_method`）と書いたファイルを `Load` に渡す
 - **THEN** エラーが返り、エラー文字列に `merge_methd` が含まれる。グローバル値へ黙って落とさない
 
+#### Scenario: repos 要素が文字列でも name 付きマッピングでもない
+- **WHEN** `repos` の要素に `{merge_method: rebase}`（`name` 無し）と書いたファイル、`[org/app]`（シーケンス）と書いたファイルのそれぞれを `Load` に渡す
+- **THEN** いずれもエラーが返り、エラー文字列に `repos` が含まれる
+
 ### Requirement: リポジトリ別に merge_method を上書きできる
 `repos` の要素は design.md の未決事項で定めた既定の表現でリポジトリ別の `merge_method` を MUST 指定できる。`Load` は各リポジトリの merge 方式を
-「リポジトリ別の指定があればそれ、無ければグローバルの `merge_method`」に解決して `Repo.MergeMethod` に埋めて返す。消費側（s14）は上書きの有無を知らずに
+「リポジトリ別の指定があればそれ、無ければグローバルの `merge_method`」に解決して `Repo.MergeMethod` に埋めて返す。リポジトリ別の `merge_method` に空文字列を明示した場合は未指定として扱い、グローバル値になる。消費側（s14）は上書きの有無を知らずに
 `Repo.MergeMethod` を読めばよい。
 
 #### Scenario: 上書きの無いリポジトリはグローバル値になる

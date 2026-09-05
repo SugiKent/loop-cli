@@ -9,7 +9,7 @@ sugi-loop は監視対象リポジトリ・更新間隔・merge 方式・エデ�
 - `internal/config` パッケージを新設し、`config.yml` を読み込んで検証済みの `Config` 型を返す `Load` を提供する
 - 設定項目は mvp.md のとおり `repos` / `refresh_interval_sec` / `merge_method`（リポジトリ別上書き可）/ `editor` / `notify` の 5 つ。それ以外は持たない
 - 既定値（`refresh_interval_sec` 120、`merge_method` squash、`notify` true、`editor` は環境変数 `EDITOR`）を適用する
-- ファイルが無い・YAML が壊れている・`repos` が空・`owner/name` 形式でない・`merge_method` が不正・未知のキーがある場合は、原因とファイルパスを含むエラーを返す
+- ファイルが無い・YAML が壊れている・`repos` が空・`owner/name` 形式でない・`merge_method` が不正・`refresh_interval_sec` が 1 未満・未知のキーがある場合は、原因とファイルパスを含むエラーを返す
 - 認証トークンは設定に持たない（mvp.md「認証は `gh auth` を再利用する」）。YAML ライブラリを 1 つ依存に追加する
 
 この change で作るのは `internal/config` だけ。`cmd/sugi-loop` から `Load` を呼ぶ配線は、設定値を最初に消費する s07 が担当する。

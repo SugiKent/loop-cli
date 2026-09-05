@@ -70,7 +70,10 @@ merge_method: squash
 `Repo` に YAML のカスタムデコード（スカラーならそれを `Name` に、マッピングなら `name` / `merge_method` を読む）を 1 つ実装する。
 マッピングの場合は、Context の確認どおり未知フィールド拒否が引き継がれないので、マッピングノードのキーを走査して `name` / `merge_method`
 以外があれば `repos の要素に未知のキー "<キー>" があります` のエラーを返す。
+マッピングに `name` キーが無ければ `repos の要素に name がありません`、要素が文字列（スカラー）でもマッピングでもない（シーケンスなど）場合は
+`repos の要素は文字列か {name, merge_method} のマッピングで書いてください` のエラーを返す。
 デコード直後の `Repo.MergeMethod` は「指定があればその値、無ければ空」なので、検証後に空のものへグローバル値を埋める。
+マッピングで `merge_method: ""` と空文字を明示した場合も未指定と同じ扱いにし、グローバル値に落とす（検証 4 が空を対象外にしているのはこのため）。
 
 ### 検証の順序とエラー文言
 
@@ -95,7 +98,7 @@ merge_method: squash
 - [`go mod tidy` で s01 が固定した 3 依存が落ちる] → tasks で `go list -m all` を確認し、落ちていたら `go get charm.land/<name>/v2@latest` で戻す
 - [`Repo` のカスタムデコードが YAML ライブラリの API に依存する] → spec は振る舞い（文字列またはマッピング）で書いてあり、ライブラリを替えても spec は変わらない
 - [`Editor` の環境変数展開で `$HOME/bin/editor` のような値も展開される] → 意図どおり。展開したくない `$` を書く用途は docs に無い
-- [`os.ExpandEnv` は未定義変数を空にする] → 未設定の `EDITOR` は空文字列になり `Load` は成功する。spec の Scenario で明示している
+- [`os.ExpandEnv` は未定義変数を空にする] → 未設定または空の `EDITOR` は空文字列になり `Load` は成功する。spec の Scenario で明示している
 
 ## 未決事項
 
@@ -103,6 +106,7 @@ docs に記述が無く、この change の実装者が選ぶ点。既定値を 
 
 | 項目 | 既定値 | 根拠 |
 | --- | --- | --- |
+| 省略可能な項目と既定値 | `repos` 以外は省略可。`refresh_interval_sec` 120 / `merge_method` squash / `notify` true / `editor` `$EDITOR` | mvp.md 設定例の値をそのまま既定値にする。mvp.md「`gh pr merge` の既定は対話式なので設定で明示する」は、squash を既定にして常に `--<method>` フラグを渡せば対話を回避できる |
 | YAML ライブラリ | `go.yaml.in/yaml/v3`（v3.0.5 時点） | `gopkg.in/yaml.v3` の後継で API 互換。未知フィールド拒否とカスタムデコードがあり、Context の確認で必要な挙動がすべて揃った |
 | 設定ファイルパスの解決 | `$HOME/.config/sugi-loop/config.yml` 固定。`XDG_CONFIG_HOME` は見ない | mvp.md の記述をそのまま採る。`os.UserConfigDir()` は darwin で別の場所を返すので使えない。XDG 対応が必要になったら `DefaultPath` だけ直せばよい |
 | リポジトリ別 `merge_method` の YAML 表現 | `repos` 要素を文字列または `{name, merge_method}` マッピングのどちらでも書ける | mvp.md の例（文字列の列挙）をそのまま有効にしつつ、上書きを同じ要素に書ける。代替案の別キー（`merge_method_overrides: {org/web: rebase}`）は `repos` に無いリポジトリを書けてしまい検証が増える |
