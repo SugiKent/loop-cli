@@ -8,7 +8,7 @@ TBD - created by archiving change s01-bootstrap. Update Purpose after archive.
 `main()` は次の順で起動する。
 1. `config.DefaultPath()` で設定ファイルのパスを決め、`config.Load` で `Config` を読む（s02）
 2. `gh.NewClient()` を作り、`Check(ctx)` で `gh` の存在と認証を確認する（s03。`ctx` は `context.Background()`）
-3. `Config.Repos[].Name` を並べた `repos` と `client` で `fetch.Fetch`（s07）を閉じた `ui.Fetcher` を `ui.New` に渡し、Bubble Tea のプログラムとして実行する
+3. `Config.Repos[].Name` を並べた `repos` と `client` で `fetch.Fetch`（s07）を閉じた `ui.Fetcher` と、同じ `client`、`ui.ExternalEditor(Config.Editor)`（s10 `answer-question`。`Config.Editor` は s02 が `$EDITOR` を展開済みで、空でもここでは失敗させない）を `ui.New` に渡し、Bubble Tea のプログラムとして実行する
 最初のフレームは s08 `queue-screen` のキュー画面であり、`Init` が返す取得コマンドが完了するまでは `Cards` が空の表と `取得中` のスピナーを描く。取得の完了で表が埋まる。hello world の画面（s01）は無くなる。
 描画内容にはアプリ名 `sugi-loop` と、`q` で終了できることを示すフッタのヒントを含める。
 
@@ -23,6 +23,10 @@ TBD - created by archiving change s01-bootstrap. Update Purpose after archive.
 #### Scenario: 起動直後に取得が始まる
 - **WHEN** 設定ファイルがあり `gh auth status` が通る端末で `sugi-loop` を起動する
 - **THEN** 最初のフレームはヘッダ `[1]今やる 0 …` と `↻ --:--`、フッタの `取得中` を含むキュー画面で、`fetch.Fetch` の完了後に設定リポジトリの Card がタブに並ぶ
+
+#### Scenario: editor が空でも起動する
+- **WHEN** 環境変数 `EDITOR` が未設定で `editor` を省略した設定ファイルがあり、`gh auth status` が通る端末で `sugi-loop` を起動する
+- **THEN** キュー画面が描画される（`a` を押したときに初めて `editor が設定されていません` のエラーがフッタに出る）
 
 ### Requirement: q で終了する
 起動中に `q` または `Ctrl+C` を押すと、プログラムは終了コード 0 で MUST 終了し、端末を元の状態に戻す。それ以外のキーでは終了しない。

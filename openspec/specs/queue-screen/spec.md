@@ -4,7 +4,7 @@
 TBD - created by archiving change s08-queue-screen. Update Purpose after archive.
 ## Requirements
 ### Requirement: Model は Card をタブ別に並べ、選択行を 1 つ持つ
-`internal/ui` は Bubble Tea の Model として型 `Model` と、取得関数を受け取る `New(fetcher Fetcher) Model` を MUST 提供する。`Fetcher` は `func(ctx context.Context) (*fetch.Result, error)` で、s07 の `fetch.Fetch` を `client` と `repos` で閉じたものを `cmd/sugi-loop` が渡す。`Model` は `classify` を呼ばず、`fetch.Result.Cards` の `Card.Result` をそのまま使う。
+`internal/ui` は Bubble Tea の Model として型 `Model` と、取得関数・`gh` クライアント・エディタ起動を受け取る `New(fetcher Fetcher, client gh.GHClient, editor Editor) Model` を MUST 提供する。`Fetcher` は `func(ctx context.Context) (*fetch.Result, error)` で、s07 の `fetch.Fetch` を `client` と `repos` で閉じたものを `cmd/sugi-loop` が渡す。`client` は書き込み（s10 `answer-question` の `a`。後続の `t` / `m` / `n` / `s` も同じ `client` を使う）に使い、取得には使わない。`Editor` は s10 `answer-question`「a は画面の対象を決めて回答テンプレートを入れたエディタを開く」の型で、`cmd/sugi-loop` は `ExternalEditor(Config.Editor)` を、テストは固定文字列を返すスタブを渡す。`Model` は `classify` を呼ばず、`fetch.Result.Cards` の `Card.Result` をそのまま使う。
 `Model` は保持中の `Cards` を `Card.Result.Tab` で mvp.md の 4 タブ（`model.TabNow` / `TabBacklog` / `TabInProgress` / `TabAbnormal`）に振り分け、1 枚の Card を 1 行にする。Card は必ずどれか 1 つのタブに入る（s05 の `classify.Card` は `Card.Result.Tab` を空にしない）。タブ内の並びは第 1 キー `Card.Result.Priority` 昇順、第 2 キー行の主体の `UpdatedAt` 降順（新しいものが上）、第 3 キー主体の `Repo` 昇順、第 4 キー主体の番号昇順とする（第 1 キーは s05 が定め、第 2 キー以降は design.md の未決事項で定めた既定値）。
 `Model` は現在のタブ（初期値は今やる）と、画面全体で 1 つの選択行の添字（初期値 0）を持つ。選択行の添字をタブごとに持たないのは、タブ切替のたびに先頭を見る mvp.md の「先頭から捌く」体験に合わせるためである。選択行の添字は常に `0 ≤ 添字 < そのタブの行数` に収め、行数 0 のタブでは選択行が無い。タブ切替と `Cards` の差し替えで行数が減ったら添字を末尾に丸める。
 
@@ -19,6 +19,10 @@ TBD - created by archiving change s08-queue-screen. Update Purpose after archive
 #### Scenario: Cards の差し替えで行数が減ったら選択行を末尾に丸める
 - **WHEN** 今やるタブに 3 行ある状態で選択行を 2（3 行目）に動かした後、今やるタブが 1 行になる `Result` を `Model` に渡す
 - **THEN** 選択行の添字は 0 である
+
+#### Scenario: New は client と editor を保持する
+- **WHEN** `gh.NewFake("../gh/testdata/fixtures/example")` で新しく作った `Fake`（`Result` を作るのに使った `Fake` とは別のもの。s07 の `Fetch` は `ViewIssue` を `Calls` に記録する）と、呼ばれた回数を数えるスタブ `Editor` で `New` した `Model` に、`example` の `Result` を取得完了として渡してから `a` を与え、返ったコマンドを実行する
+- **THEN** スタブは 1 回呼ばれ、`New` に渡した `Fake` の `Calls` は空である（エディタを開いただけでは書き込まない）
 
 ### Requirement: 行の主体は Card.Result を出した Issue または PR
 `Model` は各 Card について、リポジトリ / 番号 / タイトル / 経過の列に使う「主体」を MUST 次の順で決める。`model.Result` は比較可能な struct であり、`==` で比べる。
@@ -85,8 +89,9 @@ TBD - created by archiving change s08-queue-screen. Update Purpose after archive
 - `k` / `↑`: 選択行を 1 つ上へ。先頭では動かない
 - `1` / `2` / `3` / `4` を押すと、それぞれ今やる / バックログ / 進行中 / 異常のタブに切り替える。`Tab` を押すと次のタブに切り替える（異常の次は今やる）。切替後の選択行の添字は Requirement「Model は Card をタブ別に並べ、選択行を 1 つ持つ」の丸め規則に従う（切替前の添字を引き継ぎ、行数を超えていれば末尾）
 - `Enter`: 選択行の Card のカード詳細画面（`Issue` が nil なら PR 詳細画面）を開く。選択行が無ければ何もしない。振る舞いは s09 `card-detail` が定める
+- `a`: 選択行の主体に回答するエディタを開く。選択行が無ければ何もしない。振る舞いは s10 `answer-question` が定める
 - `q` / `Ctrl+C`: 終了コマンドを返す（s01 `tui-entrypoint`「q で終了する」を `internal/ui` の `Model` が満たす）
-- mvp.md の表にある他のキー `a` / `A` / `t` / `s` / `m` / `n` / `o` / `g` / `x` / `/` / `R` / `?` / `v` / `h` / `l` / `←` / `→` と、表に無いキー（`p` を除く。`p` は Requirement「狭い端末では表とプレビューを切り替える 1 ペインにする」。`Esc` を含む）は、キュー画面では `Model` を変えず、コマンドも返さない。担当は `a` が s10、`t` が s11、`o` / `R` / `?` が s12、`m` が s14、`n` / `s` が s15、`A` が s16、`v` / `h` / `l` / `←` / `→` が s17、`/` が s19。`g` / `x` / `Esc` は詳細画面のキーであり s09 `card-detail` が定める（キュー画面では何もしない）
+- mvp.md の表にある他のキー `A` / `t` / `s` / `m` / `n` / `o` / `g` / `x` / `/` / `R` / `?` / `v` / `h` / `l` / `←` / `→` と、表に無いキー（`p` を除く。`p` は Requirement「狭い端末では表とプレビューを切り替える 1 ペインにする」。`Esc` を含む）は、キュー画面では `Model` を変えず、コマンドも返さない。担当は `t` が s11、`o` / `R` / `?` が s12、`m` が s14、`n` / `s` が s15、`A` が s16、`v` / `h` / `l` / `←` / `→` が s17、`/` が s19。`g` / `x` / `Esc` は詳細画面のキーであり s09 `card-detail` が定める（キュー画面では何もしない）
 
 #### Scenario: j と k で選択行が動く
 - **WHEN** 今やるタブに 3 行ある `Model` に `j` を 2 回、`k` を 1 回、`↓` を 1 回、`↑` を 1 回の順で与える
@@ -101,7 +106,7 @@ TBD - created by archiving change s08-queue-screen. Update Purpose after archive
 - **THEN** 現在のタブは順に バックログ、異常、今やる、今やる、進行中 になる
 
 #### Scenario: 未実装のキーは何も変えない
-- **WHEN** 今やるタブに 2 行あり選択行が 1 の `Model` に `a`、`t`、`o`、`R`、`?`、`v`、`m`、`n`、`s`、`A`、`g`、`x`、`Esc`、`/` を 1 つずつ与える
+- **WHEN** 今やるタブに 2 行あり選択行が 1 の `Model` に `t`、`o`、`R`、`?`、`v`、`m`、`n`、`s`、`A`、`g`、`x`、`Esc`、`/` を 1 つずつ与える
 - **THEN** どのキーでもコマンドは返らず、画面の状態はキューのままで、現在のタブ・選択行・`Cards` は変わらない
 
 #### Scenario: q で終了する
@@ -111,7 +116,7 @@ TBD - created by archiving change s08-queue-screen. Update Purpose after archive
 ### Requirement: ヘッダはタブ名と件数と最終更新時刻、フッタはキーヒントとステータスを出す
 画面の状態がキューのとき、`View` の 1 行目（ヘッダ）は、アプリ名 `sugi-loop` と空白 2 列に続けて 4 タブを mvp.md の形式 `[1]今やる <n>  [2]バックログ <n>  [3]進行中 <n>  [4]異常 <n>`（タブ間は空白 2 列）で MUST 出す。`<n>` はそのタブの行数。現在のタブは太字で、他のタブは通常で描く。ヘッダの右端に右寄せで、左に最低 1 列の空白を置いて `↻ HH:MM`（最後に取得が完了した時刻。24 時間表記。完了時刻はメッセージが運ぶ `time.Time` をそのタイムゾーンのまま書く。`cmd/sugi-loop` は `time.Now()` を渡すのでローカル時刻になる）を出し、初回取得の完了前は `↻ --:--` とする。
 ヘッダの表示幅が端末幅を超えるときは、件数付きタブ名を `[4]` → `[3]` → `[2]` の順に `[n] <n>`（タブ名を落とし番号と件数だけ）に短縮し、収まった時点で止める。`[1]` は短縮しない。`[2]`〜`[4]` を全部短縮しても超えれば `↻ HH:MM` を省き、それでも超えれば行を端末幅で切る。この規則で `example` のヘッダ `sugi-loop  [1]今やる 1  [2]バックログ 1  [3]進行中 0  [4]異常 0` + 空白 1 + `↻ 12:04` は 71 列（全角 2 列）になる。
-`View` の最終行（フッタ = ステータスバー）は、左にキュー画面で動くキーだけのヒント `j/k 移動  1-4/Tab タブ  Enter 開く  q 終了` を出し、右にステータス（Requirement「取得は非同期に行い、取得中はスピナー、失敗時は前回結果を維持する」）を出す。後続 change が自分のキーのヒントを足す。動かないキーのヒントは出さない。カード詳細画面と PR 詳細画面のヘッダとフッタは s09 `card-detail` が定める。
+`View` の最終行（フッタ = ステータスバー）は、左にキュー画面で動くキーだけのヒント `j/k 移動  1-4/Tab タブ  Enter 開く  a 回答  q 終了` を出し、右にステータス（Requirement「取得は非同期に行い、取得中はスピナー、失敗時は前回結果を維持する」）を出す。後続 change が自分のキーのヒントを足す。動かないキーのヒントは出さない。カード詳細画面と PR 詳細画面のヘッダとフッタは s09 `card-detail` が、確認画面は s10 `answer-question` が定める。
 
 #### Scenario: ヘッダの件数
 - **WHEN** `example` の `Result` を完了時刻 `2026-09-05T12:04:00+09:00` で `Model` に渡し、`View` から ANSI エスケープを除いて読む
@@ -127,7 +132,7 @@ TBD - created by archiving change s08-queue-screen. Update Purpose after archive
 
 #### Scenario: フッタのキーヒント
 - **WHEN** `Model` の `View` から ANSI エスケープを除いて読む
-- **THEN** 最終行に `j/k 移動`、`1-4/Tab タブ`、`Enter 開く`、`q 終了` が含まれ、`a 回答` / `m merge` / `Esc 戻る` は含まれない
+- **THEN** 最終行に `j/k 移動`、`1-4/Tab タブ`、`Enter 開く`、`a 回答`、`q 終了` が含まれ、`m merge` / `Esc 戻る` は含まれない
 
 ### Requirement: プレビューは選択行の 1 行目・本文・コメントを出す
 `View` はプレビュー領域に、選択行の Card について MUST 次を上から順に描く。
@@ -156,22 +161,19 @@ TBD - created by archiving change s08-queue-screen. Update Purpose after archive
 ### Requirement: 狭い端末では表とプレビューを切り替える 1 ペインにする
 `Model` は端末サイズのメッセージで幅と高さを MUST 保持し、サイズを受け取る前は幅 80・高さ 24 とみなす。幅が 80 列以上かつ高さが 20 行以上なら、ヘッダ / 表 / 区切り線 / プレビュー / フッタを上下に並べた 2 ペインで描く。どちらかを下回ったら 1 ペインにフォールバックし、ヘッダ / （表またはプレビューのどちらか一方） / フッタを描く（mvp.md「狭い端末では上下を切り替える 1 ペイン表示にフォールバックする」。閾値は design.md の未決事項の既定値）。
 1 ペインでは初期状態で表を出し、`p` で表とプレビューを交互に切り替える（切替キーは mvp.md の表に無いので design.md の未決事項の既定値。表に無いキーを選んでいる）。2 ペインでは `p` は何もしない。1 ペインのフッタには `p プレビュー`（表を出しているとき）または `p 一覧`（プレビューを出しているとき）のヒントを足す。1 ペインでプレビューを出している間も `j` / `k` / `1`–`4` / `Tab` は効き、プレビューは選択行に追従する。
+この change が `a 回答` を足したことでキュー画面のフッタ左は 1 ペインで 64 列を超え、幅 60 では `p` のヒントが端末幅で切られて読めなくなったので、`p` の Scenario の端末幅を 60 から 79（2 ペインの下限 80 未満なので 1 ペインのまま）に変える。
 
 #### Scenario: 広い端末は 2 ペイン
 - **WHEN** `example` の `Result` を渡した `Model` に幅 120・高さ 40 のサイズメッセージを与え、`View` から ANSI エスケープを除いて読む
 - **THEN** 表の行 `PR131` とプレビューの `issue #108 の提案` の両方が含まれる
 
 #### Scenario: 狭い端末は表だけ出し p でプレビューに切り替わる
-- **WHEN** 同じ `Model` に幅 60・高さ 40 のサイズメッセージを与えて `View` を読み、次に `p` を与えて `View` を読む
+- **WHEN** 同じ `Model` に幅 79・高さ 40 のサイズメッセージを与えて `View` を読み、次に `p` を与えて `View` を読む
 - **THEN** 1 回目は `PR131` の行を含み `issue #108 の提案` を含まず、フッタに `p プレビュー` がある。2 回目は `issue #108 の提案` を含み `PR131` の行を含まず、フッタに `p 一覧` がある
 
 #### Scenario: 低い端末も 1 ペイン
 - **WHEN** 同じ `Model` に幅 120・高さ 15 のサイズメッセージを与えて `View` を読む
 - **THEN** `PR131` の行を含み `issue #108 の提案` を含まない
-
-#### Scenario: 2 ペインで p は何もしない
-- **WHEN** 幅 120・高さ 40 の `Model` に `p` を与える
-- **THEN** コマンドは返らず、`View` は与える前と同じである
 
 ### Requirement: 取得は非同期に行い、取得中はスピナー、失敗時は前回結果を維持する
 `internal/ui` は `Fetcher` を `context.Background()` で実行し、その完了を `Result`（または error）と完了時刻を運ぶメッセージ `fetchedMsg` として返すコマンドを非公開関数 `fetchCmd(fetcher Fetcher)` として MUST 持ち、`Model` の `Init` はスピナーの tick とそのコマンドをまとめて返す。完了メッセージは `Update` に届く。`Model` は `gh` を直接呼ばず、取得の実行は必ずコマンド（別ゴルーチン）で行う。
