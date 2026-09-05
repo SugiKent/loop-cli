@@ -80,7 +80,7 @@ func (m Model) renderDetail() string {
 
 // queueHint はキュー画面のフッタ左。
 func (m Model) queueHint() string {
-	hint := "j/k 移動  1-4/Tab タブ  Enter 開く  a 回答  q 終了"
+	hint := "j/k 移動  1-4/Tab タブ  Enter 開く  a 回答  t todo  q 終了"
 	if m.twoPane() {
 		return hint
 	}
@@ -199,9 +199,9 @@ func (m Model) footer(hint string) string {
 	switch {
 	case m.fetching:
 		status = m.spinner.View() + " 取得中"
-	case m.answerStatus != "":
-		status = m.answerStatus
-		if m.answerStatusErr {
+	case m.writeStatus != "":
+		status = m.writeStatus
+		if m.writeStatusErr {
 			status = errorStyle.Render(status)
 		}
 	case m.errText != "":

@@ -49,10 +49,10 @@ type Model struct {
 	screen screen
 	detail detailState
 
-	answer          answerState
-	posting         bool
-	answerStatus    string
-	answerStatusErr bool
+	answer         answerState
+	writing        bool
+	writeStatus    string
+	writeStatusErr bool
 
 	spinner spinner.Model
 }
@@ -127,6 +127,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case postedMsg:
 		return m.updatePosted(msg), nil
 
+	case toggledMsg:
+		return m.updateToggled(msg), nil
+
 	case tea.KeyPressMsg:
 		key := msg.String()
 		if key == "q" || key == "ctrl+c" {
@@ -138,6 +141,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// a は 3 画面すべてで効き、対象は画面が見せているものに決まる。
 		if key == "a" {
 			return m.answerKey()
+		}
+		// t の対象は常に Issue で、キュー画面とカード詳細の 2 画面で効く。
+		if key == "t" {
+			return m.todoKey()
 		}
 		if m.screen != screenQueue {
 			return m.updateDetailKey(key), nil

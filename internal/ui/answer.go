@@ -44,7 +44,7 @@ type postedMsg struct {
 
 // answerKey は `a`（回答）を扱う。対象は画面が見せているものに決まる。
 func (m Model) answerKey() (tea.Model, tea.Cmd) {
-	if m.posting {
+	if m.writing {
 		return m, nil
 	}
 	target, label, comments, ok := m.answerTarget()
@@ -52,7 +52,7 @@ func (m Model) answerKey() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.answer = answerState{target: target, label: label, from: m.screen}
-	m.answerStatus, m.answerStatusErr = "", false
+	m.writeStatus, m.writeStatusErr = "", false
 	return m, m.editor(action.AnswerTemplate(comments))
 }
 
@@ -95,9 +95,9 @@ func prLabel(p model.PR) string { return fmt.Sprintf("%s PR#%d", p.Repo, p.Numbe
 func (m Model) updateEdited(msg editedMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case msg.err != nil:
-		m.answerStatus, m.answerStatusErr = "エディタ: "+msg.err.Error(), true
+		m.writeStatus, m.writeStatusErr = "エディタ: "+msg.err.Error(), true
 	case strings.TrimSpace(msg.text) == "":
-		m.answerStatus, m.answerStatusErr = "回答を中止しました（本文が空）", false
+		m.writeStatus, m.writeStatusErr = "回答を中止しました（本文が空）", false
 	case action.HasRoutineMarker(msg.text):
 		m.answer.draft, m.answer.reason = msg.text, reasonMarker
 		m.screen = screenConfirm
@@ -112,8 +112,8 @@ func (m Model) updateEdited(msg editedMsg) (tea.Model, tea.Cmd) {
 
 // post は投稿を始める。投稿中は a を無視して二重投稿を防ぐ。
 func (m Model) post(body string) (tea.Model, tea.Cmd) {
-	m.posting = true
-	m.answerStatus, m.answerStatusErr = m.answer.label+" にコメントを投稿中", false
+	m.writing = true
+	m.writeStatus, m.writeStatusErr = m.answer.label+" にコメントを投稿中", false
 	return m, postCmd(m.client, m.answer.target, m.answer.label, body)
 }
 
@@ -128,12 +128,12 @@ func postCmd(client gh.GHClient, target action.Target, label, body string) tea.C
 
 // updatePosted は投稿の完了を扱う。結果はフッタに出すだけで、再取得はしない（1 件再取得は s18）。
 func (m Model) updatePosted(msg postedMsg) Model {
-	m.posting = false
+	m.writing = false
 	if msg.err != nil {
-		m.answerStatus, m.answerStatusErr = msg.label+" へのコメントに失敗: "+msg.err.Error(), true
+		m.writeStatus, m.writeStatusErr = msg.label+" へのコメントに失敗: "+msg.err.Error(), true
 		return m
 	}
-	m.answerStatus, m.answerStatusErr = msg.label+" にコメントしました", false
+	m.writeStatus, m.writeStatusErr = msg.label+" にコメントしました", false
 	return m
 }
 
@@ -152,7 +152,7 @@ func (m Model) updateConfirmKey(key string) (tea.Model, tea.Cmd) {
 		return m, m.editor(m.answer.draft)
 	case "esc":
 		m.screen = m.answer.from
-		m.answerStatus, m.answerStatusErr = "回答を中止しました", false
+		m.writeStatus, m.writeStatusErr = "回答を中止しました", false
 	}
 	return m, nil
 }

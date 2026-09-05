@@ -34,7 +34,7 @@ func TestWriteTemp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("writeTemp: %v", err)
 	}
-	defer os.Remove(path)
+	defer func() { _ = os.Remove(path) }()
 
 	if !strings.HasSuffix(path, ".md") {
 		t.Errorf("一時ファイル名が .md で終わらない: %q", path)

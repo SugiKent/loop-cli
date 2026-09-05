@@ -87,7 +87,7 @@ func TestFooterShowsOnlyImplementedKeys(t *testing.T) {
 	lines := plain(newModel(nil))
 	footer := lines[len(lines)-1]
 
-	for _, want := range []string{"j/k 移動", "1-4/Tab タブ", "Enter 開く", "a 回答", "q 終了"} {
+	for _, want := range []string{"j/k 移動", "1-4/Tab タブ", "Enter 開く", "a 回答", "t todo", "q 終了"} {
 		if !strings.Contains(footer, want) {
 			t.Errorf("フッタに %q が無い: %q", want, footer)
 		}

@@ -389,7 +389,7 @@ func (m Model) detailHint() string {
 		return "Esc 戻る  x 展開  g issue へ  a 回答  j/k スクロール  q 終了"
 	}
 	if len(m.detail.card.PRs) == 0 {
-		return "Esc 戻る  x 展開  a 回答  j/k スクロール  q 終了"
+		return "Esc 戻る  x 展開  a 回答  t todo  j/k スクロール  q 終了"
 	}
-	return "Esc 戻る  Tab PR 選択  Enter PR を開く  x 展開  g PR へ  a 回答  j/k スクロール  q 終了"
+	return "Esc 戻る  Tab PR 選択  Enter PR を開く  x 展開  g PR へ  a 回答  t todo  j/k スクロール  q 終了"
 }

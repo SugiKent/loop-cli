@@ -51,12 +51,12 @@ func writeTemp(initial string) (string, error) {
 		return "", err
 	}
 	if _, err := f.WriteString(initial); err != nil {
-		f.Close()
-		os.Remove(f.Name())
+		_ = f.Close()
+		_ = os.Remove(f.Name())
 		return "", err
 	}
 	if err := f.Close(); err != nil {
-		os.Remove(f.Name())
+		_ = os.Remove(f.Name())
 		return "", err
 	}
 	return f.Name(), nil
@@ -71,11 +71,11 @@ func editorCmd(command, path string) *exec.Cmd {
 // readEdited はエディタ終了後の一時ファイルを読み、成否によらず削除する。
 func readEdited(path string, runErr error) editedMsg {
 	if runErr != nil {
-		os.Remove(path)
+		_ = os.Remove(path)
 		return editedMsg{err: runErr}
 	}
 	b, err := os.ReadFile(path)
-	os.Remove(path)
+	_ = os.Remove(path)
 	if err != nil {
 		return editedMsg{err: err}
 	}

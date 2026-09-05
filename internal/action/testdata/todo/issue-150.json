@@ -1,0 +1,11 @@
+{
+  "body": "切り替えの fixture 150。",
+  "comments": [],
+  "labels": [
+    {"name": "stage:todo"},
+    {"name": "bug"}
+  ],
+  "number": 150,
+  "title": "fixture 150",
+  "url": "https://github.com/org/app/issues/150"
+}

@@ -540,7 +540,7 @@ func TestDetailFooters(t *testing.T) {
 
 	lines := linesOf(m)
 	footer := lines[len(lines)-1]
-	for _, want := range []string{"Esc 戻る", "Tab PR 選択", "x 展開", "a 回答", "q 終了"} {
+	for _, want := range []string{"Esc 戻る", "Tab PR 選択", "x 展開", "a 回答", "t todo", "q 終了"} {
 		if !strings.Contains(footer, want) {
 			t.Errorf("カード詳細のフッタに %q が無い: %q", want, footer)
 		}
@@ -557,8 +557,10 @@ func TestDetailFooters(t *testing.T) {
 			t.Errorf("PR 詳細のフッタに %q が無い: %q", want, footer)
 		}
 	}
-	if strings.Contains(footer, "Tab PR 選択") {
-		t.Errorf("PR 詳細のフッタに PR 選択のヒントがある: %q", footer)
+	for _, ng := range []string{"Tab PR 選択", "t todo"} {
+		if strings.Contains(footer, ng) {
+			t.Errorf("PR 詳細のフッタに %q がある: %q", ng, footer)
+		}
 	}
 }
 

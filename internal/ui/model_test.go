@@ -88,7 +88,7 @@ func TestUnimplementedKeysDoNothing(t *testing.T) {
 
 	keys := map[string]tea.Msg{
 		"esc": codeKey(tea.KeyEscape),
-		"t":   runeKey('t'), "o": runeKey('o'), "R": runeKey('R'),
+		"o":   runeKey('o'), "R": runeKey('R'),
 		"?": runeKey('?'), "v": runeKey('v'), "m": runeKey('m'), "n": runeKey('n'),
 		"s": runeKey('s'), "A": runeKey('A'), "g": runeKey('g'), "x": runeKey('x'),
 		"/": runeKey('/'),
