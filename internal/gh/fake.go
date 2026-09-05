@@ -24,6 +24,26 @@ type Call struct {
 	CommentID   int64
 }
 
+// fixture ファイル名。Fake の読み取りと Client.Capture の map キーが同じ名前を使う。
+const (
+	fixtureSearchIssues = "search-issues.json"
+	fixtureSearchPRs    = "search-prs.json"
+)
+
+func fixtureIssue(number int) string { return fmt.Sprintf("issue-%d.json", number) }
+
+func fixtureIssueCrossRefs(number int) string {
+	return fmt.Sprintf("issue-%d-cross-refs.json", number)
+}
+
+func fixtureIssueTimeline(number int) string { return fmt.Sprintf("issue-%d-timeline.json", number) }
+
+func fixturePR(number int) string { return fmt.Sprintf("pr-%d.json", number) }
+
+func fixturePRReviewThreads(number int) string {
+	return fmt.Sprintf("pr-%d-review-threads.json", number)
+}
+
 // Fake は fixture ディレクトリから GHClient と同じ型を返す。
 // ディレクトリ 1 つがリポジトリ 1 件に対応するので repo 引数はファイル探索に使わない。
 type Fake struct {
@@ -41,7 +61,7 @@ func (f *Fake) read(name string) ([]byte, error) {
 }
 
 func (f *Fake) SearchIssues(_ context.Context, _ []string) ([]SearchIssue, error) {
-	b, err := f.read("search-issues.json")
+	b, err := f.read(fixtureSearchIssues)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +69,7 @@ func (f *Fake) SearchIssues(_ context.Context, _ []string) ([]SearchIssue, error
 }
 
 func (f *Fake) SearchPRs(_ context.Context, _ []string) ([]SearchPR, error) {
-	b, err := f.read("search-prs.json")
+	b, err := f.read(fixtureSearchPRs)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +80,7 @@ func (f *Fake) SearchPRs(_ context.Context, _ []string) ([]SearchPR, error) {
 // 不変条件 3（ラベルを外す → 読み直す → 付ける）の順序をテストが検証するため。
 func (f *Fake) ViewIssue(_ context.Context, repo string, number int) (*IssueDetail, error) {
 	f.Calls = append(f.Calls, Call{Method: "ViewIssue", Repo: repo, Number: number})
-	b, err := f.read(fmt.Sprintf("issue-%d.json", number))
+	b, err := f.read(fixtureIssue(number))
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +88,7 @@ func (f *Fake) ViewIssue(_ context.Context, repo string, number int) (*IssueDeta
 }
 
 func (f *Fake) ViewPR(_ context.Context, _ string, number int) (*PRDetail, error) {
-	b, err := f.read(fmt.Sprintf("pr-%d.json", number))
+	b, err := f.read(fixturePR(number))
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +97,7 @@ func (f *Fake) ViewPR(_ context.Context, _ string, number int) (*PRDetail, error
 
 // ViewPRMergeState は ViewPR と同じ pr-<n>.json を読む。再取得も待ちもしない。
 func (f *Fake) ViewPRMergeState(_ context.Context, _ string, number int) (*PRMergeState, error) {
-	b, err := f.read(fmt.Sprintf("pr-%d.json", number))
+	b, err := f.read(fixturePR(number))
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +105,7 @@ func (f *Fake) ViewPRMergeState(_ context.Context, _ string, number int) (*PRMer
 }
 
 func (f *Fake) ReviewThreads(_ context.Context, _ string, number int) ([]ReviewThread, error) {
-	b, err := f.read(fmt.Sprintf("pr-%d-review-threads.json", number))
+	b, err := f.read(fixturePRReviewThreads(number))
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +113,7 @@ func (f *Fake) ReviewThreads(_ context.Context, _ string, number int) ([]ReviewT
 }
 
 func (f *Fake) CrossReferencedPRs(_ context.Context, _ string, number int) ([]CrossReferencedPR, error) {
-	b, err := f.read(fmt.Sprintf("issue-%d-cross-refs.json", number))
+	b, err := f.read(fixtureIssueCrossRefs(number))
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +121,7 @@ func (f *Fake) CrossReferencedPRs(_ context.Context, _ string, number int) ([]Cr
 }
 
 func (f *Fake) LabelTimeline(_ context.Context, _ string, number int) ([]LabelEvent, error) {
-	b, err := f.read(fmt.Sprintf("issue-%d-timeline.json", number))
+	b, err := f.read(fixtureIssueTimeline(number))
 	if err != nil {
 		return nil, err
 	}

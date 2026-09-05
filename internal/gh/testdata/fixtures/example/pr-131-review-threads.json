@@ -11,7 +11,7 @@
                 "nodes": [
                   {
                     "databaseId": 3935153121,
-                    "author": {"login": "bob"},
+                    "author": {"login": "user-3"},
                     "body": "ここは 30 日でよいですか。",
                     "createdAt": "2026-09-04T11:00:00Z"
                   }

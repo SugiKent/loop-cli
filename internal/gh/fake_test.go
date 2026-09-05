@@ -56,7 +56,7 @@ func TestFakeViewIssue(t *testing.T) {
 	if !strings.HasPrefix(got.Comments[0].Body, "<!-- routine -->") {
 		t.Errorf("1 件目の body = %q", got.Comments[0].Body)
 	}
-	if got.Comments[1].Author.Login != "alice" {
+	if got.Comments[1].Author.Login != "user-2" {
 		t.Errorf("2 件目の author = %q", got.Comments[1].Author.Login)
 	}
 }
@@ -69,7 +69,7 @@ func TestFakeViewPR(t *testing.T) {
 	if got.IsDraft {
 		t.Errorf("IsDraft = true, want false")
 	}
-	if len(got.Comments) != 1 || got.Comments[0].Author.Login != "routine-bot" {
+	if len(got.Comments) != 1 || got.Comments[0].Author.Login != "user-1" {
 		t.Errorf("Comments = %+v", got.Comments)
 	}
 }

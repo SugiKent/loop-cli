@@ -3,7 +3,7 @@
   "comments": [
     {
       "id": "IC_kwDOA1",
-      "author": {"login": "routine-bot"},
+      "author": {"login": "user-1"},
       "authorAssociation": "MEMBER",
       "body": "<!-- routine -->\nQ1: セッションの寿命は何日にしますか。\nQ2: 失効時はログイン画面へ戻しますか。",
       "createdAt": "2026-09-04T09:00:00Z",
@@ -16,7 +16,7 @@
     },
     {
       "id": "IC_kwDOA2",
-      "author": {"login": "alice"},
+      "author": {"login": "user-2"},
       "authorAssociation": "OWNER",
       "body": "寿命は 30 日で。",
       "createdAt": "2026-09-04T09:12:00Z",

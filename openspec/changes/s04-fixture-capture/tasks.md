@@ -1,0 +1,33 @@
+## 1. internal/gh の Capture
+
+- [x] 1.1 `internal/gh/client.go` を直す。読み取り 8 メソッドの引数組み立てを非公開関数（`argsSearchIssues(repos)` / `argsSearchPRs(repos)` / `argsViewIssue(repo, n)` / `argsPRView(repo, n, fields)` / `argsReviewThreads(repo, n)` / `argsCrossReferencedPRs(repo, n)` / `argsLabelTimeline(repo, n)`）に切り出し、`ViewPRMergeState` の「実行 → `mergeable` が `UNKNOWN` なら `RetryWait` 後に 1 回再実行」を `prViewRaw(ctx, repo, n, fields string) ([]byte, error)`（`decodePRMergeState` で UNKNOWN を判定。再取得後も UNKNOWN ならその出力を返す）に切り出す。s03（4f9ad8b）には `argsXxx` に相当する関数は無く、`viewPRMergeStateOnce` だけがあるので、`viewPRMergeStateOnce` は `prViewRaw` + `decodePRMergeState` に置き換えて消し、他の名前は上の既定値を使う。`ViewPR` は `prViewRaw` を通さない。s03 の `client_test.go` が変更なしで通ることを確認する
+- [x] 1.2 `internal/gh/fake.go` の fixture ファイル名の組み立てを非公開関数（`fixtureSearchIssues` / `fixtureSearchPRs` の定数と `fixtureIssue(n)` / `fixturePR(n)` / `fixturePRReviewThreads(n)` / `fixtureIssueCrossRefs(n)` / `fixtureIssueTimeline(n)`）にまとめ、`Fake` の読み取りがそれを使うようにする。s03 の `fake.go` はファイル名を `fmt.Sprintf` で直書きしていて同等の関数は無いので、名前は上の既定値を使う。s03 の `fake_test.go` が変更なしで通ることを確認する（5.1 の login 変更はこの時点では行わない）
+- [x] 1.3 `internal/gh/capture.go` を作成し、`(*Client).Capture(ctx, repo string, progress func(name string)) (map[string][]byte, error)` を実装する。spec「Client は fixture 用に読み取りコマンドの標準出力を採取する」の順序（search issues → 各 issue の view / cross-refs / timeline → search prs → 各 PR の pr view 11 フィールド（`prViewRaw` 経由）/ review-threads）で、各実行の直前に `progress` を呼び、失敗したらそのエラーを返して止める。issue / PR 番号は `decodeSearchIssues` / `decodeSearchPRs` で得る
+- [x] 1.4 `internal/gh/capture_test.go` を作成し、`run` を差し替えて検証する。issue 108 + PR 131 で 7 キーと各値の一致と `progress` の順序 / 引数列が `argsXxx` と同一（`pr view` は 11 フィールド、GraphQL は `-f owner=org -f name=app -F number=<n> -f query=<Q>`）/ `RetryWait` 0 で `pr view` の UNKNOWN → MERGEABLE が 2 回実行され 2 回目の出力が入る、MERGEABLE なら 1 回 / 空配列 2 つで 2 キー・2 回実行 / `issue view 108` の `*Error` で止まり後続が呼ばれない
+
+## 2. cmd/sugi-loop-cli の骨組み
+
+- [x] 2.1 `cmd/sugi-loop-cli/main.go` を作成する。usage 定数（`help` と `fixture capture --repo owner/name --alias <alias>` の 1 行説明）、`run(args []string, stdout, stderr io.Writer) int`（`help` / `-h` / `--help` / 引数なし → usage を stdout で 0、`fixture capture` → `fixtureCapture(args[2:], stdout, stderr)` のエラーを stderr に 1 行書いて 1、それ以外 → `unknown command: <args[0]>`（`fixture foo` / `fixture` 単独はどちらも `unknown command: fixture`）と usage を stderr で 1）、`main()`（`os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))`）を実装する。外部依存を足さない
+- [x] 2.2 `cmd/sugi-loop-cli/main_test.go` を作成し、`help` / 引数なし（stdout に `fixture capture` `--repo` `--alias`、0）/ `frobnicate`（stderr に `unknown command: frobnicate`、1）/ `fixture` 単独と `fixture foo`（どちらも stderr に `unknown command: fixture`、1）/ `fixture capture --repo org/app`（stderr に `--alias`、1）/ `fixture capture --repo org/app --alias app --out x`（stderr に `out`、1）を検証する。`gh` は起動しない（フラグ検証で止まる）
+- [x] 2.3 `.gitignore` に `/sugi-loop-cli` と `/cmd/sugi-loop-cli/sugi-loop-cli` を追加する
+
+## 3. 伏せ字
+
+- [x] 3.1 `cmd/sugi-loop-cli/redact.go` を作成し、`redact(files map[string][]byte, owner, name, alias string) (map[string][]byte, int, error)`（第 2 返り値は login 表の件数）を spec「伏せ字は個人・組織情報だけを置き換え、分類に使う文字列を変えない」の手順 1〜4 どおりに実装する。メール置換 → login 表（owner = 1、ファイル名昇順で `"login"` 値、次に `@mention`）→ 衝突ガード（`name` / `owner` / `"login"` 値由来の login を対象に、JSON キー `"<x>"\s*:` との一致、`login` / `name` 以外のキーの文字列値 `"<キー>"\s*:\s*"<x>"` との一致、ラベル・マーカー語 12 個との一致を大文字小文字を区別せずに調べる）→ 各ファイルの置換（`owner/name` → `org/<alias>`、owner と `"login"` 値由来の login を単語として `user-N`、`name` を単語として `<alias>`、`@x` → `@user-N`）。単語境界は design.md の正規表現、login 1 つにつき 1 回の走査、`regexp.QuoteMeta` を通す
+- [x] 3.2 `cmd/sugi-loop-cli/redact_test.go` を作成し、spec の Scenario をそのまま検証する。`owner/name` と URL / 同一人物同一番号（`Alice` と `@alice` が同じ番号、`bob` は次）/ owner が投稿者（`user-1`）/ メールの置換と `example` が表に入らない / 分類に使う文字列（ラベル・`<!-- routine -->`・`&lt;!-- routine --&gt;`・`## Q1.`・`未確定の判断: 2 件`・`blocked-by: human`・`Refs #108`・`## PR リスク評価`）が 1 バイトも変わらない / `al` の単語境界 / login `status` のキー衝突エラー / login `completed` の列挙値（`"status":"COMPLETED"`）衝突エラー / `name` が `docs` のラベル衝突エラー
+
+## 4. fixture capture サブコマンド
+
+- [x] 4.1 `cmd/sugi-loop-cli/fixture.go` を作成し、`fixtureCapture(args []string, stdout, stderr io.Writer) error` を実装する。`flag.NewFlagSet` で `--repo` / `--alias` を解析（`SetOutput(stderr)`、`ContinueOnError`）→ `--repo` が `owner/name` 形式・`--alias` が `^[a-z0-9-]+$` かつ `example` 以外かつ `owner` / `name` を（大文字小文字を区別せず）含まないことを検証 → `internal/gh/testdata/fixtures` の存在確認（無ければルートで実行するよう促す）→ `gh.NewClient().Check(ctx)` → `Capture(ctx, repo, progress)`（`progress` は stderr に名前を 1 行）→ `redact` → `<alias>` ディレクトリを `os.RemoveAll` して作り直し全ファイルを書く → 自己検査として `gh.NewFake(dir)` で `SearchIssues` / `SearchPRs` と各 issue の `ViewIssue` / `CrossReferencedPRs` / `LabelTimeline`、各 PR の `ViewPR` / `ViewPRMergeState` / `ReviewThreads` を呼び、失敗したらディレクトリを消してエラー → stdout に要約 1 行（design.md の文言）
+- [x] 4.2 `fixture.go` のうち `gh` を使わない部分をテストする（`main_test.go` に追加）。`--alias example`（エラーに `example`）/ `--repo acme/widgets --alias my-widgets`（エラーに `widgets`）/ `--repo name`（エラーに `owner/name`）/ `t.TempDir()` に chdir した状態で `internal/gh/testdata/fixtures` が無いエラー。`Capture` 以降は `go test` では live に出ないので、5.1 の実採取で確認する
+
+## 5. fixture の検査と採取（利用者が実行）
+
+- [x] 5.1 `internal/gh/fixtures_test.go` を作成し、`testdata/fixtures/` 直下の全ディレクトリの全ファイルについて、`"login"` 値（`"login"\s*:\s*"…"`、手順 2 と同じ形）が `^user-[0-9]+$`、`user@example.com` 以外のメールアドレス無し、`SUGI_LOOP_FIXTURE_ORIGIN`（`owner/name`）があれば `example` 以外のディレクトリに owner と name が大文字小文字を区別せず含まれない（無ければ `t.Skip`）を検査する。失敗メッセージにファイルパスと見つかった文字列を含める。s03 の `example` の login は `alice` / `bob` / `routine-bot` で `user-N` 形式ではないので、`issue-108.json` / `pr-131.json` / `pr-131-review-threads.json` の `"login"` 値を `routine-bot` → `user-1`、`alice` → `user-2`、`bob` → `user-3` に直し（`issue-108.json` の `routine-bot` と `alice`、`pr-131.json` の `routine-bot`、`pr-131-review-threads.json` の `bob`）、`fake_test.go` でこの値を見ている期待値 2 か所（`TestFakeViewIssue` の `alice` → `user-2`、`TestFakeViewPR` の `routine-bot` → `user-1`）も合わせて直す
+- [ ] 5.2 利用者が採取する。issue-driven-sdd が稼働しているリポジトリ 1 件（V-2 で使うものと同じ）と alias を決め、リポジトリのルートで `go run ./cmd/sugi-loop-cli fixture capture --repo <owner/name> --alias <alias>` を実行し、要約行のファイル数・issue 数・PR 数が GitHub 上の open 件数と合うことを確認する
+- [ ] 5.3 `SUGI_LOOP_FIXTURE_ORIGIN=<owner/name> go test ./internal/gh/ -run Fixtures -v` が通ることを確認し、`internal/gh/testdata/fixtures/<alias>/` の各ファイルを読んで本文中の固有名詞（顧客名・他リポジトリ名・製品名）が残っていないか目視で確認する。残っていれば伏せ字の規則を直して再採取する（手で編集しない）
+- [ ] 5.4 `internal/gh/testdata/fixtures/<alias>/` だけを 1 コミットにする（コミットメッセージに元の `owner/name` を書かない）
+
+## 6. 最終確認
+
+- [x] 6.1 `gofmt -l .` が空で、`go build ./... && go vet ./... && go test ./...` が通ることを確認する（`golangci-lint run ./...` も s01 の CI が回すので通す）

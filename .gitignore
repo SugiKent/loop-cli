@@ -1,3 +1,5 @@
 /bin/
 /sugi-loop
 /cmd/sugi-loop/sugi-loop
+/sugi-loop-cli
+/cmd/sugi-loop-cli/sugi-loop-cli

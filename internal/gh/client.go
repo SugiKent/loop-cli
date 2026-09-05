@@ -80,13 +80,56 @@ func (c *Client) Check(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) SearchIssues(ctx context.Context, repos []string) ([]SearchIssue, error) {
+// 引数の組み立ては Capture と共有するため関数に分けてある。
+func argsSearchIssues(repos []string) []string {
 	args := []string{"search", "issues"}
 	for _, r := range repos {
 		args = append(args, "--repo", r)
 	}
-	args = append(args, "--state", "open", "--limit", "200",
+	return append(args, "--state", "open", "--limit", "200",
 		"--json", "repository,number,title,labels,updatedAt,url,body,commentsCount")
+}
+
+func argsSearchPRs(repos []string) []string {
+	args := []string{"search", "prs"}
+	for _, r := range repos {
+		args = append(args, "--repo", r)
+	}
+	return append(args, "--state", "open", "--limit", "200",
+		"--json", "repository,number,title,labels,updatedAt,url,body,isDraft")
+}
+
+func argsViewIssue(repo string, number int) []string {
+	return []string{"issue", "view", strconv.Itoa(number), "-R", repo,
+		"--json", "number,title,body,url,labels,comments"}
+}
+
+func argsPRView(repo string, number int, fields string) []string {
+	return []string{"pr", "view", strconv.Itoa(number), "-R", repo, "--json", fields}
+}
+
+func argsReviewThreads(repo string, number int) []string {
+	owner, name := splitRepo(repo)
+	return []string{"api", "graphql",
+		"-f", "owner=" + owner, "-f", "name=" + name, "-F", "number=" + strconv.Itoa(number),
+		"-f", "query=" + reviewThreadsQuery}
+}
+
+func argsCrossReferencedPRs(repo string, number int) []string {
+	owner, name := splitRepo(repo)
+	return []string{"api", "graphql",
+		"-f", "owner=" + owner, "-f", "name=" + name, "-F", "number=" + strconv.Itoa(number),
+		"-f", "query=" + crossReferencedPRsQuery}
+}
+
+func argsLabelTimeline(repo string, number int) []string {
+	owner, name := splitRepo(repo)
+	path := fmt.Sprintf("repos/%s/%s/issues/%d/timeline", owner, name, number)
+	return []string{"api", path, "--paginate", "--jq", labelTimelineJQ}
+}
+
+func (c *Client) SearchIssues(ctx context.Context, repos []string) ([]SearchIssue, error) {
+	args := argsSearchIssues(repos)
 
 	out, err := c.run(ctx, "", args...)
 	if err != nil {
@@ -100,12 +143,7 @@ func (c *Client) SearchIssues(ctx context.Context, repos []string) ([]SearchIssu
 }
 
 func (c *Client) SearchPRs(ctx context.Context, repos []string) ([]SearchPR, error) {
-	args := []string{"search", "prs"}
-	for _, r := range repos {
-		args = append(args, "--repo", r)
-	}
-	args = append(args, "--state", "open", "--limit", "200",
-		"--json", "repository,number,title,labels,updatedAt,url,body,isDraft")
+	args := argsSearchPRs(repos)
 
 	out, err := c.run(ctx, "", args...)
 	if err != nil {
@@ -119,8 +157,7 @@ func (c *Client) SearchPRs(ctx context.Context, repos []string) ([]SearchPR, err
 }
 
 func (c *Client) ViewIssue(ctx context.Context, repo string, number int) (*IssueDetail, error) {
-	args := []string{"issue", "view", strconv.Itoa(number), "-R", repo,
-		"--json", "number,title,body,url,labels,comments"}
+	args := argsViewIssue(repo, number)
 
 	out, err := c.run(ctx, "", args...)
 	if err != nil {
@@ -134,8 +171,7 @@ func (c *Client) ViewIssue(ctx context.Context, repo string, number int) (*Issue
 }
 
 func (c *Client) ViewPR(ctx context.Context, repo string, number int) (*PRDetail, error) {
-	args := []string{"pr", "view", strconv.Itoa(number), "-R", repo,
-		"--json", "number,title,body,url,labels,isDraft,comments"}
+	args := argsPRView(repo, number, "number,title,body,url,labels,isDraft,comments")
 
 	out, err := c.run(ctx, "", args...)
 	if err != nil {
@@ -148,24 +184,27 @@ func (c *Client) ViewPR(ctx context.Context, repo string, number int) (*PRDetail
 	return detail, nil
 }
 
+const prMergeStateFields = "mergeable,mergeStateStatus,statusCheckRollup,reviewDecision"
+
 // ViewPRMergeState は mergeable が UNKNOWN のとき RetryWait 待って 1 回だけ取り直す。
 // GitHub が mergeable を非同期に計算するため、直後の 1 回目は UNKNOWN になりやすい。
 func (c *Client) ViewPRMergeState(ctx context.Context, repo string, number int) (*PRMergeState, error) {
-	state, err := c.viewPRMergeStateOnce(ctx, repo, number)
-	if err != nil || state.Mergeable != "UNKNOWN" {
-		return state, err
+	out, err := c.prViewRaw(ctx, repo, number, prMergeStateFields)
+	if err != nil {
+		return nil, err
 	}
-	select {
-	case <-time.After(c.RetryWait):
-	case <-ctx.Done():
-		return nil, ctx.Err()
+	state, err := decodePRMergeState(out)
+	if err != nil {
+		return nil, decodeErr(argsPRView(repo, number, prMergeStateFields), err)
 	}
-	return c.viewPRMergeStateOnce(ctx, repo, number)
+	return state, nil
 }
 
-func (c *Client) viewPRMergeStateOnce(ctx context.Context, repo string, number int) (*PRMergeState, error) {
-	args := []string{"pr", "view", strconv.Itoa(number), "-R", repo,
-		"--json", "mergeable,mergeStateStatus,statusCheckRollup,reviewDecision"}
+// prViewRaw は pr view の標準出力を返す。mergeable が UNKNOWN なら RetryWait 後に 1 回だけ
+// 取り直し、2 回目も UNKNOWN ならその出力をそのまま返す（エラーにしない）。
+// fields には mergeable を含める（Capture の 11 フィールドと ViewPRMergeState の 4 フィールド）。
+func (c *Client) prViewRaw(ctx context.Context, repo string, number int, fields string) ([]byte, error) {
+	args := argsPRView(repo, number, fields)
 
 	out, err := c.run(ctx, "", args...)
 	if err != nil {
@@ -175,14 +214,19 @@ func (c *Client) viewPRMergeStateOnce(ctx context.Context, repo string, number i
 	if err != nil {
 		return nil, decodeErr(args, err)
 	}
-	return state, nil
+	if state.Mergeable != "UNKNOWN" {
+		return out, nil
+	}
+	select {
+	case <-time.After(c.RetryWait):
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	return c.run(ctx, "", args...)
 }
 
 func (c *Client) ReviewThreads(ctx context.Context, repo string, number int) ([]ReviewThread, error) {
-	owner, name := splitRepo(repo)
-	args := []string{"api", "graphql",
-		"-f", "owner=" + owner, "-f", "name=" + name, "-F", "number=" + strconv.Itoa(number),
-		"-f", "query=" + reviewThreadsQuery}
+	args := argsReviewThreads(repo, number)
 
 	out, err := c.run(ctx, "", args...)
 	if err != nil {
@@ -196,10 +240,7 @@ func (c *Client) ReviewThreads(ctx context.Context, repo string, number int) ([]
 }
 
 func (c *Client) CrossReferencedPRs(ctx context.Context, repo string, number int) ([]CrossReferencedPR, error) {
-	owner, name := splitRepo(repo)
-	args := []string{"api", "graphql",
-		"-f", "owner=" + owner, "-f", "name=" + name, "-F", "number=" + strconv.Itoa(number),
-		"-f", "query=" + crossReferencedPRsQuery}
+	args := argsCrossReferencedPRs(repo, number)
 
 	out, err := c.run(ctx, "", args...)
 	if err != nil {
@@ -213,9 +254,7 @@ func (c *Client) CrossReferencedPRs(ctx context.Context, repo string, number int
 }
 
 func (c *Client) LabelTimeline(ctx context.Context, repo string, number int) ([]LabelEvent, error) {
-	owner, name := splitRepo(repo)
-	path := fmt.Sprintf("repos/%s/%s/issues/%d/timeline", owner, name, number)
-	args := []string{"api", path, "--paginate", "--jq", labelTimelineJQ}
+	args := argsLabelTimeline(repo, number)
 
 	out, err := c.run(ctx, "", args...)
 	if err != nil {
