@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -112,33 +113,35 @@ func TestFetchExample(t *testing.T) {
 		t.Errorf("2 枚目の Situation = %q, want E", second.Result.Situation)
 	}
 
-	// question 付き issue だけ ViewIssue が呼ばれる。
+	// 全 issue に ViewIssue が呼ばれる（question の有無を問わない）。
 	var viewed []int
 	for _, c := range fake.Calls {
 		if c.Method == "ViewIssue" {
 			viewed = append(viewed, c.Number)
 		}
 	}
-	if !equalInts(viewed, []int{108}) {
-		t.Errorf("ViewIssue の呼び出し = %v, want [108]", viewed)
+	sort.Ints(viewed)
+	if !equalInts(viewed, []int{108, 140}) {
+		t.Errorf("ViewIssue の呼び出し = %v, want [108 140]", viewed)
 	}
 	if len(first.Issue.Comments) != 2 {
 		t.Errorf("issue 108 の Comments = %d 件, want 2", len(first.Issue.Comments))
 	}
-	if second.Issue.Comments != nil {
-		t.Errorf("issue 140 の Comments = %+v, want nil", second.Issue.Comments)
+	// issue-140.json のコメントは 0 件。取得できたので nil ではなく長さ 0 になる。
+	if c := second.Issue.Comments; c == nil || len(c) != 0 {
+		t.Errorf("issue 140 の Comments = %+v, want 長さ 0 の非 nil", c)
 	}
 
-	// question 付き PR はコメントを取り、merge 状態と review threads は取らない。
+	// question 付き PR でも merge 状態と review thread を取る。
 	pr := first.PRs[0]
 	if len(pr.Comments) != 1 {
 		t.Errorf("PR 131 の Comments = %d 件, want 1", len(pr.Comments))
 	}
-	if pr.MergeState != nil {
-		t.Errorf("PR 131 の MergeState = %+v, want nil", pr.MergeState)
+	if pr.MergeState == nil || pr.MergeState.Mergeable != "UNKNOWN" {
+		t.Errorf("PR 131 の MergeState = %+v, want Mergeable UNKNOWN", pr.MergeState)
 	}
-	if pr.ReviewThreads != nil {
-		t.Errorf("PR 131 の ReviewThreads = %+v, want nil", pr.ReviewThreads)
+	if len(pr.ReviewThreads) != 1 {
+		t.Errorf("PR 131 の ReviewThreads = %d 件, want 1", len(pr.ReviewThreads))
 	}
 }
 
@@ -153,7 +156,7 @@ func TestFetchLink(t *testing.T) {
 		t.Fatalf("issue 108 の PRs = %v, want [131 140 151]", prNumbers(card.PRs))
 	}
 
-	// merge 候補 PR（archive・未確定 0 件・question 無し）は merge 状態も取る。
+	// merge 候補 PR（archive・未確定 0 件・question 無し）。
 	pr151 := card.PRs[2]
 	if pr151.MergeState == nil || pr151.MergeState.Mergeable != "MERGEABLE" {
 		t.Errorf("PR 151 の MergeState = %+v, want MERGEABLE", pr151.MergeState)
@@ -161,17 +164,17 @@ func TestFetchLink(t *testing.T) {
 	if len(pr151.Comments) != 0 {
 		t.Errorf("PR 151 の Comments = %d 件, want 0", len(pr151.Comments))
 	}
-	if pr151.ReviewThreads != nil {
-		t.Errorf("PR 151 の ReviewThreads = %+v, want nil", pr151.ReviewThreads)
+	if pr151.ReviewThreads == nil || len(pr151.ReviewThreads) != 0 {
+		t.Errorf("PR 151 の ReviewThreads = %+v, want 長さ 0 の非 nil", pr151.ReviewThreads)
 	}
 	if pr151.Result.Situation != model.SituationC {
 		t.Errorf("PR 151 の Situation = %q, want C", pr151.Result.Situation)
 	}
 
-	// apply PR は review threads を取り、未確定 1 件なので merge 状態は取らない。
+	// 未確定 1 件の apply PR。merge 状態も取るが、未確定が 0 件でないので C にならない。
 	pr140 := card.PRs[1]
-	if pr140.MergeState != nil {
-		t.Errorf("PR 140 の MergeState = %+v, want nil", pr140.MergeState)
+	if pr140.MergeState == nil {
+		t.Error("PR 140 の MergeState = nil, want non-nil")
 	}
 	if len(pr140.ReviewThreads) != 1 {
 		t.Errorf("PR 140 の ReviewThreads = %d 件, want 1", len(pr140.ReviewThreads))
@@ -197,13 +200,19 @@ func TestFetchLink(t *testing.T) {
 		}
 	}
 
-	// 未確定 1 件以上の段階 PR は merge 状態を取らない。
+	// 詳細が埋まっても分類結果は変わらない: 未確定 2 件の propose PR は other のまま。
 	pr132 := lonePR(t, res, 132)
 	if len(pr132.Comments) != 1 {
 		t.Errorf("PR 132 の Comments = %d 件, want 1", len(pr132.Comments))
 	}
-	if pr132.MergeState != nil {
-		t.Errorf("PR 132 の MergeState = %+v, want nil", pr132.MergeState)
+	if pr132.MergeState == nil || pr132.MergeState.Mergeable != "MERGEABLE" {
+		t.Errorf("PR 132 の MergeState = %+v, want MERGEABLE", pr132.MergeState)
+	}
+	if pr132.ReviewThreads == nil || len(pr132.ReviewThreads) != 0 {
+		t.Errorf("PR 132 の ReviewThreads = %+v, want 長さ 0 の非 nil", pr132.ReviewThreads)
+	}
+	if pr132.Result.Situation != model.SituationOther {
+		t.Errorf("PR 132 の Situation = %q, want other", pr132.Result.Situation)
 	}
 
 	// question 無し PR でもコメントを取り、最新コメントが人なら進行中。
@@ -214,8 +223,17 @@ func TestFetchLink(t *testing.T) {
 	if len(pr90.ReviewThreads) != 1 {
 		t.Errorf("PR 90 の ReviewThreads = %d 件, want 1", len(pr90.ReviewThreads))
 	}
-	if pr90.MergeState != nil {
-		t.Errorf("PR 90 の MergeState = %+v, want nil", pr90.MergeState)
+	if pr90.MergeState == nil {
+		t.Error("PR 90 の MergeState = nil, want non-nil")
+	}
+
+	// question 無しの issue のコメントは分類に影響しない（規則 4 の分岐に入らない）。
+	issue140 := issueCard(t, res, "org/app", 140)
+	if len(issue140.Issue.Comments) != 1 {
+		t.Errorf("issue 140 の Comments = %d 件, want 1", len(issue140.Issue.Comments))
+	}
+	if issue140.Issue.Result.Situation != model.SituationE {
+		t.Errorf("issue 140 の Situation = %q, want E", issue140.Issue.Result.Situation)
 	}
 }
 
@@ -223,6 +241,9 @@ func TestFetchMultiRepo(t *testing.T) {
 	res, err := Fetch(t.Context(), gh.NewFake("testdata/multirepo"), []string{"org/app", "org/web"})
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
+	}
+	if len(res.Errors) != 0 {
+		t.Fatalf("Errors = %v, want 空", res.Errors)
 	}
 	if len(res.Cards) != 2 {
 		t.Fatalf("Cards 件数 = %d, want 2", len(res.Cards))
@@ -256,8 +277,8 @@ func TestFetchSameStage(t *testing.T) {
 		t.Errorf("PR 88 の Comments = %d 件、ReviewThreads = %d 件, want どちらも 1 件以上",
 			len(pr88.Comments), len(pr88.ReviewThreads))
 	}
-	if pr88.MergeState != nil {
-		t.Errorf("PR 88 の MergeState = %+v, want nil", pr88.MergeState)
+	if pr88.MergeState == nil {
+		t.Error("PR 88 の MergeState = nil, want non-nil")
 	}
 }
 
@@ -267,22 +288,26 @@ func TestFetchPartialFailure(t *testing.T) {
 	if !equalInts(prNumbers(card.PRs), []int{131}) {
 		t.Fatalf("issue 108 の PRs = %v, want [131]", prNumbers(card.PRs))
 	}
-	if card.PRs[0].Comments != nil {
-		t.Errorf("PR 131 の Comments = %+v, want nil", card.PRs[0].Comments)
+	pr131 := card.PRs[0]
+	if pr131.Comments != nil || pr131.MergeState != nil || pr131.ReviewThreads != nil {
+		t.Errorf("PR 131 の詳細 = %+v / %+v / %+v, want すべて nil",
+			pr131.Comments, pr131.MergeState, pr131.ReviewThreads)
 	}
-	if card.PRs[0].Result.Situation != model.SituationOther {
-		t.Errorf("PR 131 の Situation = %q, want other", card.PRs[0].Result.Situation)
+	if pr131.Result.Situation != model.SituationOther {
+		t.Errorf("PR 131 の Situation = %q, want other", pr131.Result.Situation)
 	}
 	if len(card.Issue.Comments) != 2 {
 		t.Errorf("issue 108 の Comments = %d 件, want 2", len(card.Issue.Comments))
 	}
-	if len(res.Errors) != 1 {
-		t.Fatalf("Errors = %v, want 1 件", res.Errors)
+
+	// 1 つの PR の 3 つの詳細が失敗し、並びはメソッド順で決まる（完了順に依存しない）。
+	if len(res.Errors) != 3 {
+		t.Fatalf("Errors = %v, want 3 件", res.Errors)
 	}
-	msg := res.Errors[0].Error()
-	for _, want := range []string{"ViewPR", "org/app", "131", "pr-131.json"} {
-		if !strings.Contains(msg, want) {
-			t.Errorf("Errors[0] = %q, %q を含まない", msg, want)
+	for i, method := range []string{"ViewPR", "ViewPRMergeState", "ReviewThreads"} {
+		msg := res.Errors[i].Error()
+		if !strings.HasPrefix(msg, method+" org/app#131: ") {
+			t.Errorf("Errors[%d] = %q, want %q で始まる", i, msg, method+" org/app#131: ")
 		}
 	}
 }

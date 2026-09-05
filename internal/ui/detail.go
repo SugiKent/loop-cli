@@ -221,7 +221,7 @@ func (m Model) prListRow(i int, stage string, pr model.PR) string {
 	line += " labels: " + strings.Join(pr.Labels, " ")
 	switch {
 	case pr.MergeState == nil:
-		line += " checks 未取得 mergeable 未取得"
+		line += " checks 取得失敗 mergeable 取得失敗"
 	case classify.ChecksGreen(pr.MergeState):
 		line += " checks 緑 mergeable " + pr.MergeState.Mergeable
 	default:
@@ -284,10 +284,10 @@ func questionLines(body string) []string {
 	return lines
 }
 
-// commentSection はコメント時系列。nil は未取得、長さ 0 はなし（s05 が表示に委ねた区別）。
+// commentSection はコメント時系列。nil は取得失敗、長さ 0 はなし（s05 が表示に委ねた区別）。
 func (m Model) commentSection(comments []model.Comment) []string {
 	if comments == nil {
-		return []string{"コメント: 未取得"}
+		return []string{"コメント: 取得失敗"}
 	}
 	if len(comments) == 0 {
 		return []string{"コメント: なし"}
@@ -335,10 +335,10 @@ func (m Model) prBodyLines() []string {
 	return append(lines, m.reviewThreadLines(pr.ReviewThreads)...)
 }
 
-// checkLines は merge 状態と checks。nil は未取得（s07 は merge 候補にしか取らない）。
+// checkLines は merge 状態と checks。s20 は全 PR に取りに行くので nil は取得失敗を意味する。
 func checkLines(ms *gh.PRMergeState) []string {
 	if ms == nil {
-		return []string{"checks: 未取得"}
+		return []string{"checks: 取得失敗"}
 	}
 	lines := []string{strings.TrimSpace("mergeable: " + ms.Mergeable + " " + ms.MergeStateStatus)}
 	if len(ms.StatusCheckRollup) == 0 {
@@ -362,7 +362,7 @@ func checkLines(ms *gh.PRMergeState) []string {
 // reviewThreadLines は review thread を未 resolve 先頭で並べる。thread のコメントは畳まない。
 func (m Model) reviewThreadLines(threads []gh.ReviewThread) []string {
 	if threads == nil {
-		return []string{"review thread: 未取得"}
+		return []string{"review thread: 取得失敗"}
 	}
 	if len(threads) == 0 {
 		return []string{"review thread: なし"}

@@ -25,10 +25,12 @@ type Result struct {
 }
 
 // detailError は Errors を決定的に並べるために発生元を保持する。
+// 1 つの PR が 3 つの詳細で失敗し得るので、メソッドも並び順のキーに使う。
 type detailError struct {
 	isPR   bool
 	repo   string
 	number int
+	method string
 	err    error
 }
 
@@ -72,7 +74,7 @@ func call[T any](ctx context.Context, f func(context.Context) (T, error)) (T, er
 	return f(c)
 }
 
-// fetchDetails は分類に必要な詳細だけを並行取得し、部分失敗を返す。
+// fetchDetails は全 issue / 全 PR の詳細を並行取得し、部分失敗を返す。
 func fetchDetails(ctx context.Context, client gh.GHClient, issues []model.Issue, prs []model.PR) []detailError {
 	var (
 		wg   sync.WaitGroup
@@ -83,7 +85,7 @@ func fetchDetails(ctx context.Context, client gh.GHClient, issues []model.Issue,
 	fail := func(isPR bool, method, repo string, number int, err error) {
 		mu.Lock()
 		defer mu.Unlock()
-		errs = append(errs, detailError{isPR: isPR, repo: repo, number: number,
+		errs = append(errs, detailError{isPR: isPR, repo: repo, number: number, method: method,
 			err: fmt.Errorf("%s %s#%d: %w", method, repo, number, err)})
 	}
 	run := func(f func()) {
@@ -97,10 +99,7 @@ func fetchDetails(ctx context.Context, client gh.GHClient, issues []model.Issue,
 	}
 
 	for i := range issues {
-		// 1. question 付き issue のコメント（局面 B と進行中の規則 4 / 5）。
-		if !model.HasLabel(issues[i].Labels, model.LabelQuestion) {
-			continue
-		}
+		// 1. 全 open issue のコメント。
 		run(func() {
 			detail, err := call(ctx, func(ctx context.Context) (*gh.IssueDetail, error) {
 				return client.ViewIssue(ctx, issues[i].Repo, issues[i].Number)
@@ -115,11 +114,7 @@ func fetchDetails(ctx context.Context, client gh.GHClient, issues []model.Issue,
 
 	for i := range prs {
 		pr := &prs[i]
-		// 取得対象は search 結果だけで決まるので、ゴルーチンを起こす前に判定する。
-		mergeCandidate := isMergeCandidate(*pr)
-		isApply := model.HasLabel(pr.Labels, model.LabelApply)
-
-		// 2. 全 open PR のコメント（局面 A と規則 2 / 3）。
+		// 2. 全 open PR のコメント。
 		run(func() {
 			detail, err := call(ctx, func(ctx context.Context) (*gh.PRDetail, error) {
 				return client.ViewPR(ctx, pr.Repo, pr.Number)
@@ -130,45 +125,32 @@ func fetchDetails(ctx context.Context, client gh.GHClient, issues []model.Issue,
 			}
 			pr.Comments = comments(detail.Comments)
 		})
-		// 3. merge 候補 PR の merge 状態（局面 C）。
-		if mergeCandidate {
-			run(func() {
-				ms, err := call(ctx, func(ctx context.Context) (*gh.PRMergeState, error) {
-					return client.ViewPRMergeState(ctx, pr.Repo, pr.Number)
-				})
-				if err != nil {
-					fail(true, "ViewPRMergeState", pr.Repo, pr.Number, err)
-					return
-				}
-				pr.MergeState = ms
+		// 3. 全 open PR の merge 状態。
+		run(func() {
+			ms, err := call(ctx, func(ctx context.Context) (*gh.PRMergeState, error) {
+				return client.ViewPRMergeState(ctx, pr.Repo, pr.Number)
 			})
-		}
-		// 4. apply PR の review thread（局面 D）。question の有無は問わない。
-		if isApply {
-			run(func() {
-				th, err := call(ctx, func(ctx context.Context) ([]gh.ReviewThread, error) {
-					return client.ReviewThreads(ctx, pr.Repo, pr.Number)
-				})
-				if err != nil {
-					fail(true, "ReviewThreads", pr.Repo, pr.Number, err)
-					return
-				}
-				pr.ReviewThreads = th
+			if err != nil {
+				fail(true, "ViewPRMergeState", pr.Repo, pr.Number, err)
+				return
+			}
+			pr.MergeState = ms
+		})
+		// 4. 全 open PR の review thread。
+		run(func() {
+			th, err := call(ctx, func(ctx context.Context) ([]gh.ReviewThread, error) {
+				return client.ReviewThreads(ctx, pr.Repo, pr.Number)
 			})
-		}
+			if err != nil {
+				fail(true, "ReviewThreads", pr.Repo, pr.Number, err)
+				return
+			}
+			pr.ReviewThreads = th
+		})
 	}
 
 	wg.Wait()
 	return errs
-}
-
-// isMergeCandidate は局面 C の条件のうち search 結果だけで決まる部分。IsDraft は見ない。
-func isMergeCandidate(pr model.PR) bool {
-	if len(model.PRStages(pr.Labels)) == 0 || model.HasLabel(pr.Labels, model.LabelQuestion) {
-		return false
-	}
-	n, ok := model.ParseUndecided(pr.Body)
-	return ok && n == 0
 }
 
 func comments(cs []gh.Comment) []model.Comment {
@@ -236,7 +218,20 @@ func stageRank(pr model.PR) int {
 	}
 }
 
-// sortErrors は issue のエラーを (repo, number) 順、続けて PR のエラーを (repo, number) 順に並べる。
+// methodRank は同じ PR の複数の失敗を並行実行の完了順に依らず並べるための順位。
+func methodRank(method string) int {
+	switch method {
+	case "ViewPR":
+		return 0
+	case "ViewPRMergeState":
+		return 1
+	default: // ReviewThreads。issue 側は ViewIssue の 1 種類だけなので順位を使わない。
+		return 2
+	}
+}
+
+// sortErrors は issue のエラーを (repo, number) 順、
+// 続けて PR のエラーを (repo, number, メソッド) 順に並べる。
 func sortErrors(errs []detailError) []error {
 	sort.SliceStable(errs, func(i, j int) bool {
 		if errs[i].isPR != errs[j].isPR {
@@ -245,7 +240,10 @@ func sortErrors(errs []detailError) []error {
 		if errs[i].repo != errs[j].repo {
 			return errs[i].repo < errs[j].repo
 		}
-		return errs[i].number < errs[j].number
+		if errs[i].number != errs[j].number {
+			return errs[i].number < errs[j].number
+		}
+		return methodRank(errs[i].method) < methodRank(errs[j].method)
 	})
 	var out []error
 	for _, e := range errs {

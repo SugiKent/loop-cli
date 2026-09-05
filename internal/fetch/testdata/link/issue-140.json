@@ -1,0 +1,22 @@
+{
+  "body": "起動時に設定ファイルが無いと落ちる。",
+  "comments": [
+    {
+      "id": "IC_kwDOA140",
+      "author": {"login": "user-2"},
+      "authorAssociation": "OWNER",
+      "body": "こちらでも再現しました。",
+      "createdAt": "2026-09-04T10:00:00Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/org/app/issues/140#issuecomment-3101",
+      "viewerDidAuthor": true
+    }
+  ],
+  "labels": [],
+  "number": 140,
+  "title": "設定ファイル未作成でクラッシュする",
+  "url": "https://github.com/org/app/issues/140"
+}

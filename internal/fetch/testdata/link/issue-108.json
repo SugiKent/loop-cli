@@ -1,0 +1,14 @@
+{
+  "body": "認証まわりの仕様を決めたい。",
+  "comments": [],
+  "labels": [
+    {
+      "name": "stage:propose",
+      "color": "ededed",
+      "description": ""
+    }
+  ],
+  "number": 108,
+  "title": "ログインのセッション仕様を決める",
+  "url": "https://github.com/org/app/issues/108"
+}

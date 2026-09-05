@@ -17,5 +17,18 @@
     "title": "ログインのセッション仕様を決める",
     "updatedAt": "2026-09-04T09:00:00Z",
     "url": "https://github.com/org/app/issues/108"
+  },
+  {
+    "body": "起動時に設定ファイルが無いと落ちる。",
+    "commentsCount": 1,
+    "labels": [],
+    "number": 140,
+    "repository": {
+      "name": "app",
+      "nameWithOwner": "org/app"
+    },
+    "title": "設定ファイル未作成でクラッシュする",
+    "updatedAt": "2026-09-04T10:00:00Z",
+    "url": "https://github.com/org/app/issues/140"
   }
 ]

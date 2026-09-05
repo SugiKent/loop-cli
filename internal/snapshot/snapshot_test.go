@@ -67,8 +67,9 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 		t.Errorf("往復で変わった:\n got %+v\nwant %+v", got, before)
 	}
 
-	if c := cardOf(t, got.Cards, 140); c.Issue.Comments != nil {
-		t.Errorf("issue 140 の Comments = %v, want nil", c.Issue.Comments)
+	// s20 で全 issue のコメントを取るので、issue 140 は長さ 0 の非 nil で往復する。
+	if c := cardOf(t, got.Cards, 140).Issue.Comments; c == nil || len(c) != 0 {
+		t.Errorf("issue 140 の Comments = %v, want 長さ 0 の非 nil", c)
 	}
 	wantThreads := cardOf(t, cards, 108).PRs[0].ReviewThreads
 	gotThreads := cardOf(t, got.Cards, 108).PRs[0].ReviewThreads

@@ -265,7 +265,8 @@ func TestPRListOfIssue108(t *testing.T) {
 	if !strings.HasPrefix(row, "▶") {
 		t.Errorf("選択中の PR の行が ▶ で始まらない: %q", row)
 	}
-	wantOrder(t, []string{row}, "[propose] PR#131 open", "1 行目なし", "labels: propose question", "checks 未取得", "mergeable 未取得")
+	// s20 で全 PR の merge 状態を取るので、pr-131.json の実値が出る（UNKNOWN・ci/legacy PENDING）。
+	wantOrder(t, []string{row}, "[propose] PR#131 open", "1 行目なし", "labels: propose question", "checks 緑以外", "mergeable UNKNOWN")
 	for _, want := range []string{"[apply] なし", "[archive] なし"} {
 		if _, ok := lineWith(lines, want); !ok {
 			t.Errorf("%q の行が無い", want)
@@ -313,7 +314,7 @@ func TestCardBodyOfIssue108(t *testing.T) {
 	if !strings.Contains(text, "認証まわりの仕様を決めたい") {
 		t.Error("本文が出ていない")
 	}
-	for _, ng := range []string{"blocked-by:", "コメント: 未取得", "コメント: なし"} {
+	for _, ng := range []string{"blocked-by:", "コメント: 取得失敗", "コメント: なし"} {
 		if strings.Contains(text, ng) {
 			t.Errorf("本文領域に %q がある", ng)
 		}
@@ -342,7 +343,9 @@ func TestBlockedByHumanWithoutQuestionsShowsBody(t *testing.T) {
 	wantOrder(t, linesOf(m), "blocked-by: human", "次の方針をコメントで教えてください")
 }
 
-func TestCommentsNotFetched(t *testing.T) {
+// TestCommentsEmpty は、取得できてコメントが 0 件の issue が「なし」と出ることを検証する
+// （issue-140.json の comments は空配列。s20 で全 issue のコメントを取る）。
+func TestCommentsEmpty(t *testing.T) {
 	res := exampleResult(t)
 	m := detailModel(120, 40, res.Cards)
 	// 今やるタブの 1 件目は issue 108 なので、issue 140 のカードを直接開く。
@@ -351,12 +354,43 @@ func TestCommentsNotFetched(t *testing.T) {
 	m.refreshDetail()
 
 	text := plainText(m)
-	if !strings.Contains(text, "起動時に設定ファイルが無いと落ちる") || !strings.Contains(text, "コメント: 未取得") {
+	if !strings.Contains(text, "起動時に設定ファイルが無いと落ちる") || !strings.Contains(text, "コメント: なし") {
 		t.Errorf("issue 140 の詳細が想定と違う:\n%s", text)
 	}
-	if strings.Contains(text, "▌") {
-		t.Error("コメント未取得の issue に ▌ がある")
+	for _, ng := range []string{"コメント: 取得失敗", "▌"} {
+		if strings.Contains(text, ng) {
+			t.Errorf("コメント 0 件の issue に %q がある", ng)
+		}
 	}
+}
+
+// TestCommentsFetchFailed は Comments が nil（取得失敗）の issue の表示を検証する。
+func TestCommentsFetchFailed(t *testing.T) {
+	issue := &model.Issue{Number: 500, Title: "取得に失敗した issue", Body: "本文。", UpdatedAt: at}
+	m, _ := send(detailModel(120, 40, []model.Card{issueCard(issue, nil, "確認する")}), enterKey)
+
+	text := plainText(m)
+	if !strings.Contains(text, "コメント: 取得失敗") {
+		t.Errorf("`コメント: 取得失敗` が無い:\n%s", text)
+	}
+	for _, ng := range []string{"コメント: なし", "▌"} {
+		if strings.Contains(text, ng) {
+			t.Errorf("取得失敗の issue に %q がある", ng)
+		}
+	}
+}
+
+// TestPRListFetchFailed は、カード詳細の PR 行の checks / mergeable の取得失敗表示を検証する。
+func TestPRListFetchFailed(t *testing.T) {
+	issue := &model.Issue{Number: 501, Title: "PR の詳細が取れないカード", UpdatedAt: at}
+	card := issueCard(issue, []model.PR{prOf(131, "OPEN", []string{model.LabelPropose})}, "確認する")
+	m, _ := send(detailModel(120, 40, []model.Card{card}), enterKey)
+
+	row, ok := lineWith(linesOf(m), "[propose] PR#131")
+	if !ok {
+		t.Fatal("PR 131 の行が無い")
+	}
+	wantOrder(t, []string{row}, "[propose] PR#131 open", "checks 取得失敗", "mergeable 取得失敗")
 }
 
 func TestAICommentIsCollapsedAndExpandedByX(t *testing.T) {
@@ -420,11 +454,33 @@ func TestPRDetailOfPR131(t *testing.T) {
 		"[propose] open  labels: propose question",
 		"1 行目に未確定の判断が無い",
 		"紐づく issue: #108",
-		"checks: 未取得",
+		"mergeable: UNKNOWN BLOCKED",
+		"test: SUCCESS",
+		"ci/legacy: PENDING",
 		"issue #108 の提案",
 		"▌AI  19:31  Q1: マイグレーションを分けますか。  (+0 行)",
-		"review thread: 未取得",
+		"thread 未 resolve",
 	)
+	// s20 で全 PR の merge 状態と review thread を取るので、どちらも埋まる。
+	for _, ng := range []string{"checks: 取得失敗", "review thread: 取得失敗"} {
+		if strings.Contains(plainText(m), ng) {
+			t.Errorf("PR 131 の詳細に %q がある", ng)
+		}
+	}
+}
+
+// TestPRDetailFetchFailed は PR 詳細の 3 箇所の取得失敗表示を検証する。
+func TestPRDetailFetchFailed(t *testing.T) {
+	issue := &model.Issue{Number: 502, Title: "詳細が取れない PR のカード", UpdatedAt: at}
+	card := issueCard(issue, []model.PR{prOf(131, "OPEN", []string{model.LabelPropose})}, "確認する")
+	m, _ := send(detailModel(120, 40, []model.Card{card}), enterKey, enterKey)
+
+	wantOrder(t, linesOf(m), "checks: 取得失敗", "コメント: 取得失敗", "review thread: 取得失敗")
+	for _, ng := range []string{"checks: なし", "コメント: なし", "review thread: なし"} {
+		if strings.Contains(plainText(m), ng) {
+			t.Errorf("取得失敗の PR 詳細に %q がある", ng)
+		}
+	}
 }
 
 func TestPRDetailReviewThreadsAndChecks(t *testing.T) {

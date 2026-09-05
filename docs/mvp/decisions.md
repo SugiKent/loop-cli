@@ -38,6 +38,22 @@ gh search prs --repo O/a --repo O/b … --state open --limit 200 \
 2026-09-05-1805 追記: `blocked` の issue に対する `blocked-by: human` 検出の行を `question` の issue に置き換えた。上流が
 `blocked-by: human` を `question` ラベルで可視化するようになり、ラベルだけで局面 B を判定できる（D-004 を見る）。
 
+2026-09-05-2130 追記（s20-fetch-all-details）: **上の遅延取得表をやめ、詳細は全件先取りにした。** search で得た
+すべての open issue に `gh issue view --json comments`、すべての open PR に `gh pr view --json comments`・
+`gh pr view --json mergeable,…`・`gh api graphql`（reviewThreads）を無条件に呼ぶ。理由は、取得条件から外れた対象の
+詳細が `nil` のまま残り、カード詳細と PR 詳細に `未取得` が並ぶこと。一覧を見ても「調べていないから分からない」が
+残るので、確認の手数が減らないという道具の目的そのものを損なっていた。全件取得にすると `nil` は「取得に失敗した」
+だけを意味するようになり、表示も `取得失敗` に変わる。分類結果は変わらない（`classify` が詳細を読む分岐は
+`question` / merge 候補の条件 / `apply` ラベルで守られており、上の取得条件と一致していた）。
+
+呼び出し回数は open が issue N 件・PR M 件のとき `2 + N + 3M` になる（従来は `2 + α + M`）。search 2 回は REST の
+search 枠（30 req/分）のままで変わらず、増えるのは GraphQL 枠（5,000 point/時）だけである。GraphQL は回数ではなく
+point で数えるので単価は実測が要るが、**仮に 1 呼び出し 1 point とする**と `refresh_interval_sec` の既定値 120 秒
+（30 回/時）では 1 更新あたり 166 回が上限の境目で、search の 2 回を除くと `N + 3M ≤ 164` になる。issue 100 件 +
+PR 20 件（160）は余裕、issue 200 件 + PR 50 件（350）は超える。この枠は sugi-loop の専有ではなく、手動の `R` と
+利用者自身の他の `gh` 利用が同じトークンの枠を使う。取得件数の上限やレート制限のガードは設けていない。
+`detailConcurrency` は 4 のままなので、呼び出しが増えた分だけ 1 回の更新にかかる時間は伸びる。
+
 **Issue と PR の紐づけ（カード化）** は 2 つの根拠を合わせる。どちらも `gh` で取れる（稼働リポジトリで確認済み）。
 
 1. PR 側: title の `[<段階>] #<n>` と本文の `Refs #n` / `Closes #n` をパースする。search 結果の title / body だけで済み、追加呼び出し不要。
@@ -155,5 +171,6 @@ TUI が書くラベルは `stage:todo` と `s` の `stage:propose` の 2 つだ�
 
 | 日時 | 変更内容 | 理由 |
 | --- | --- | --- |
+| 2026-09-05-2130 | D-001 の遅延取得表を全件先取りに置き換え、呼び出し回数の見積もりを追記 | 取得条件から外れた詳細が `未取得` のまま並び、確認の手数が減らなかったため（s20-fetch-all-details） |
 | 2026-09-05-1805 | D-004 を追加、D-001 の遅延取得表の `blocked` 行を `question` の issue に置換 | 上流 `d8db3842` の規約変更に同期するため |
 | 2026-09-05-1407 | `docs/mvp/design.md` のデータ層（取得・キャッシュ）・技術選定・参考リンクを意思決定記録として分離 | docs 管理規約が求める `docs/mvp/decisions.md` を正本にし、各決定に決定日時を付けて後から変更履歴を追えるようにするため |
