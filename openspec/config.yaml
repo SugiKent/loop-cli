@@ -1,0 +1,31 @@
+schema: spec-driven
+
+context: |
+  プロジェクト: sugi-loop。issue-driven-sdd（Claude Code Routines が GitHub Issue のラベルで propose → apply → archive を回す構成）で
+  「人の出番だけ」を複数リポジトリ横断で 1 本のキューに並べて捌く TUI。`gh` CLI をサブプロセスとして使い、DB は持たない。
+  技術スタック: Go 1.26 / Bubble Tea v2 / Bubbles v2 / Lip Gloss v2 / Glamour / huh。配布は go install。
+  正本ドキュメント（必ず読む）:
+    - docs/mvp/mvp.md（体験・画面・キーバインド・設定ファイル）
+    - docs/mvp/decisions.md（D-001〜D-004: データ取得・キャッシュ・技術選定・上流同期）
+    - docs/mvp/implementation-tasks.md（実装順序。change はこの粒度）
+    - docs/mvp/validation-plan.md（V-1 / V-2。未定事項あり）
+    - docs/domain/issue-driven-sdd/human-turn-signals.md（局面 A〜G の判定表と書き込み不変条件 1〜8）
+  内部構成（D-003）: cmd/sugi-loop, cmd/sugi-loop-cli, internal/{config,gh,model,classify,ui,action}
+  ラベル名と routine マーカー（<!-- routine -->）はプラグイン規約に固定。TUI が書くラベルは stage:todo と s の stage:propose のみ。
+  プロジェクトの CLAUDE.md（シンプルさ最優先・投機的機能を書かない）に従う。
+
+rules:
+  proposal:
+    - 日本語で書く
+    - capability 名は kebab-case の ASCII
+    - docs/mvp と docs/domain に無い仕様を発明しない。未決事項は design.md の「未決事項」に書く
+  specs:
+    - 日本語で書く。Requirement 名と Scenario 名も日本語で良い
+    - Scenario は必ず `####` 4 つで書く
+    - 先行 change が導入した capability を拡張する場合、原則 ADDED で新しい Requirement を足す。挙動を変える場合だけ MODIFIED（先行 change の specs から Requirement ブロック全体をコピーして書き換える）
+  design:
+    - 日本語で書く。Bubble Tea v2 等のライブラリ API シグネチャを断定しない（振る舞いで書く）
+    - docs が沈黙・未決の点は「未決事項」節に列挙し、実装者が選ぶ既定値を 1 つ示す
+  tasks:
+    - 日本語で書く。1 タスクは 1 ファイル群 + テストが対応する粒度
+    - 各 change の最後に `go build ./... && go vet ./... && go test ./...` が通ることを確認するタスクを入れる
