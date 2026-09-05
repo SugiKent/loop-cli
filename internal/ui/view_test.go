@@ -87,7 +87,7 @@ func TestFooterShowsOnlyImplementedKeys(t *testing.T) {
 	lines := plain(newModel(nil))
 	footer := lines[len(lines)-1]
 
-	order(t, footer, "Enter 開く", "a 回答", "t todo", "o ブラウザ", "R 更新", "? ヘルプ", "q 終了")
+	order(t, footer, "Enter 開く", "a 回答", "t todo", "o ブラウザ", "R 更新", "? ヘルプ", "u URL", "q 終了")
 	for _, ng := range []string{"j/k 移動", "1-4/Tab タブ", "m merge", "Esc 戻る"} {
 		if strings.Contains(footer, ng) {
 			t.Errorf("フッタに出さないキー %q がある: %q", ng, footer)
@@ -408,17 +408,17 @@ func indexOf(lines []string, s string) (int, bool) {
 }
 
 // TestHintWidths はフッタのヒントが既定幅 80 に収まる設計どおりの表示幅であることを検証する。
-// キューは 64 列（取得中でも 64 + 1 + 8 = 73 で両方出る）、カード詳細は 101 列だが
-// `? ヘルプ` が 65 列目で終わるのでヘルプの入口は幅 80 でも見える。
+// キューは 71 列（取得中でも 71 + 1 + 8 = 80 で両方出る）、カード詳細は 108 列だが
+// `? ヘルプ` が 65 列目、`u URL` が 72 列目で終わるのでヘルプと URL 一覧の入口は幅 80 でも見える。
 func TestHintWidths(t *testing.T) {
 	card := Model{screen: screenCard, detail: detailState{card: model.Card{PRs: []model.PR{{Number: 131}}}}}
 	cases := map[string]struct {
 		hint string
 		want int
 	}{
-		"キュー":   {newModel(nil).queueHint(), 64},
-		"PR 詳細": {Model{screen: screenPR}.detailHint(), 66},
-		"カード詳細": {card.detailHint(), 101},
+		"キュー":   {newModel(nil).queueHint(), 71},
+		"PR 詳細": {Model{screen: screenPR}.detailHint(), 73},
+		"カード詳細": {card.detailHint(), 108},
 	}
 	for name, tc := range cases {
 		if got := ansi.StringWidth(tc.hint); got != tc.want {
@@ -429,6 +429,9 @@ func TestHintWidths(t *testing.T) {
 	hint := card.detailHint()
 	if end := ansi.StringWidth(hint[:strings.Index(hint, "? ヘルプ")]) + ansi.StringWidth("? ヘルプ"); end != 65 {
 		t.Errorf("カード詳細の `? ヘルプ` が %d 列目で終わる, want 65: %q", end, hint)
+	}
+	if end := ansi.StringWidth(hint[:strings.Index(hint, "u URL")]) + ansi.StringWidth("u URL"); end != 72 {
+		t.Errorf("カード詳細の `u URL` が %d 列目で終わる, want 72: %q", end, hint)
 	}
 }
 

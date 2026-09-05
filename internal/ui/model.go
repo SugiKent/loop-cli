@@ -57,6 +57,7 @@ type Model struct {
 	screen   screen
 	detail   detailState
 	helpFrom screen // ヘルプ画面を開いた画面。? / Esc で戻る先
+	urls     urlListState
 
 	answer         answerState
 	writing        bool
@@ -175,6 +176,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case browsedMsg:
 		return m.updateBrowsed(msg), nil
 
+	case openedURLMsg:
+		return m.updateOpenedURL(msg), nil
+
 	case refreshTickMsg:
 		return m.updateTick()
 
@@ -189,6 +193,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// ヘルプ画面は a / t / o より先に振り分ける（後ろだと閉じずに書き込みが起きる）。
 		if m.screen == screenHelp {
 			return m.updateHelpKey(key), nil
+		}
+		// URL 一覧画面と u も a / t / o / ? より先に振り分ける
+		// （後ろだと一覧の裏にある対象へ書き込みやブラウザ起動が起きる）。
+		// 一覧画面の分岐が先なので、一覧を出したまま u を押しても戻り先は上書きされない。
+		if m.screen == screenURL {
+			return m.updateURLKey(key)
+		}
+		if key == "u" {
+			return m.urlKey()
 		}
 		// a は 3 画面すべてで効き、対象は画面が見せているものに決まる。
 		if key == "a" {

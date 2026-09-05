@@ -600,7 +600,7 @@ func TestDetailFooters(t *testing.T) {
 
 	lines := linesOf(m)
 	footer := lines[len(lines)-1]
-	for _, want := range []string{"Esc 戻る", "Tab PR 選択", "x 展開", "a 回答", "t todo", "o ブラウザ", "? ヘルプ", "q 終了"} {
+	for _, want := range []string{"Esc 戻る", "Tab PR 選択", "x 展開", "a 回答", "t todo", "o ブラウザ", "? ヘルプ", "u URL", "q 終了"} {
 		if !strings.Contains(footer, want) {
 			t.Errorf("カード詳細のフッタに %q が無い: %q", want, footer)
 		}
@@ -614,7 +614,7 @@ func TestDetailFooters(t *testing.T) {
 	m, _ = send(m, enterKey)
 	lines = linesOf(m)
 	footer = lines[len(lines)-1]
-	for _, want := range []string{"Esc 戻る", "g issue へ", "a 回答", "o ブラウザ", "? ヘルプ", "q 終了"} {
+	for _, want := range []string{"Esc 戻る", "g issue へ", "a 回答", "o ブラウザ", "? ヘルプ", "u URL", "q 終了"} {
 		if !strings.Contains(footer, want) {
 			t.Errorf("PR 詳細のフッタに %q が無い: %q", want, footer)
 		}
@@ -635,7 +635,7 @@ func TestFooterWithoutPRs(t *testing.T) {
 
 	lines := linesOf(m)
 	footer := lines[len(lines)-1]
-	for _, want := range []string{"Esc 戻る", "x 展開", "t todo", "o ブラウザ"} {
+	for _, want := range []string{"Esc 戻る", "x 展開", "t todo", "o ブラウザ", "u URL"} {
 		if !strings.Contains(footer, want) {
 			t.Errorf("フッタに %q が無い: %q", want, footer)
 		}

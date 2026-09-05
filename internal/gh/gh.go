@@ -27,6 +27,7 @@ type GHClient interface {
 	CreateIssue(ctx context.Context, repo string, title string, body string) (string, error)
 	ReplyReviewThread(ctx context.Context, repo string, number int, commentID int64, body string) error
 	Browse(ctx context.Context, repo string, number int) error
+	OpenURL(ctx context.Context, url string) error
 }
 
 // Error は gh が非 0 で終了したことを表す。呼び出し側は errors.As でデコード失敗と区別する。

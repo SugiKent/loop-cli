@@ -23,6 +23,7 @@ type Call struct {
 	MergeMethod string
 	Title       string
 	CommentID   int64
+	URL         string
 }
 
 // fixture ファイル名。Fake の読み取りと Client.Capture の map キーが同じ名前を使う。
@@ -176,5 +177,10 @@ func (f *Fake) ReplyReviewThread(_ context.Context, repo string, number int, com
 
 func (f *Fake) Browse(_ context.Context, repo string, number int) error {
 	f.record(Call{Method: "Browse", Repo: repo, Number: number})
+	return nil
+}
+
+func (f *Fake) OpenURL(_ context.Context, url string) error {
+	f.record(Call{Method: "OpenURL", URL: url})
 	return nil
 }

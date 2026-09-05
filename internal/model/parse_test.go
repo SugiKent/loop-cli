@@ -129,3 +129,52 @@ func TestParseQuestionsWithoutHeadingIsEmpty(t *testing.T) {
 		t.Errorf("ParseQuestions = %+v, want 空", qs)
 	}
 }
+
+// TestParseLinks は本文から取り出す URL とリンクテキストを検証する。
+func TestParseLinks(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want []Link
+	}{
+		{
+			name: "裸の URL と Markdown リンクを出現順に取る",
+			body: "設計は [設計メモ](https://example.com/design) を見る。\n参考: https://example.com/ref\n",
+			want: []Link{
+				{Text: "設計メモ", URL: "https://example.com/design"},
+				{URL: "https://example.com/ref"},
+			},
+		},
+		{
+			name: "末尾の句読点と閉じ括弧を含めない",
+			body: "詳細は https://example.com/a。\n（https://example.com/b）\n<https://example.com/c>",
+			want: []Link{
+				{URL: "https://example.com/a"},
+				{URL: "https://example.com/b"},
+				{URL: "https://example.com/c"},
+			},
+		},
+		{
+			name: "参照記法と相対リンクは取らない",
+			body: "Closes #108\nissue org/app#140 も参照。\n[手順](./docs/mvp/mvp.md) と @user-1",
+		},
+		{
+			name: "同じ URL が 2 回あれば 2 件返る",
+			body: "https://example.com/a と https://example.com/a",
+			want: []Link{{URL: "https://example.com/a"}, {URL: "https://example.com/a"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ParseLinks(tt.body)
+			if len(got) != len(tt.want) {
+				t.Fatalf("件数 = %d (%+v), want %d", len(got), got, len(tt.want))
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("%d 件目 = %+v, want %+v", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}

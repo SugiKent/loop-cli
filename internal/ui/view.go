@@ -53,6 +53,8 @@ func (m Model) render() string {
 		return m.renderDetail()
 	case screenHelp:
 		return m.renderHelp()
+	case screenURL:
+		return m.renderURLs()
 	}
 	lines := []string{m.header()}
 	rest := max(m.height-3, 0)
@@ -78,7 +80,7 @@ func (m Model) renderDetail() string {
 // queueHint はキュー画面のフッタ左。
 func (m Model) queueHint() string {
 	// 移動系のキー（j / k / 1–4 / Tab）は出さず `?` のヘルプに委ねる（既定幅 80 に収めるため）。
-	return "Enter 開く  a 回答  t todo  o ブラウザ  R 更新  ? ヘルプ  q 終了"
+	return "Enter 開く  a 回答  t todo  o ブラウザ  R 更新  ? ヘルプ  u URL  q 終了"
 }
 
 // header はアプリ名・4 タブの件数・最終更新時刻を 1 行で書く。

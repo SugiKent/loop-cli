@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -25,13 +26,15 @@ const (
 // Client は gh サブプロセスで GHClient を実装する。
 type Client struct {
 	run func(ctx context.Context, stdin string, args ...string) ([]byte, error)
+	// openBrowser は OS のブラウザ起動コマンドの実行。gh とは別の経路なので run とは分けて持つ。
+	openBrowser func(ctx context.Context, name, url string) (exitCode int, stderr string, err error)
 	// RetryWait は ViewPRMergeState が mergeable UNKNOWN で再取得するまでの待ち時間。
 	RetryWait time.Duration
 }
 
 // NewClient は os/exec で gh を起動する Client を返す。
 func NewClient() *Client {
-	return &Client{run: runGH, RetryWait: 2 * time.Second}
+	return &Client{run: runGH, openBrowser: runBrowser, RetryWait: 2 * time.Second}
 }
 
 func runGH(ctx context.Context, stdin string, args ...string) ([]byte, error) {
@@ -321,4 +324,47 @@ func (c *Client) ReplyReviewThread(ctx context.Context, repo string, number int,
 func (c *Client) Browse(ctx context.Context, repo string, number int) error {
 	_, err := c.run(ctx, "", "browse", strconv.Itoa(number), "-R", repo)
 	return err
+}
+
+// OpenURL は OS のブラウザ起動コマンドで任意の URL を開く。gh は使わない
+// （gh browse はリポジトリと番号しか受け取れず、本文に書かれた URL を開けないため）。
+func (c *Client) OpenURL(ctx context.Context, url string) error {
+	name := browserCommand(runtime.GOOS)
+	code, stderr, err := c.openBrowser(ctx, name, url)
+	if err != nil {
+		return fmt.Errorf("%s %s: %w", name, url, err)
+	}
+	if code != 0 {
+		return fmt.Errorf("%s %s: exit %d: %s", name, url, code, strings.TrimSpace(stderr))
+	}
+	return nil
+}
+
+// browserCommand は OS ごとのブラウザ起動コマンド名。
+func browserCommand(goos string) string {
+	if goos == "darwin" {
+		return "open"
+	}
+	return "xdg-open"
+}
+
+// runBrowser はコマンドを ctx 付きでシェルを経由せずに実行し、終了コードと stderr を返す。
+// 標準出力は読み捨てる。起動できなかったときだけ error を返す。
+func runBrowser(ctx context.Context, name, url string) (int, string, error) {
+	cmd := exec.CommandContext(ctx, name, url)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err == nil {
+		return 0, stderr.String(), nil
+	}
+	// ctx が切れた場合、cmd.Run は「signal: killed」の ExitError を返すので ctx を先に見る。
+	if ctx.Err() != nil {
+		return 0, stderr.String(), ctx.Err()
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ExitCode(), stderr.String(), nil
+	}
+	return 0, stderr.String(), err
 }

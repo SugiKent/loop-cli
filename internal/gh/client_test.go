@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -397,4 +398,79 @@ func TestCheckOK(t *testing.T) {
 		t.Fatalf("Check: %v", err)
 	}
 	wantArgs(t, rec, "auth status")
+}
+
+// TestOpenURLRunsBrowserCommand は OpenURL がブラウザ起動コマンドに URL をそのまま渡し、
+// gh を呼ばないことを検証する。
+func TestOpenURLRunsBrowserCommand(t *testing.T) {
+	var urls []string
+	ghCalls := 0
+	c := &Client{
+		run: func(context.Context, string, ...string) ([]byte, error) {
+			ghCalls++
+			return nil, nil
+		},
+		openBrowser: func(_ context.Context, _, url string) (int, string, error) {
+			urls = append(urls, url)
+			return 0, "", nil
+		},
+	}
+
+	if err := c.OpenURL(context.Background(), "https://example.com/a b"); err != nil {
+		t.Fatalf("OpenURL: %v", err)
+	}
+	if len(urls) != 1 || urls[0] != "https://example.com/a b" {
+		t.Errorf("渡した URL = %q, want [https://example.com/a b]", urls)
+	}
+	if ghCalls != 0 {
+		t.Errorf("gh を %d 回呼んでいる, want 0", ghCalls)
+	}
+}
+
+// TestBrowserCommandPerOS は OS ごとのコマンド名を検証する。
+func TestBrowserCommandPerOS(t *testing.T) {
+	if got := browserCommand("darwin"); got != "open" {
+		t.Errorf("darwin = %q, want open", got)
+	}
+	if got := browserCommand("linux"); got != "xdg-open" {
+		t.Errorf("linux = %q, want xdg-open", got)
+	}
+}
+
+// TestOpenURLExitCodeError は終了コードが 0 でないときのエラー文字列を検証する。
+func TestOpenURLExitCodeError(t *testing.T) {
+	c := &Client{
+		openBrowser: func(context.Context, string, string) (int, string, error) {
+			return 1, "no browser\n", nil
+		},
+	}
+
+	err := c.OpenURL(context.Background(), "https://example.com/a")
+	if err == nil {
+		t.Fatal("エラーが返っていない")
+	}
+	for _, want := range []string{"https://example.com/a", "exit 1", "no browser"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("エラー %q に %q が含まれない", err.Error(), want)
+		}
+	}
+}
+
+// TestRunBrowserMissingCommand は起動できないコマンドを error として返すことを検証する
+// （OpenURL はこれをコマンド名と URL を含むエラーに包む）。
+func TestRunBrowserMissingCommand(t *testing.T) {
+	_, _, err := runBrowser(t.Context(), "sugi-loop-no-such-command", "https://example.com/a")
+	if err == nil {
+		t.Fatal("起動できないコマンドでエラーが返っていない")
+	}
+
+	c := &Client{openBrowser: func(context.Context, string, string) (int, string, error) {
+		return 0, "", err
+	}}
+	msg := c.OpenURL(t.Context(), "https://example.com/a").Error()
+	for _, want := range []string{browserCommand(runtime.GOOS), "https://example.com/a"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("エラー %q に %q が含まれない", msg, want)
+		}
+	}
 }

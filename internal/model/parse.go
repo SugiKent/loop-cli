@@ -110,3 +110,29 @@ func ParseQuestions(body string) []Question {
 	}
 	return out
 }
+
+// Link は本文から取り出した URL 1 件。Text は Markdown リンクのときだけ入る。
+type Link struct {
+	Text string
+	URL  string
+}
+
+// linkRe は Markdown リンク `[テキスト](URL)` と裸の URL。
+// Markdown リンクを先に並べるので、リンクの範囲は裸の URL の走査から外れる。
+var linkRe = regexp.MustCompile(`\[([^\]]*)\]\((https?://[^)\s]*)\)|https?://[^\s)>\]）］〉」]+`)
+
+// ParseLinks は本文から URL とリンクテキストを出現順に取り出す。
+// 拾うのは Markdown リンクと裸の URL だけで、`#123` のような参照記法と相対リンクは取らない。
+// 重複の除去は呼び出し側が行う。
+func ParseLinks(body string) []Link {
+	var out []Link
+	for _, m := range linkRe.FindAllStringSubmatch(body, -1) {
+		if m[2] != "" {
+			out = append(out, Link{Text: m[1], URL: m[2]})
+			continue
+		}
+		// 裸の URL は末尾に付いた句読点を削る。
+		out = append(out, Link{URL: strings.TrimRight(m[0], ".,:;。、")})
+	}
+	return out
+}

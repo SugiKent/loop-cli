@@ -255,3 +255,17 @@ func TestFakeCallsConcurrent(t *testing.T) {
 		}
 	}
 }
+
+// TestFakeRecordsOpenURL は Fake が OpenURL の URL を記録することを検証する。
+func TestFakeRecordsOpenURL(t *testing.T) {
+	f := NewFake(exampleDir)
+
+	if err := f.OpenURL(t.Context(), "https://example.com/design"); err != nil {
+		t.Fatalf("OpenURL: %v", err)
+	}
+
+	want := Call{Method: "OpenURL", URL: "https://example.com/design"}
+	if len(f.Calls) != 1 || f.Calls[0] != want {
+		t.Fatalf("呼び出し = %+v, want [%+v]", f.Calls, want)
+	}
+}
