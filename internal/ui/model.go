@@ -11,7 +11,16 @@ import (
 	"github.com/SugiKent/sugi-loop/internal/fetch"
 	"github.com/SugiKent/sugi-loop/internal/gh"
 	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/sugi-loop/internal/snapshot"
 )
+
+// Options は New の起動時の選択肢。ゼロ値は
+// 「スナップショット無し・自動更新無し・通知無し」で、従来どおりの Model になる。
+type Options struct {
+	Snapshot        *snapshot.Snapshot // 起動時の stale 表示に使う前回の Card 群と保存時刻
+	RefreshInterval time.Duration      // 自動更新の間隔。0 なら自動更新しない
+	Notify          Notifier           // デスクトップ通知。nil なら通知しない
+}
 
 // Fetcher は Card 群の取得。cmd/sugi-loop が fetch.Fetch を client と repos で閉じて渡す。
 type Fetcher func(ctx context.Context) (*fetch.Result, error)
@@ -55,23 +64,35 @@ type Model struct {
 	writeStatus    string
 	writeStatusErr bool
 
+	refreshInterval time.Duration
+	notify          Notifier
+
 	spinner spinner.Model
 }
 
 // New は取得前の Model を返す。初期状態は常に「これから取得する」。
 // client は回答の投稿に、editor は下書きの編集に使う。
-func New(fetcher Fetcher, client gh.GHClient, editor Editor) Model {
-	return Model{
-		fetcher:  fetcher,
-		client:   client,
-		editor:   editor,
-		rows:     buildRows(nil),
-		tab:      model.TabNow,
-		fetching: true,
-		width:    80,
-		height:   24,
-		spinner:  spinner.New(spinner.WithSpinner(spinner.MiniDot)),
+func New(fetcher Fetcher, client gh.GHClient, editor Editor, opts Options) Model {
+	m := Model{
+		fetcher:         fetcher,
+		client:          client,
+		editor:          editor,
+		rows:            buildRows(nil),
+		tab:             model.TabNow,
+		fetching:        true,
+		width:           80,
+		height:          24,
+		refreshInterval: opts.RefreshInterval,
+		notify:          opts.Notify,
+		spinner:         spinner.New(spinner.WithSpinner(spinner.MiniDot)),
 	}
+	// スナップショットがあれば前回の表と保存時刻から始める（D-002「起動直後は stale 表示」）。
+	if opts.Snapshot != nil {
+		m.cards = opts.Snapshot.Cards
+		m.rows = buildRows(m.cards)
+		m.at = opts.Snapshot.At
+	}
+	return m
 }
 
 // fetchCmd は Fetcher を別ゴルーチンで実行し、完了を fetchedMsg で返す。
@@ -83,6 +104,9 @@ func fetchCmd(fetcher Fetcher) tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
+	if m.refreshInterval > 0 {
+		return tea.Batch(m.spinner.Tick, fetchCmd(m.fetcher), tickCmd(m.refreshInterval))
+	}
 	return tea.Batch(m.spinner.Tick, fetchCmd(m.fetcher))
 }
 
@@ -120,6 +144,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.errText = msg.err.Error()
 			m.partial = ""
 		} else {
+			// 通知の比較は差し替える前の Cards と、最終更新時刻の有無（前回があるか）で決まる。
+			prev, hadPrev := m.cards, !m.at.IsZero()
 			m.cards = msg.res.Cards
 			m.rows = buildRows(m.cards)
 			m.at = msg.at
@@ -127,6 +153,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.partial = ""
 			if n := len(msg.res.Errors); n > 0 {
 				m.partial = fmt.Sprintf("詳細取得の失敗 %d 件: %v", n, msg.res.Errors[0])
+			}
+			if m.notify != nil && hadPrev {
+				if added := addedNow(prev, m.cards); len(added) > 0 {
+					m.clampCursor()
+					return m, notifyCmd(m.notify, added)
+				}
 			}
 		}
 		m.clampCursor()
@@ -143,6 +175,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case browsedMsg:
 		return m.updateBrowsed(msg), nil
+
+	case refreshTickMsg:
+		return m.updateTick()
 
 	case tea.KeyPressMsg:
 		key := msg.String()

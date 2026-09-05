@@ -4,15 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/SugiKent/sugi-loop/internal/config"
+	"github.com/SugiKent/sugi-loop/internal/fetch"
 	"github.com/SugiKent/sugi-loop/internal/gh"
 	"github.com/SugiKent/sugi-loop/internal/onboarding"
+	"github.com/SugiKent/sugi-loop/internal/snapshot"
+	"github.com/SugiKent/sugi-loop/internal/ui"
 )
 
 // stubForm は呼ばれた回数とパスを記録し、固定のエラーを返す。
@@ -159,5 +165,74 @@ func TestCheckErrorOtherIsOneLine(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), orig.Error()) {
 		t.Errorf("%q に元のエラー %q が無い", err, orig)
+	}
+}
+
+// exampleFetcher は example fixture から s07 の Fetch で作った Result を返す Fetcher。
+func exampleFetcher(t *testing.T) (ui.Fetcher, *fetch.Result) {
+	t.Helper()
+	res, err := fetch.Fetch(context.Background(), gh.NewFake("../../internal/gh/testdata/fixtures/example"), []string{"org/app"})
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	return func(context.Context) (*fetch.Result, error) { return res, nil }, res
+}
+
+func TestSavingFetcherSavesOnSuccess(t *testing.T) {
+	fetcher, res := exampleFetcher(t)
+	path := filepath.Join(t.TempDir(), "sugi-loop", "snapshot.json")
+
+	before := time.Now()
+	got, err := savingFetcher(fetcher, path)(context.Background())
+	after := time.Now()
+
+	if err != nil {
+		t.Fatalf("savingFetcher: %v", err)
+	}
+	if got != res {
+		t.Errorf("返った Result が元のものでない: %p, want %p", got, res)
+	}
+	snap, err := snapshot.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !reflect.DeepEqual(snap.Cards, res.Cards) {
+		t.Error("保存された Cards が Result のものと違う")
+	}
+	if snap.At.Before(before) || snap.At.After(after) {
+		t.Errorf("保存時刻 %v が呼び出しの前後 %v–%v の外", snap.At, before, after)
+	}
+}
+
+func TestSavingFetcherDoesNotSaveOnError(t *testing.T) {
+	want := errors.New("search issues: gh search issues: exit 1: rate limited")
+	fetcher := func(context.Context) (*fetch.Result, error) { return nil, want }
+	path := filepath.Join(t.TempDir(), "no-such", "snapshot.json")
+
+	res, err := savingFetcher(fetcher, path)(context.Background())
+
+	if !errors.Is(err, want) {
+		t.Fatalf("err = %v, want %v", err, want)
+	}
+	if res != nil {
+		t.Errorf("Result = %v, want nil", res)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("取得失敗でファイルが作られた: %v", err)
+	}
+}
+
+func TestSavingFetcherIgnoresSaveFailure(t *testing.T) {
+	fetcher, res := exampleFetcher(t)
+	// ディレクトリと同じパスには書けない。
+	path := t.TempDir()
+
+	got, err := savingFetcher(fetcher, path)(context.Background())
+
+	if err != nil {
+		t.Fatalf("保存の失敗が取得の結果を変えた: %v", err)
+	}
+	if got != res {
+		t.Errorf("返った Result が元のものでない: %p, want %p", got, res)
 	}
 }

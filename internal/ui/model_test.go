@@ -11,6 +11,7 @@ import (
 
 	"github.com/SugiKent/sugi-loop/internal/fetch"
 	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/sugi-loop/internal/snapshot"
 )
 
 func key(k tea.Key) tea.KeyPressMsg { return tea.KeyPressMsg(k) }
@@ -389,5 +390,79 @@ func TestRefreshDoesNothingOutsideQueue(t *testing.T) {
 	}
 	if n != 0 {
 		t.Errorf("Fetcher が呼ばれた: %d 回", n)
+	}
+}
+
+// staleAt はスナップショットの保存時刻（mvp.md の画面例の 12:04 の 14 分前）。
+var staleAt = time.Date(2026, 9, 5, 11, 50, 0, 0, time.FixedZone("JST", 9*3600))
+
+// staleModel は example の Card を持つスナップショットから始めた Model。
+func staleModel(t *testing.T) Model {
+	t.Helper()
+	snap := &snapshot.Snapshot{Cards: exampleResult(t).Cards, At: staleAt}
+	return newModelOpts(nil, Options{Snapshot: snap})
+}
+
+// backlogOnlyResult は issue 140 の Card（バックログ）だけの Result。
+func backlogOnlyResult(t *testing.T) *fetch.Result {
+	t.Helper()
+	return &fetch.Result{Cards: []model.Card{cardOf(t, exampleResult(t), 140)}}
+}
+
+func TestSnapshotStartsWithStaleTable(t *testing.T) {
+	text := plainText(staleModel(t))
+
+	for _, want := range []string{"PR131", "[1]今やる 1", "↻ 11:50", "取得中"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("stale 表示に %q が無い:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "routines-setup") {
+		t.Errorf("stale 表示に空キューのヒントが出ている:\n%s", text)
+	}
+}
+
+func TestSnapshotIsReplacedByFirstFetch(t *testing.T) {
+	m, _ := send(staleModel(t), fetchedMsg{res: backlogOnlyResult(t), at: at})
+
+	if n := len(m.rows[model.TabNow]); n != 0 {
+		t.Errorf("今やるタブ = %d 行, want 0", n)
+	}
+	if n := len(m.rows[model.TabBacklog]); n != 1 {
+		t.Errorf("バックログタブ = %d 行, want 1", n)
+	}
+	text := plainText(m)
+	if !strings.Contains(text, "↻ 12:04") {
+		t.Errorf("ヘッダが更新されていない:\n%s", text)
+	}
+	if strings.Contains(text, "取得中") {
+		t.Errorf("取得完了後に 取得中 が残っている:\n%s", text)
+	}
+}
+
+func TestSnapshotSurvivesFirstFetchFailure(t *testing.T) {
+	m, _ := send(staleModel(t),
+		fetchedMsg{err: errors.New("search issues: gh search issues: exit 1: rate limited"), at: at})
+
+	text := plainText(m)
+	for _, want := range []string{"PR131", "↻ 11:50", "rate limited"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("取得失敗後に %q が無い:\n%s", want, text)
+		}
+	}
+}
+
+func TestZeroOptionsStartsEmpty(t *testing.T) {
+	m := newModelOpts(nil, Options{})
+	m.Init()
+
+	text := plainText(m)
+	if n := len(m.rows[model.TabNow]); n != 0 {
+		t.Errorf("今やるタブ = %d 行, want 0", n)
+	}
+	for _, want := range []string{"↻ --:--", "取得中"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("スナップショット無しの初期表示に %q が無い:\n%s", want, text)
+		}
 	}
 }

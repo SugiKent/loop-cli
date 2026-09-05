@@ -20,7 +20,7 @@ var aKey = runeKey('a')
 // Fake は Result を作ったものとは別に作る（s07 の Fetch が ViewIssue を Calls に残すため）。
 func answerModel(cards []model.Card, ed *stubEditor) (Model, *gh.Fake) {
 	fake := gh.NewFake(fixtureDir)
-	m, _ := send(New(nil, fake, ed.Editor),
+	m, _ := send(New(nil, fake, ed.Editor, Options{}),
 		tea.WindowSizeMsg{Width: 120, Height: 40},
 		fetchedMsg{res: &fetch.Result{Cards: cards}, at: at})
 	return m, fake
@@ -347,7 +347,7 @@ func TestAnswerPostFailureKeepsCards(t *testing.T) {
 		err:  errors.New("gh pr comment 131 -R org/app --body-file -: exit 1: HTTP 403"),
 	}
 	cards := []model.Card{prCard(nil)}
-	m, _ := send(New(nil, client, ed.Editor),
+	m, _ := send(New(nil, client, ed.Editor, Options{}),
 		tea.WindowSizeMsg{Width: 120, Height: 40},
 		fetchedMsg{res: &fetch.Result{Cards: cards}, at: at})
 

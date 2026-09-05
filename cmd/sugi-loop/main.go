@@ -9,14 +9,17 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/term"
+	"github.com/gen2brain/beeep"
 
 	"github.com/SugiKent/sugi-loop/internal/config"
 	"github.com/SugiKent/sugi-loop/internal/fetch"
 	"github.com/SugiKent/sugi-loop/internal/gh"
 	"github.com/SugiKent/sugi-loop/internal/onboarding"
+	"github.com/SugiKent/sugi-loop/internal/snapshot"
 	"github.com/SugiKent/sugi-loop/internal/ui"
 )
 
@@ -50,12 +53,39 @@ func run() error {
 		repos[i] = r.Name
 	}
 
-	// editor が空でも起動は失敗させない（a を押したときにフッタにエラーが出る）。
-	m := ui.New(func(ctx context.Context) (*fetch.Result, error) {
+	var fetcher ui.Fetcher = func(ctx context.Context) (*fetch.Result, error) {
 		return fetch.Fetch(ctx, client, repos)
-	}, client, ui.ExternalEditor(cfg.Editor))
+	}
+	opts := ui.Options{RefreshInterval: time.Duration(cfg.RefreshIntervalSec) * time.Second}
+	if cfg.Notify {
+		// icon は string か []byte でなければならない。空文字列でアイコンなし（s06 と同じ）。
+		opts.Notify = func(title, body string) error { return beeep.Notify(title, body, "") }
+	}
+	// スナップショットは派生データなので、パスも読み込みも失敗したら諦めて通常起動する。
+	if snapPath, err := snapshot.DefaultPath(); err == nil {
+		if snap, err := snapshot.Load(snapPath); err == nil {
+			opts.Snapshot = &snap
+		}
+		fetcher = savingFetcher(fetcher, snapPath)
+	}
+
+	// editor が空でも起動は失敗させない（a を押したときにフッタにエラーが出る）。
+	m := ui.New(fetcher, client, ui.ExternalEditor(cfg.Editor), opts)
 	_, err = tea.NewProgram(m).Run()
 	return err
+}
+
+// savingFetcher は取得が成功するたびにスナップショットを保存する包み。
+// 保存の失敗は無視する（次の起動が空の画面から始まるだけで、画面は止めない）。
+func savingFetcher(fetcher ui.Fetcher, path string) ui.Fetcher {
+	return func(ctx context.Context) (*fetch.Result, error) {
+		res, err := fetcher(ctx)
+		if err != nil {
+			return nil, err
+		}
+		_ = snapshot.Save(path, snapshot.Snapshot{Cards: res.Cards, At: time.Now()})
+		return res, nil
+	}
 }
 
 // ensureConfig は設定ファイルが無いときだけ onboarding のフォームを起動する。

@@ -23,7 +23,12 @@ const fixtureDir = "../gh/testdata/fixtures/example"
 // newModel は回答を使わない画面のテスト用の Model。
 // エディタは押されない前提だが、nil で落ちないようにエラーを返すスタブを入れる。
 func newModel(fetcher Fetcher) Model {
-	return New(fetcher, gh.NewFake(fixtureDir), (&stubEditor{msg: editedMsg{err: errors.New("使わない")}}).Editor)
+	return newModelOpts(fetcher, Options{})
+}
+
+// newModelOpts は起動時の選択肢を変えた newModel。
+func newModelOpts(fetcher Fetcher, opts Options) Model {
+	return New(fetcher, gh.NewFake(fixtureDir), (&stubEditor{msg: editedMsg{err: errors.New("使わない")}}).Editor, opts)
 }
 
 // stubEditor はエディタを起動せず固定の結果を返す Editor。渡された下書きを記録する。

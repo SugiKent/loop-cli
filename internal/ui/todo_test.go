@@ -17,7 +17,7 @@ var tKey = runeKey('t')
 
 // todoModel は t のテスト用の Model。client は Result を作った Fake とは別に渡す。
 func todoModel(client gh.GHClient, cards []model.Card, ed *stubEditor) Model {
-	m, _ := send(New(nil, client, ed.Editor),
+	m, _ := send(New(nil, client, ed.Editor, Options{}),
 		tea.WindowSizeMsg{Width: 120, Height: 40},
 		fetchedMsg{res: &fetch.Result{Cards: cards}, at: at})
 	return m
