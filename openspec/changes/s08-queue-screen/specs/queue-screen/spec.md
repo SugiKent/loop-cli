@@ -1,0 +1,201 @@
+## ADDED Requirements
+
+### Requirement: Model は Card をタブ別に並べ、選択行を 1 つ持つ
+`internal/ui` は Bubble Tea の Model として型 `Model` と、取得関数を受け取る `New(fetcher Fetcher) Model` を MUST 提供する。`Fetcher` は `func(ctx context.Context) (*fetch.Result, error)` で、s07 の `fetch.Fetch` を `client` と `repos` で閉じたものを `cmd/sugi-loop` が渡す。`Model` は `classify` を呼ばず、`fetch.Result.Cards` の `Card.Result` をそのまま使う。
+`Model` は保持中の `Cards` を `Card.Result.Tab` で mvp.md の 4 タブ（`model.TabNow` / `TabBacklog` / `TabInProgress` / `TabAbnormal`）に振り分け、1 枚の Card を 1 行にする。Card は必ずどれか 1 つのタブに入る（s05 の `classify.Card` は `Card.Result.Tab` を空にしない）。タブ内の並びは第 1 キー `Card.Result.Priority` 昇順、第 2 キー行の主体の `UpdatedAt` 降順（新しいものが上）、第 3 キー主体の `Repo` 昇順、第 4 キー主体の番号昇順とする（第 1 キーは s05 が定め、第 2 キー以降は design.md の未決事項で定めた既定値）。
+`Model` は現在のタブ（初期値は今やる）と、画面全体で 1 つの選択行の添字（初期値 0）を持つ。選択行の添字をタブごとに持たないのは、タブ切替のたびに先頭を見る mvp.md の「先頭から捌く」体験に合わせるためである。選択行の添字は常に `0 ≤ 添字 < そのタブの行数` に収め、行数 0 のタブでは選択行が無い。タブ切替と `Cards` の差し替えで行数が減ったら添字を末尾に丸める。
+
+#### Scenario: example の Card が 4 タブに振り分けられる
+- **WHEN** s07 の `fetch.Fetch` に `gh.NewFake("../gh/testdata/fixtures/example")` を渡して得た `Result`（issue 108 + PR 131 の Card が `A`、issue 140 の Card が `E`）を `Model` に取得完了として渡す
+- **THEN** 今やるタブの行は issue 108 の Card の 1 行、バックログタブの行は issue 140 の Card の 1 行、進行中タブと異常タブは 0 行である
+
+#### Scenario: タブ内は優先度順、同じ優先度なら新しい順
+- **WHEN** `Card.Result.Priority` が 3 で主体の `UpdatedAt` が 5 時間前・9 時間前・1 日前の Card 3 枚と、`Priority` が 1 で 1 時間前・12 分前の Card 2 枚を、この順で `Cards` に持つ `Result` を `Model` に渡す
+- **THEN** 今やるタブの行は上から 12 分前（1）、1 時間前（1）、5 時間前（3）、9 時間前（3）、1 日前（3）の順である
+
+#### Scenario: Cards の差し替えで行数が減ったら選択行を末尾に丸める
+- **WHEN** 今やるタブに 3 行ある状態で選択行を 2（3 行目）に動かした後、今やるタブが 1 行になる `Result` を `Model` に渡す
+- **THEN** 選択行の添字は 0 である
+
+### Requirement: 行の主体は Card.Result を出した Issue または PR
+`Model` は各 Card について、リポジトリ / 番号 / タイトル / 経過の列に使う「主体」を MUST 次の順で決める。`model.Result` は比較可能な struct であり、`==` で比べる。
+1. `Card.Issue` があり、`Issue.Result == Card.Result` なら Issue
+2. そうでなければ `Card.PRs` の並び順で最初に `PRs[i].Result == Card.Result` を満たす PR
+3. どちらにも当たらなければ `Card.Issue`（nil でなければ）、それも無ければ `PRs[0]`
+この順は s05 `classify.Card` の同点判定（Issue を優先し、次に `PRs` の並び順で先のもの）と、候補が無いときの `Summary` の採り方（先頭の open PR、無ければ Issue）に一致する。
+`internal/ui` はこの決定を関数 `Subject(c model.Card) (repo string, number int, isPR bool, title string, updatedAt time.Time)` として公開する（s09 のカード詳細のヘッダも同じ主体を使う）。
+
+#### Scenario: PR が局面を決めた Card の主体は PR
+- **WHEN** `example` の issue 108 の Card（`Issue.Result.Situation` が `in-progress`、`PRs[0].Result.Situation` が `A`、`Card.Result.Situation` が `A`）で `Subject` を呼ぶ
+- **THEN** `repo` は `org/app`、`number` は 131、`isPR` は true、`title` は PR 131 の `Title`、`updatedAt` は PR 131 の `UpdatedAt` である
+
+#### Scenario: Issue が局面を決めた Card の主体は Issue
+- **WHEN** `example` の issue 140 の Card（PR 無し、`Card.Result.Situation` が `E`）で `Subject` を呼ぶ
+- **THEN** `repo` は `org/app`、`number` は 140、`isPR` は false である
+
+#### Scenario: 進行中に落ちた Card の主体は先頭の open PR
+- **WHEN** Issue の `Result` が `in-progress`（`Summary` `#5 は進行中`）、`PRs[0]` の `Result` が `in-progress`（`Summary` `PR #9 は auto-fix が受け取り中`）で、`Card.Result` が `PRs[0].Result` と等しい Card で `Subject` を呼ぶ
+- **THEN** `number` は 9、`isPR` は true である
+
+### Requirement: 表の行は優先記号・種別・リポジトリ・番号・タイトル・経過を種別の色で出す
+`Model` の `View` は現在のタブの各行を、mvp.md の列順 優先 / 種別 / リポジトリ / # / タイトル / 経過 で MUST 描く。各列の表記は次のとおりで、`internal/ui` は 1 行分の文字列を返す関数を持つ（列幅は design.md の未決事項の既定値）。
+- 優先: `Card.Result.Priority` を記号にする。mvp.md の画面例にある 1 → `!!`、2 → `!`、3 → `●` を固定とし、それ以外の値の記号は design.md の未決事項の既定値（0 → `!!!`、5 → `●`、4 / 6 / 7 → `-`）
+- 種別: `Card.Result.Situation.Kind()` の文字列（s05 が定めた 質問 / 方針 / merge / todo 候補 / 異常 / その他 / 進行中）
+- リポジトリ: 主体の `Repo`（`owner/name`）
+- 番号: 主体が Issue なら `#<n>`、PR なら `PR<n>`（s06 の `classify` サブコマンドと同じ表記）
+- タイトル: 主体の `Title`。列幅は端末幅から他の列の合計 48 を引いた残りで、負なら 0（タイトルを出さず、行は端末幅で切る）。列幅に収まらなければ表示幅で切り詰めて末尾に `…` を付ける
+- 経過: Requirement「経過は最終更新時刻を基準に m / h / d で書く」の表記
+- 選択行の先頭に `▶` を置き、非選択行は同じ幅の空白にする
+行全体の色は `Kind()` で固定する（mvp.md「行の色は種別で固定」）: 質問 = マゼンタ（`#D876E3`。GitHub の `question` ラベル色）、方針 = 赤（`#B60205`。`blocked` の色）、merge = 緑（`#0E8A16`。`propose` の色）、todo 候補 = シアン、異常 = 黄の背景。その他と進行中は色を付けない（mvp.md に色の指定が無い）。シアンと黄の具体値は design.md の未決事項の既定値。
+
+#### Scenario: A の Card の行
+- **WHEN** `example` の issue 108 の Card（`Priority` 1、`Kind()` 質問、主体は PR 131）を 1 行にし、ANSI エスケープを除いて読む
+- **THEN** 行に `!!`、`質問`、`org/app`、`PR131`、PR 131 の `Title` が、この順で含まれる
+
+#### Scenario: E の Card の行
+- **WHEN** `example` の issue 140 の Card（`Priority` 4、`Kind()` todo 候補、主体は issue 140）を 1 行にし、ANSI エスケープを除いて読む
+- **THEN** 行に `-`、`todo 候補`、`org/app`、`#140`、issue 140 の `Title` が、この順で含まれる
+
+#### Scenario: 長いタイトルは切り詰める
+- **WHEN** タイトル列の幅より表示幅が大きい `Title` を持つ Card を 1 行にする
+- **THEN** タイトルは列幅以内に切り詰められ、末尾が `…` である
+
+#### Scenario: 選択行に印が付く
+- **WHEN** 今やるタブに 2 行ある状態で `View` の文字列から ANSI エスケープを除いて読む
+- **THEN** 1 行目の先頭に `▶` があり、2 行目の先頭には無い
+
+### Requirement: 経過は最終更新時刻を基準に m / h / d で書く
+`internal/ui` は `Elapsed(now, t time.Time) string` を MUST 提供し、s06 `dev-cli` の `elapsed` と同じ規則で書く: 差が 1 時間未満なら `<m>m`、24 時間未満なら `<h>h`、それ以上なら `<d>d`。いずれも切り捨て。`t` が `now` より後なら `0m`。
+画面の `now` は最後に取得が完了した時刻（Requirement「取得は非同期に行い、取得中はスピナー、失敗時は前回結果を維持する」の完了時刻）であり、`Model` は壁時計を直接読まない。次の取得（s12 の `R`、s13 の自動更新）まで経過の表示は変わらない。
+
+#### Scenario: 経過の表記
+- **WHEN** `Elapsed(now, t)` に `t` が `now` の 12 分前・3 時間前・2 日前・未来（`now` より後）の値を渡す
+- **THEN** 戻り値はそれぞれ `12m` / `3h` / `2d` / `0m` である
+
+#### Scenario: 経過は取得完了時刻を基準にする
+- **WHEN** 主体の `UpdatedAt` が `2026-09-05T09:00:00Z` の Card を持つ `Result` を、完了時刻 `2026-09-05T12:04:00Z` の取得完了として `Model` に渡し、`View` を読む
+- **THEN** その行の経過は `3h` である
+
+### Requirement: j / k / ↑ / ↓ で行を移動し、1–4 / Tab でタブを切り替え、他のキーは何もしない
+`Model` の `Update` はキー入力を MUST 次のとおり扱う。
+- `j` / `↓`: 選択行を 1 つ下へ。末尾では動かない（循環しない）
+- `k` / `↑`: 選択行を 1 つ上へ。先頭では動かない
+- `1` / `2` / `3` / `4` を押すと、それぞれ今やる / バックログ / 進行中 / 異常のタブに切り替える。`Tab` を押すと次のタブに切り替える（異常の次は今やる）。切替後の選択行の添字は Requirement「Model は Card をタブ別に並べ、選択行を 1 つ持つ」の丸め規則に従う（切替前の添字を引き継ぎ、行数を超えていれば末尾）
+- `q` / `Ctrl+C`: 終了コマンドを返す（s01 `tui-entrypoint`「q で終了する」を `internal/ui` の `Model` が満たす）
+- mvp.md の表にある他のキー `Enter` / `a` / `A` / `t` / `s` / `m` / `n` / `o` / `g` / `/` / `R` / `?` / `v` / `h` / `l` / `←` / `→` と、表に無いキー（`p` を除く。`p` は Requirement「狭い端末では表とプレビューを切り替える 1 ペインにする」）は、`Model` を変えず、コマンドも返さない。担当は `Enter` が s09、`a` が s10、`t` が s11、`o` / `R` / `?` が s12、`m` が s14、`n` / `s` が s15、`A` が s16、`v` / `h` / `l` / `←` / `→` / `g` が s17、`/` が s19
+
+#### Scenario: j と k で選択行が動く
+- **WHEN** 今やるタブに 3 行ある `Model` に `j` を 2 回、`k` を 1 回、`↓` を 1 回、`↑` を 1 回の順で与える
+- **THEN** 選択行の添字は順に 1、2、1、2、1 になる
+
+#### Scenario: 末尾と先頭で止まる
+- **WHEN** 今やるタブに 2 行ある `Model` に `j` を 3 回与えた後、`k` を 3 回与える
+- **THEN** `j` の後の添字は 1、`k` の後の添字は 0 である
+
+#### Scenario: 数字と Tab でタブが切り替わる
+- **WHEN** `Model` に `2`、`4`、`Tab`、`1`、`3` の順で与える
+- **THEN** 現在のタブは順に バックログ、異常、今やる、今やる、進行中 になる
+
+#### Scenario: 未実装のキーは何も変えない
+- **WHEN** 今やるタブに 2 行あり選択行が 1 の `Model` に `Enter`、`a`、`t`、`o`、`R`、`?`、`v`、`m`、`n`、`s`、`A`、`g`、`/` を 1 つずつ与える
+- **THEN** どのキーでもコマンドは返らず、現在のタブ・選択行・`Cards` は変わらない
+
+#### Scenario: q で終了する
+- **WHEN** `Model` に `q` を与える
+- **THEN** 終了コマンドが返る
+
+### Requirement: ヘッダはタブ名と件数と最終更新時刻、フッタはキーヒントとステータスを出す
+`View` の 1 行目（ヘッダ）は、アプリ名 `sugi-loop` と空白 2 列に続けて 4 タブを mvp.md の形式 `[1]今やる <n>  [2]バックログ <n>  [3]進行中 <n>  [4]異常 <n>`（タブ間は空白 2 列）で MUST 出す。`<n>` はそのタブの行数。現在のタブは太字で、他のタブは通常で描く。ヘッダの右端に右寄せで、左に最低 1 列の空白を置いて `↻ HH:MM`（最後に取得が完了した時刻。24 時間表記。完了時刻はメッセージが運ぶ `time.Time` をそのタイムゾーンのまま書く。`cmd/sugi-loop` は `time.Now()` を渡すのでローカル時刻になる）を出し、初回取得の完了前は `↻ --:--` とする。
+ヘッダの表示幅が端末幅を超えるときは、件数付きタブ名を `[4]` → `[3]` → `[2]` の順に `[n] <n>`（タブ名を落とし番号と件数だけ）に短縮し、収まった時点で止める。`[1]` は短縮しない。`[2]`〜`[4]` を全部短縮しても超えれば `↻ HH:MM` を省き、それでも超えれば行を端末幅で切る。この規則で `example` のヘッダ `sugi-loop  [1]今やる 1  [2]バックログ 1  [3]進行中 0  [4]異常 0` + 空白 1 + `↻ 12:04` は 71 列（全角 2 列）になる。
+`View` の最終行（フッタ = ステータスバー）は、左にこの change で動くキーだけのヒント `j/k 移動  1-4/Tab タブ  q 終了` を出し、右にステータス（Requirement「取得は非同期に行い、取得中はスピナー、失敗時は前回結果を維持する」）を出す。後続 change が自分のキーのヒントを足す。動かないキーのヒントは出さない。
+
+#### Scenario: ヘッダの件数
+- **WHEN** `example` の `Result` を完了時刻 `2026-09-05T12:04:00+09:00` で `Model` に渡し、`View` から ANSI エスケープを除いて読む
+- **THEN** 1 行目に `[1]今やる 1`、`[2]バックログ 1`、`[3]進行中 0`、`[4]異常 0`、`↻ 12:04` が含まれる
+
+#### Scenario: 狭い端末ではタブ名を右から短縮する
+- **WHEN** `example` の `Result` を完了時刻 `2026-09-05T12:04:00+09:00` で渡した `Model` に幅 60・高さ 40 のサイズメッセージを与え、`View` から ANSI エスケープを除いて読む
+- **THEN** 1 行目に `[1]今やる 1`、`[2] 1`、`[3] 0`、`[4] 0`、`↻ 12:04` が含まれ、`バックログ` / `進行中` / `異常` は含まれない
+
+#### Scenario: 初回取得前のヘッダ
+- **WHEN** `New` 直後の `Model` の `View` から ANSI エスケープを除いて読む
+- **THEN** 1 行目に `[1]今やる 0` と `↻ --:--` が含まれる
+
+#### Scenario: フッタのキーヒント
+- **WHEN** `Model` の `View` から ANSI エスケープを除いて読む
+- **THEN** 最終行に `j/k 移動`、`1-4/Tab タブ`、`q 終了` が含まれ、`a 回答` / `m merge` / `Enter 開く` は含まれない
+
+### Requirement: プレビューは選択行の 1 行目・本文・コメントを出す
+`View` はプレビュー領域に、選択行の Card について MUST 次を上から順に描く。
+1. 1 行目: 主体の `Body` の 1 行目（先頭の空行を除いた最初の行）に続けて `labels: <主体の Labels を空白区切り>`（mvp.md の画面例の形）。`Labels` が空なら `labels:` を省く。`Body` も空なら 1 行目を出さない。`Card.Result.Summary` はこの画面には出さない（s09 のカード詳細ヘッダで使う）
+2. 本文: 主体の `Body` を Glamour で幅 = プレビュー幅で Markdown レンダリングした文字列。レンダリングが失敗したら `Body` をそのまま出す
+3. コメント: 主体の `Comments` を並び順（末尾が最新）に出す。各コメントは見出し行と本文の行からなる。本文は Glamour で幅 = プレビュー幅 − 1 で Markdown レンダリングし（D-003「Glamour: Issue / PR 本文とコメントを色付きで端末表示」）、失敗したら本文をそのまま出す。`AI` が true のコメントは見出しを `AI  HH:MM`（`CreatedAt` を取得完了時刻と同じタイムゾーンに直した 24 時間表記）とし、見出しとレンダリング後の本文の全行の左端に縦バー `▌` を付ける。`AI` が false のコメントは見出しを `<Author>  HH:MM` とし、バーを付けない。`Comments` が nil または空ならコメント部分は出さない（詳細を取っていない主体もある。何を取るかは s07 の範囲）
+コメント本文の routine マーカー行は、レンダラが出すかどうかに関わらず、レンダリング前に取り除いてプレビューに出さない。除去規則は「`strings.TrimSpace` 後の行全体が `<!-- routine -->` または `&lt;!-- routine --&gt;` に一致する行を落とす」であり、取り除くのはその行だけである（マーカーを含む他の行や部分一致は触らない）。
+プレビューは領域の高さを超えた分を出さない。プレビューのスクロールキーは mvp.md に無く、この change では持たない。選択行が無い（タブが 0 行）ときは `（このタブにはカードがありません）` と 1 行出す。
+
+#### Scenario: A の Card のプレビュー
+- **WHEN** 幅 120・高さ 40 のサイズメッセージを与えた後、`example` の `Result` を渡し、今やるタブで issue 108 の Card（主体 PR 131。コメント 1 件が `<!-- routine -->` 始まり）を選択した `View` から ANSI エスケープを除いて読む
+- **THEN** プレビューの 1 行目に `issue #108 の提案。` と `labels: propose question` が含まれ、`▌AI` で始まる行と `▌` 付きの `Q1: マイグレーションを分けますか。` が含まれ、`PR #131 の質問に答える`（`Summary`）、`<!-- routine -->`、`&lt;!-- routine --&gt;` は含まれない
+
+#### Scenario: 人のコメントにはバーが付かない
+- **WHEN** 幅 120・高さ 40 のサイズメッセージを与えた後、主体の `Comments` に `AI` が false、`Author` が `user-2`、本文 `Q1: A` のコメントを持つ Card を選択した `View` から ANSI エスケープを除いて読む
+- **THEN** `user-2` を含む見出し行と `Q1: A` の行があり、どちらも `▌` で始まらない
+
+#### Scenario: コメントもラベルも無い Card のプレビュー
+- **WHEN** 幅 120・高さ 40 のサイズメッセージを与えた後、`example` のバックログタブで issue 140 の Card（`Labels` 空、`Comments` nil）を選択した `View` を読む
+- **THEN** プレビューに `起動時に設定ファイルが無いと落ちる` が含まれ、`labels:` と `▌` は含まれない
+
+#### Scenario: 0 行のタブ
+- **WHEN** `example` の `Result` を渡して異常タブに切り替えた `View` を読む
+- **THEN** プレビューに `（このタブにはカードがありません）` が含まれる
+
+### Requirement: 狭い端末では表とプレビューを切り替える 1 ペインにする
+`Model` は端末サイズのメッセージで幅と高さを MUST 保持し、サイズを受け取る前は幅 80・高さ 24 とみなす。幅が 80 列以上かつ高さが 20 行以上なら、ヘッダ / 表 / 区切り線 / プレビュー / フッタを上下に並べた 2 ペインで描く。どちらかを下回ったら 1 ペインにフォールバックし、ヘッダ / （表またはプレビューのどちらか一方） / フッタを描く（mvp.md「狭い端末では上下を切り替える 1 ペイン表示にフォールバックする」。閾値は design.md の未決事項の既定値）。
+1 ペインでは初期状態で表を出し、`p` で表とプレビューを交互に切り替える（切替キーは mvp.md の表に無いので design.md の未決事項の既定値。表に無いキーを選んでいる）。2 ペインでは `p` は何もしない。1 ペインのフッタには `p プレビュー`（表を出しているとき）または `p 一覧`（プレビューを出しているとき）のヒントを足す。1 ペインでプレビューを出している間も `j` / `k` / `1`–`4` / `Tab` は効き、プレビューは選択行に追従する。
+
+#### Scenario: 広い端末は 2 ペイン
+- **WHEN** `example` の `Result` を渡した `Model` に幅 120・高さ 40 のサイズメッセージを与え、`View` から ANSI エスケープを除いて読む
+- **THEN** 表の行 `PR131` とプレビューの `issue #108 の提案` の両方が含まれる
+
+#### Scenario: 狭い端末は表だけ出し p でプレビューに切り替わる
+- **WHEN** 同じ `Model` に幅 60・高さ 40 のサイズメッセージを与えて `View` を読み、次に `p` を与えて `View` を読む
+- **THEN** 1 回目は `PR131` の行を含み `issue #108 の提案` を含まず、フッタに `p プレビュー` がある。2 回目は `issue #108 の提案` を含み `PR131` の行を含まず、フッタに `p 一覧` がある
+
+#### Scenario: 低い端末も 1 ペイン
+- **WHEN** 同じ `Model` に幅 120・高さ 15 のサイズメッセージを与えて `View` を読む
+- **THEN** `PR131` の行を含み `issue #108 の提案` を含まない
+
+#### Scenario: 2 ペインで p は何もしない
+- **WHEN** 幅 120・高さ 40 の `Model` に `p` を与える
+- **THEN** コマンドは返らず、`View` は与える前と同じである
+
+### Requirement: 取得は非同期に行い、取得中はスピナー、失敗時は前回結果を維持する
+`internal/ui` は `Fetcher` を `context.Background()` で実行し、その完了を `Result`（または error）と完了時刻を運ぶメッセージ `fetchedMsg` として返すコマンドを非公開関数 `fetchCmd(fetcher Fetcher)` として MUST 持ち、`Model` の `Init` はスピナーの tick とそのコマンドをまとめて返す。完了メッセージは `Update` に届く。`Model` は `gh` を直接呼ばず、取得の実行は必ずコマンド（別ゴルーチン）で行う。
+- 取得中: フッタの右側にスピナー（Bubbles のスピナー）と `取得中` を出す。初回取得前は `Cards` が空なので表は 0 行、プレビューは 0 行の表示、ヘッダは `↻ --:--`
+- 成功（error が nil）: `Cards` を `Result.Cards` で差し替え、最終更新時刻を完了時刻にし、スピナーを消す。`Result.Errors` が 1 件以上なら、フッタの右側に `詳細取得の失敗 <n> 件: <Errors[0] の文字列>` を赤で出す（部分失敗でも Card は `Result.Cards` のとおり表示する。s07「詳細取得の失敗は部分失敗として Card を残す」）
+- 失敗（error が非 nil）: `Cards` と最終更新時刻を変えず（D-002「失敗時は前回結果を維持」）、スピナーを消し、フッタの右側に error の文字列を赤で出す。初回取得の失敗なら `Cards` は空のまま
+- エラー表示は次の取得が始まったとき（スピナーに置き換わる）に消える。この change では次の取得を起こすキーが無い（`R` は s12、自動更新は s13）。スナップショットからの stale 表示は s13
+
+#### Scenario: fetchCmd が Fetcher を実行して fetchedMsg を返す
+- **WHEN** 呼ばれた回数を数える `Fetcher` で `fetchCmd` を作って実行し、得たメッセージを同じ `Fetcher` で `New` した `Model` の `Update` に渡す
+- **THEN** `Fetcher` が 1 回呼ばれ、メッセージは `fetchedMsg` で、`Update` 後の `Cards` はその `Result.Cards` である
+
+#### Scenario: 初回取得前は空の画面とスピナー
+- **WHEN** `New` 直後に `Init` を呼び（コマンドは実行しない）、`View` から ANSI エスケープを除いて読む
+- **THEN** 表は 0 行で、フッタに `取得中` が含まれ、ヘッダに `↻ --:--` が含まれる
+
+#### Scenario: 取得成功で Cards と時刻が入る
+- **WHEN** `example` の `Result` と完了時刻 `12:04` を取得完了として渡す
+- **THEN** 今やるタブに 1 行、バックログに 1 行あり、ヘッダに `↻ 12:04` が出て、フッタに `取得中` は無い
+
+#### Scenario: 取得失敗で前回の Cards が残りエラーが赤で出る
+- **WHEN** `example` の `Result` を取得完了として渡した後、error `search issues: gh search issues: exit 1: rate limited` を取得失敗として渡し、`View` から ANSI エスケープを除いて読む
+- **THEN** 今やるタブに issue 108 の Card の行が残り、ヘッダの `↻ 12:04` は変わらず、フッタに `rate limited` が含まれ、`取得中` は含まれない
+
+#### Scenario: 部分失敗は Card を出しつつ件数を赤で出す
+- **WHEN** `Cards` 1 枚と `Errors` 2 件（先頭が `ViewPR org/app#131: open pr-131.json: no such file`）の `Result` を取得完了として渡し、`View` から ANSI エスケープを除いて読む
+- **THEN** 表に 1 行あり、フッタに `詳細取得の失敗 2 件: ViewPR org/app#131` が含まれる
+
+#### Scenario: 初回取得の失敗
+- **WHEN** `New` 直後に error を取得失敗として渡し、`View` から ANSI エスケープを除いて読む
+- **THEN** 表は 0 行、ヘッダは `↻ --:--`、フッタに error の文字列が含まれ、`取得中` は含まれない

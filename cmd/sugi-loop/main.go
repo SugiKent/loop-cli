@@ -1,42 +1,49 @@
+// Command sugi-loop は今やるキュー画面を出す TUI。
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
+
+	"github.com/SugiKent/sugi-loop/internal/config"
+	"github.com/SugiKent/sugi-loop/internal/fetch"
+	"github.com/SugiKent/sugi-loop/internal/gh"
+	"github.com/SugiKent/sugi-loop/internal/ui"
 )
-
-var (
-	titleStyle = lipgloss.NewStyle().Bold(true)
-	hintStyle  = lipgloss.NewStyle().Faint(true)
-)
-
-// model は hello world 画面。状態を持たない。s08 がキュー画面に置き換える。
-type model struct{}
-
-func (m model) Init() tea.Cmd {
-	return nil
-}
-
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if key, ok := msg.(tea.KeyPressMsg); ok {
-		switch key.String() {
-		case "q", "ctrl+c":
-			return m, tea.Quit
-		}
-	}
-	return m, nil
-}
-
-func (m model) View() tea.View {
-	return tea.NewView(titleStyle.Render("sugi-loop") + "\n" + hintStyle.Render("q で終了"))
-}
 
 func main() {
-	if _, err := tea.NewProgram(model{}).Run(); err != nil {
+	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func run() error {
+	path, err := config.DefaultPath()
+	if err != nil {
+		return err
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		return err
+	}
+
+	client := gh.NewClient()
+	if err := client.Check(context.Background()); err != nil {
+		return err
+	}
+
+	repos := make([]string, len(cfg.Repos))
+	for i, r := range cfg.Repos {
+		repos[i] = r.Name
+	}
+
+	m := ui.New(func(ctx context.Context) (*fetch.Result, error) {
+		return fetch.Fetch(ctx, client, repos)
+	})
+	_, err = tea.NewProgram(m).Run()
+	return err
 }
