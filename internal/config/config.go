@@ -114,17 +114,17 @@ func validate(cfg *Config) error {
 	if len(cfg.Repos) == 0 {
 		return errors.New("repos が空です")
 	}
-	for _, repo := range cfg.Repos {
+	for i, repo := range cfg.Repos {
 		if !isOwnerName(repo.Name) {
-			return fmt.Errorf("repos の %q: owner/name 形式ではありません", repo.Name)
+			return fmt.Errorf("repos[%d] %q: owner/name 形式ではありません", i, repo.Name)
 		}
 	}
 	if !isMergeMethod(cfg.MergeMethod) {
 		return fmt.Errorf("merge_method %q: squash / merge / rebase のいずれかを指定してください", cfg.MergeMethod)
 	}
-	for _, repo := range cfg.Repos {
+	for i, repo := range cfg.Repos {
 		if repo.MergeMethod != "" && !isMergeMethod(repo.MergeMethod) {
-			return fmt.Errorf("repos の %q の merge_method %q: squash / merge / rebase のいずれかを指定してください", repo.Name, repo.MergeMethod)
+			return fmt.Errorf("repos[%d] %q の merge_method %q: squash / merge / rebase のいずれかを指定してください", i, repo.Name, repo.MergeMethod)
 		}
 	}
 	if cfg.RefreshIntervalSec < 1 {
