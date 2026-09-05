@@ -573,7 +573,7 @@ func TestFooterWithoutPRs(t *testing.T) {
 
 	lines := linesOf(m)
 	footer := lines[len(lines)-1]
-	for _, want := range []string{"Esc 戻る", "x 展開"} {
+	for _, want := range []string{"Esc 戻る", "x 展開", "t todo"} {
 		if !strings.Contains(footer, want) {
 			t.Errorf("フッタに %q が無い: %q", want, footer)
 		}
