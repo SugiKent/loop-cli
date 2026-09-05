@@ -1,0 +1,47 @@
+{
+  "body": "issue #108 の提案。\n\nCloses #108",
+  "comments": [
+    {
+      "id": "IC_kwDOB1",
+      "author": {"login": "routine-bot"},
+      "authorAssociation": "MEMBER",
+      "body": "<!-- routine -->\nQ1: マイグレーションを分けますか。",
+      "createdAt": "2026-09-04T10:31:00Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/org/app/pull/131#issuecomment-3101",
+      "viewerDidAuthor": false
+    }
+  ],
+  "isDraft": false,
+  "labels": [
+    {"id": "LA_kwDOC", "name": "propose", "color": "1d76db", "description": "提案 PR"},
+    {"id": "LA_kwDOB", "name": "question", "color": "d876e3", "description": "確認事項あり"}
+  ],
+  "mergeStateStatus": "BLOCKED",
+  "mergeable": "UNKNOWN",
+  "number": 131,
+  "reviewDecision": "REVIEW_REQUIRED",
+  "statusCheckRollup": [
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-04T10:40:00Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/org/app/actions/runs/9001",
+      "name": "test",
+      "startedAt": "2026-09-04T10:35:00Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "StatusContext",
+      "context": "ci/legacy",
+      "state": "PENDING",
+      "targetUrl": "https://ci.example.com/build/42"
+    }
+  ],
+  "title": "propose: ログインのセッション仕様",
+  "url": "https://github.com/org/app/pull/131"
+}

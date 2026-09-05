@@ -1,0 +1,24 @@
+{
+  "data": {
+    "repository": {
+      "issue": {
+        "timelineItems": {
+          "nodes": [
+            {
+              "source": {
+                "number": 131,
+                "title": "propose: ログインのセッション仕様",
+                "body": "issue #108 の提案。\n\nCloses #108",
+                "state": "OPEN",
+                "labels": {"nodes": [{"name": "propose"}, {"name": "question"}]}
+              }
+            },
+            {
+              "source": {}
+            }
+          ]
+        }
+      }
+    }
+  }
+}

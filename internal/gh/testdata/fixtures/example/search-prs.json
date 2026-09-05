@@ -1,0 +1,15 @@
+[
+  {
+    "body": "issue #108 の提案。\n\nCloses #108",
+    "isDraft": false,
+    "labels": [
+      {"id": "LA_kwDOC", "name": "propose", "color": "1d76db", "description": "提案 PR"},
+      {"id": "LA_kwDOB", "name": "question", "color": "d876e3", "description": "確認事項あり"}
+    ],
+    "number": 131,
+    "repository": {"name": "app", "nameWithOwner": "org/app"},
+    "title": "propose: ログインのセッション仕様",
+    "updatedAt": "2026-09-04T10:30:00Z",
+    "url": "https://github.com/org/app/pull/131"
+  }
+]

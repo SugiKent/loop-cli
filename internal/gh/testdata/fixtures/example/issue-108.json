@@ -1,0 +1,38 @@
+{
+  "body": "認証まわりの仕様を決めたい。\n\n- [ ] セッションの寿命\n- [ ] 失効時の挙動",
+  "comments": [
+    {
+      "id": "IC_kwDOA1",
+      "author": {"login": "routine-bot"},
+      "authorAssociation": "MEMBER",
+      "body": "<!-- routine -->\nQ1: セッションの寿命は何日にしますか。\nQ2: 失効時はログイン画面へ戻しますか。",
+      "createdAt": "2026-09-04T09:00:00Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/org/app/issues/108#issuecomment-3001",
+      "viewerDidAuthor": false
+    },
+    {
+      "id": "IC_kwDOA2",
+      "author": {"login": "alice"},
+      "authorAssociation": "OWNER",
+      "body": "寿命は 30 日で。",
+      "createdAt": "2026-09-04T09:12:00Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/org/app/issues/108#issuecomment-3002",
+      "viewerDidAuthor": true
+    }
+  ],
+  "labels": [
+    {"id": "LA_kwDOA", "name": "stage:propose", "color": "0e8a16", "description": "提案待ち"},
+    {"id": "LA_kwDOB", "name": "question", "color": "d876e3", "description": "確認事項あり"}
+  ],
+  "number": 108,
+  "title": "ログインのセッション仕様を決める",
+  "url": "https://github.com/org/app/issues/108"
+}
