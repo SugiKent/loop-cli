@@ -76,9 +76,10 @@ func redact(files map[string][]byte, owner, name, alias string) (map[string][]by
 	}
 
 	// 4. 置換
+	repoRe := regexp.MustCompile(`(?i)` + regexp.QuoteMeta(owner+"/"+name))
 	for _, n := range names {
 		s := out[n]
-		s = strings.ReplaceAll(s, owner+"/"+name, "org/"+alias)
+		s = repoRe.ReplaceAllString(s, "org/"+alias)
 		for _, login := range wordLogins {
 			s = replaceWord(s, login, "user-"+strconv.Itoa(table[strings.ToLower(login)]))
 		}

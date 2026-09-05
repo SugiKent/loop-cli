@@ -24,6 +24,15 @@ func TestRedactRepoAndURL(t *testing.T) {
 	}
 }
 
+// gh は正規化した大文字小文字で返すので、--repo の綴りと一致しなくても置き換える。
+func TestRedactRepoIgnoresCase(t *testing.T) {
+	in := `{"nameWithOwner":"Acme/Widgets","url":"https://github.com/ACME/widgets/issues/5"}`
+	want := `{"nameWithOwner":"org/app","url":"https://github.com/org/app/issues/5"}`
+	if got := redactOne(t, in, "acme", "widgets", "app"); got != want {
+		t.Errorf("結果 =\n  %s\nwant\n  %s", got, want)
+	}
+}
+
 func TestRedactSamePersonSameNumber(t *testing.T) {
 	files := map[string][]byte{
 		"issue-1.json": []byte(`{"author":{"login":"Alice"},"body":"@bob と @alice で確認"}`),
