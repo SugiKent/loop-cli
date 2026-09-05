@@ -1,0 +1,69 @@
+[
+  {
+    "body": "未確定の判断: 1 件\n\nCloses #108",
+    "isDraft": false,
+    "labels": [
+      {
+        "name": "propose",
+        "color": "ededed",
+        "description": ""
+      }
+    ],
+    "number": 140,
+    "repository": {
+      "name": "app",
+      "nameWithOwner": "org/app"
+    },
+    "title": "propose: セッション仕様（作り直し）",
+    "updatedAt": "2026-09-04T10:00:00Z",
+    "url": "https://github.com/org/app/pull/140"
+  },
+  {
+    "body": "issue #108 の提案。\n\nCloses #108",
+    "isDraft": false,
+    "labels": [
+      {
+        "name": "propose",
+        "color": "ededed",
+        "description": ""
+      },
+      {
+        "name": "question",
+        "color": "ededed",
+        "description": ""
+      }
+    ],
+    "number": 131,
+    "repository": {
+      "name": "app",
+      "nameWithOwner": "org/app"
+    },
+    "title": "propose: ログインのセッション仕様",
+    "updatedAt": "2026-09-04T10:00:00Z",
+    "url": "https://github.com/org/app/pull/131"
+  },
+  {
+    "body": "未確定の判断: 1 件\n\n実装します。",
+    "isDraft": false,
+    "labels": [
+      {
+        "name": "apply",
+        "color": "ededed",
+        "description": ""
+      },
+      {
+        "name": "question",
+        "color": "ededed",
+        "description": ""
+      }
+    ],
+    "number": 88,
+    "repository": {
+      "name": "app",
+      "nameWithOwner": "org/app"
+    },
+    "title": "apply: セッション仕様を実装する",
+    "updatedAt": "2026-09-04T10:00:00Z",
+    "url": "https://github.com/org/app/pull/88"
+  }
+]

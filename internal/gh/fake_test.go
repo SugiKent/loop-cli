@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -227,5 +228,30 @@ func TestFakeDoesNotRecordOtherReads(t *testing.T) {
 	}
 	if len(f.Calls) != 0 {
 		t.Errorf("Calls = %+v, want 空", f.Calls)
+	}
+}
+
+func TestFakeCallsConcurrent(t *testing.T) {
+	f := NewFake(exampleDir)
+	ctx := t.Context()
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := f.ViewIssue(ctx, "org/app", 108); err != nil {
+				t.Errorf("ViewIssue: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if len(f.Calls) != 8 {
+		t.Fatalf("Calls 件数 = %d, want 8", len(f.Calls))
+	}
+	for i, c := range f.Calls {
+		if c.Method != "ViewIssue" || c.Repo != "org/app" || c.Number != 108 {
+			t.Errorf("Calls[%d] = %+v", i, c)
+		}
 	}
 }

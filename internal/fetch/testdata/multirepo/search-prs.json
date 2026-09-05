@@ -1,0 +1,21 @@
+[
+  {
+    "body": "未確定の判断: 1 件\n\n提案します。",
+    "isDraft": false,
+    "labels": [
+      {
+        "name": "propose",
+        "color": "ededed",
+        "description": ""
+      }
+    ],
+    "number": 30,
+    "repository": {
+      "name": "web",
+      "nameWithOwner": "org/web"
+    },
+    "title": "[propose] #12 ログイン画面",
+    "updatedAt": "2026-09-04T10:00:00Z",
+    "url": "https://github.com/org/web/pull/30"
+  }
+]

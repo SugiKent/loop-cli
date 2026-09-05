@@ -1,0 +1,28 @@
+[
+  {
+    "body": "app 側の課題。",
+    "commentsCount": 0,
+    "labels": [],
+    "number": 12,
+    "repository": {
+      "name": "app",
+      "nameWithOwner": "org/app"
+    },
+    "title": "app の設定を直す",
+    "updatedAt": "2026-09-04T09:00:00Z",
+    "url": "https://github.com/org/app/issues/12"
+  },
+  {
+    "body": "web 側の課題。",
+    "commentsCount": 0,
+    "labels": [],
+    "number": 12,
+    "repository": {
+      "name": "web",
+      "nameWithOwner": "org/web"
+    },
+    "title": "web のログイン画面",
+    "updatedAt": "2026-09-04T09:00:00Z",
+    "url": "https://github.com/org/web/issues/12"
+  }
+]

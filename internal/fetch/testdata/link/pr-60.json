@@ -1,0 +1,19 @@
+{
+  "body": "README の誤字を直す。",
+  "comments": [],
+  "isDraft": false,
+  "labels": [
+    {
+      "name": "docs",
+      "color": "ededed",
+      "description": ""
+    }
+  ],
+  "mergeStateStatus": "BLOCKED",
+  "mergeable": "UNKNOWN",
+  "number": 60,
+  "reviewDecision": "REVIEW_REQUIRED",
+  "statusCheckRollup": [],
+  "title": "docs: README を直す",
+  "url": "https://github.com/org/app/pull/60"
+}

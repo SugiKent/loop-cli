@@ -1,0 +1,13 @@
+{
+  "body": "依存を更新する。",
+  "comments": [],
+  "isDraft": false,
+  "labels": [],
+  "mergeStateStatus": "BLOCKED",
+  "mergeable": "UNKNOWN",
+  "number": 61,
+  "reviewDecision": "REVIEW_REQUIRED",
+  "statusCheckRollup": [],
+  "title": "chore: 依存を上げる",
+  "url": "https://github.com/org/app/pull/61"
+}

@@ -1,0 +1,13 @@
+{
+  "body": "提案します。",
+  "comments": [],
+  "isDraft": false,
+  "labels": [],
+  "mergeStateStatus": "BLOCKED",
+  "mergeable": "UNKNOWN",
+  "number": 62,
+  "reviewDecision": "REVIEW_REQUIRED",
+  "statusCheckRollup": [],
+  "title": "[propose] #999 存在しない issue の提案",
+  "url": "https://github.com/org/app/pull/62"
+}

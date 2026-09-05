@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 var (
@@ -49,11 +50,21 @@ func fixturePRReviewThreads(number int) string {
 type Fake struct {
 	Dir   string
 	Calls []Call
+
+	// Fetch（s07）が ViewIssue を並行して呼ぶので Calls への追記を排他する。
+	mu sync.Mutex
 }
 
 // NewFake は dir 配下の fixture を読む Fake を返す。
 func NewFake(dir string) *Fake {
 	return &Fake{Dir: dir}
+}
+
+// record は Calls に 1 件追記する。並行呼び出しでも内容と件数を壊さない。
+func (f *Fake) record(c Call) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Calls = append(f.Calls, c)
 }
 
 func (f *Fake) read(name string) ([]byte, error) {
@@ -79,7 +90,7 @@ func (f *Fake) SearchPRs(_ context.Context, _ []string) ([]SearchPR, error) {
 // ViewIssue は読み取りだが Calls に記録する。
 // 不変条件 3（ラベルを外す → 読み直す → 付ける）の順序をテストが検証するため。
 func (f *Fake) ViewIssue(_ context.Context, repo string, number int) (*IssueDetail, error) {
-	f.Calls = append(f.Calls, Call{Method: "ViewIssue", Repo: repo, Number: number})
+	f.record(Call{Method: "ViewIssue", Repo: repo, Number: number})
 	b, err := f.read(fixtureIssue(number))
 	if err != nil {
 		return nil, err
@@ -129,41 +140,41 @@ func (f *Fake) LabelTimeline(_ context.Context, _ string, number int) ([]LabelEv
 }
 
 func (f *Fake) CommentIssue(_ context.Context, repo string, number int, body string) error {
-	f.Calls = append(f.Calls, Call{Method: "CommentIssue", Repo: repo, Number: number, Body: body})
+	f.record(Call{Method: "CommentIssue", Repo: repo, Number: number, Body: body})
 	return nil
 }
 
 func (f *Fake) CommentPR(_ context.Context, repo string, number int, body string) error {
-	f.Calls = append(f.Calls, Call{Method: "CommentPR", Repo: repo, Number: number, Body: body})
+	f.record(Call{Method: "CommentPR", Repo: repo, Number: number, Body: body})
 	return nil
 }
 
 func (f *Fake) AddLabel(_ context.Context, repo string, number int, label string) error {
-	f.Calls = append(f.Calls, Call{Method: "AddLabel", Repo: repo, Number: number, Label: label})
+	f.record(Call{Method: "AddLabel", Repo: repo, Number: number, Label: label})
 	return nil
 }
 
 func (f *Fake) RemoveLabel(_ context.Context, repo string, number int, label string) error {
-	f.Calls = append(f.Calls, Call{Method: "RemoveLabel", Repo: repo, Number: number, Label: label})
+	f.record(Call{Method: "RemoveLabel", Repo: repo, Number: number, Label: label})
 	return nil
 }
 
 func (f *Fake) MergePR(_ context.Context, repo string, number int, method string) error {
-	f.Calls = append(f.Calls, Call{Method: "MergePR", Repo: repo, Number: number, MergeMethod: method})
+	f.record(Call{Method: "MergePR", Repo: repo, Number: number, MergeMethod: method})
 	return nil
 }
 
 func (f *Fake) CreateIssue(_ context.Context, repo string, title string, body string) (string, error) {
-	f.Calls = append(f.Calls, Call{Method: "CreateIssue", Repo: repo, Title: title, Body: body})
+	f.record(Call{Method: "CreateIssue", Repo: repo, Title: title, Body: body})
 	return fmt.Sprintf("https://github.com/%s/issues/0", repo), nil
 }
 
 func (f *Fake) ReplyReviewThread(_ context.Context, repo string, number int, commentID int64, body string) error {
-	f.Calls = append(f.Calls, Call{Method: "ReplyReviewThread", Repo: repo, Number: number, CommentID: commentID, Body: body})
+	f.record(Call{Method: "ReplyReviewThread", Repo: repo, Number: number, CommentID: commentID, Body: body})
 	return nil
 }
 
 func (f *Fake) Browse(_ context.Context, repo string, number int) error {
-	f.Calls = append(f.Calls, Call{Method: "Browse", Repo: repo, Number: number})
+	f.record(Call{Method: "Browse", Repo: repo, Number: number})
 	return nil
 }

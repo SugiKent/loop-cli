@@ -1,0 +1,26 @@
+[
+  {
+    "body": "issue #108 の提案。\n\nCloses #108",
+    "isDraft": false,
+    "labels": [
+      {
+        "name": "propose",
+        "color": "ededed",
+        "description": ""
+      },
+      {
+        "name": "question",
+        "color": "ededed",
+        "description": ""
+      }
+    ],
+    "number": 131,
+    "repository": {
+      "name": "app",
+      "nameWithOwner": "org/app"
+    },
+    "title": "propose: ログインのセッション仕様",
+    "updatedAt": "2026-09-04T10:00:00Z",
+    "url": "https://github.com/org/app/pull/131"
+  }
+]

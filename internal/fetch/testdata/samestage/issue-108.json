@@ -1,0 +1,38 @@
+{
+  "body": "認証まわりの仕様を決めたい。",
+  "comments": [
+    {
+      "id": "IC_kwDOA1",
+      "author": {
+        "login": "user-1"
+      },
+      "body": "<!-- routine -->\nQ1: セッションの寿命は何日にしますか。",
+      "createdAt": "2026-09-04T09:00:00Z",
+      "url": "https://github.com/org/app/issues/108#issuecomment-kwDOA1"
+    },
+    {
+      "id": "IC_kwDOA2",
+      "author": {
+        "login": "user-2"
+      },
+      "body": "寿命は 30 日で。",
+      "createdAt": "2026-09-04T09:12:00Z",
+      "url": "https://github.com/org/app/issues/108#issuecomment-kwDOA2"
+    }
+  ],
+  "labels": [
+    {
+      "name": "stage:propose",
+      "color": "ededed",
+      "description": ""
+    },
+    {
+      "name": "question",
+      "color": "ededed",
+      "description": ""
+    }
+  ],
+  "number": 108,
+  "title": "ログインのセッション仕様を決める",
+  "url": "https://github.com/org/app/issues/108"
+}

@@ -1,0 +1,19 @@
+{
+  "body": "issue #108 の提案。\n\nCloses #108",
+  "comments": [],
+  "isDraft": false,
+  "labels": [
+    {
+      "name": "propose",
+      "color": "ededed",
+      "description": ""
+    }
+  ],
+  "mergeStateStatus": "BLOCKED",
+  "mergeable": "UNKNOWN",
+  "number": 131,
+  "reviewDecision": "REVIEW_REQUIRED",
+  "statusCheckRollup": [],
+  "title": "propose: ログインのセッション仕様",
+  "url": "https://github.com/org/app/pull/131"
+}

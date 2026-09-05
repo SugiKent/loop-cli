@@ -1,0 +1,28 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewThreads": {
+          "nodes": [
+            {
+              "id": "PRRT_kwDO88",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "databaseId": 4003,
+                    "author": {
+                      "login": "user-1"
+                    },
+                    "body": "<!-- routine -->\nここは仕様どおりですか。",
+                    "createdAt": "2026-09-04T12:10:00Z"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

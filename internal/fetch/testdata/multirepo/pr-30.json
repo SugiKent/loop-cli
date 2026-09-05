@@ -1,0 +1,19 @@
+{
+  "body": "未確定の判断: 1 件\n\n提案します。",
+  "comments": [],
+  "isDraft": false,
+  "labels": [
+    {
+      "name": "propose",
+      "color": "ededed",
+      "description": ""
+    }
+  ],
+  "mergeStateStatus": "BLOCKED",
+  "mergeable": "UNKNOWN",
+  "number": 30,
+  "reviewDecision": "REVIEW_REQUIRED",
+  "statusCheckRollup": [],
+  "title": "[propose] #12 ログイン画面",
+  "url": "https://github.com/org/web/pull/30"
+}

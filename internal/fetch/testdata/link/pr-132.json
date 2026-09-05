@@ -1,0 +1,40 @@
+{
+  "body": "未確定の判断: 2 件\n\n検索の提案。",
+  "comments": [
+    {
+      "id": "IC_kwDO1321",
+      "author": {
+        "login": "user-1"
+      },
+      "body": "<!-- routine -->\n進捗を記録します。",
+      "createdAt": "2026-09-04T11:00:00Z",
+      "url": "https://github.com/org/app/pull/132#issuecomment-kwDO1321"
+    }
+  ],
+  "isDraft": false,
+  "labels": [
+    {
+      "name": "propose",
+      "color": "ededed",
+      "description": ""
+    }
+  ],
+  "mergeStateStatus": "CLEAN",
+  "mergeable": "MERGEABLE",
+  "number": 132,
+  "reviewDecision": "REVIEW_REQUIRED",
+  "statusCheckRollup": [
+    {
+      "__typename": "CheckRun",
+      "name": "test",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "workflowName": "CI",
+      "startedAt": "2026-09-04T10:35:00Z",
+      "completedAt": "2026-09-04T10:40:00Z",
+      "detailsUrl": "https://github.com/org/app/actions/runs/9001"
+    }
+  ],
+  "title": "propose: 検索の仕様",
+  "url": "https://github.com/org/app/pull/132"
+}

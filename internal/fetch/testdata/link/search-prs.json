@@ -1,0 +1,142 @@
+[
+  {
+    "body": "未確定の判断: 0 件\n\nアーカイブします。",
+    "isDraft": true,
+    "labels": [
+      {
+        "name": "archive",
+        "color": "ededed",
+        "description": ""
+      }
+    ],
+    "number": 151,
+    "repository": {
+      "name": "app",
+      "nameWithOwner": "org/app"
+    },
+    "title": "[archive] #108 セッション仕様のアーカイブ",
+    "updatedAt": "2026-09-04T10:00:00Z",
+    "url": "https://github.com/org/app/pull/151"
+  },
+  {
+    "body": "issue #108 の提案。\n\nCloses #108",
+    "isDraft": false,
+    "labels": [
+      {
+        "name": "propose",
+        "color": "ededed",
+        "description": ""
+      }
+    ],
+    "number": 131,
+    "repository": {
+      "name": "app",
+      "nameWithOwner": "org/app"
+    },
+    "title": "propose: ログインのセッション仕様",
+    "updatedAt": "2026-09-04T10:00:00Z",
+    "url": "https://github.com/org/app/pull/131"
+  },
+  {
+    "body": "未確定の判断: 1 件\n\n実装します。",
+    "isDraft": false,
+    "labels": [
+      {
+        "name": "apply",
+        "color": "ededed",
+        "description": ""
+      }
+    ],
+    "number": 140,
+    "repository": {
+      "name": "app",
+      "nameWithOwner": "org/app"
+    },
+    "title": "[apply] #108 セッション仕様を実装する",
+    "updatedAt": "2026-09-04T10:00:00Z",
+    "url": "https://github.com/org/app/pull/140"
+  },
+  {
+    "body": "README の誤字を直す。",
+    "isDraft": false,
+    "labels": [
+      {
+        "name": "docs",
+        "color": "ededed",
+        "description": ""
+      }
+    ],
+    "number": 60,
+    "repository": {
+      "name": "app",
+      "nameWithOwner": "org/app"
+    },
+    "title": "docs: README を直す",
+    "updatedAt": "2026-09-04T10:00:00Z",
+    "url": "https://github.com/org/app/pull/60"
+  },
+  {
+    "body": "依存を更新する。",
+    "isDraft": false,
+    "labels": [],
+    "number": 61,
+    "repository": {
+      "name": "app",
+      "nameWithOwner": "org/app"
+    },
+    "title": "chore: 依存を上げる",
+    "updatedAt": "2026-09-04T10:00:00Z",
+    "url": "https://github.com/org/app/pull/61"
+  },
+  {
+    "body": "提案します。",
+    "isDraft": false,
+    "labels": [],
+    "number": 62,
+    "repository": {
+      "name": "app",
+      "nameWithOwner": "org/app"
+    },
+    "title": "[propose] #999 存在しない issue の提案",
+    "updatedAt": "2026-09-04T10:00:00Z",
+    "url": "https://github.com/org/app/pull/62"
+  },
+  {
+    "body": "未確定の判断: 2 件\n\n検索の提案。",
+    "isDraft": false,
+    "labels": [
+      {
+        "name": "propose",
+        "color": "ededed",
+        "description": ""
+      }
+    ],
+    "number": 132,
+    "repository": {
+      "name": "app",
+      "nameWithOwner": "org/app"
+    },
+    "title": "propose: 検索の仕様",
+    "updatedAt": "2026-09-04T10:00:00Z",
+    "url": "https://github.com/org/app/pull/132"
+  },
+  {
+    "body": "未確定の判断: 1 件\n\n検索を実装する。",
+    "isDraft": false,
+    "labels": [
+      {
+        "name": "apply",
+        "color": "ededed",
+        "description": ""
+      }
+    ],
+    "number": 90,
+    "repository": {
+      "name": "app",
+      "nameWithOwner": "org/app"
+    },
+    "title": "apply: 検索の実装",
+    "updatedAt": "2026-09-04T10:00:00Z",
+    "url": "https://github.com/org/app/pull/90"
+  }
+]

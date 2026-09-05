@@ -1,0 +1,34 @@
+{
+  "body": "未確定の判断: 1 件\n\n実装します。",
+  "comments": [
+    {
+      "id": "IC_kwDOC1",
+      "author": {
+        "login": "user-1"
+      },
+      "body": "<!-- routine -->\n進捗を記録します。",
+      "createdAt": "2026-09-04T12:00:00Z",
+      "url": "https://github.com/org/app/pull/88#issuecomment-kwDOC1"
+    }
+  ],
+  "isDraft": false,
+  "labels": [
+    {
+      "name": "apply",
+      "color": "ededed",
+      "description": ""
+    },
+    {
+      "name": "question",
+      "color": "ededed",
+      "description": ""
+    }
+  ],
+  "mergeStateStatus": "BLOCKED",
+  "mergeable": "UNKNOWN",
+  "number": 88,
+  "reviewDecision": "REVIEW_REQUIRED",
+  "statusCheckRollup": [],
+  "title": "apply: セッション仕様を実装する",
+  "url": "https://github.com/org/app/pull/88"
+}

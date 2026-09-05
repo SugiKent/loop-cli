@@ -1,0 +1,38 @@
+{
+  "body": "未確定の判断: 1 件\n\n検索を実装する。",
+  "comments": [
+    {
+      "id": "IC_kwDO901",
+      "author": {
+        "login": "user-1"
+      },
+      "body": "<!-- routine -->\n進捗を記録します。",
+      "createdAt": "2026-09-04T11:00:00Z",
+      "url": "https://github.com/org/app/pull/90#issuecomment-kwDO901"
+    },
+    {
+      "id": "IC_kwDO902",
+      "author": {
+        "login": "user-2"
+      },
+      "body": "こちらの方針でお願いします。",
+      "createdAt": "2026-09-04T11:30:00Z",
+      "url": "https://github.com/org/app/pull/90#issuecomment-kwDO902"
+    }
+  ],
+  "isDraft": false,
+  "labels": [
+    {
+      "name": "apply",
+      "color": "ededed",
+      "description": ""
+    }
+  ],
+  "mergeStateStatus": "BLOCKED",
+  "mergeable": "UNKNOWN",
+  "number": 90,
+  "reviewDecision": "REVIEW_REQUIRED",
+  "statusCheckRollup": [],
+  "title": "apply: 検索の実装",
+  "url": "https://github.com/org/app/pull/90"
+}

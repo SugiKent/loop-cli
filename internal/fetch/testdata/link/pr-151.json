@@ -1,0 +1,30 @@
+{
+  "body": "未確定の判断: 0 件\n\nアーカイブします。",
+  "comments": [],
+  "isDraft": true,
+  "labels": [
+    {
+      "name": "archive",
+      "color": "ededed",
+      "description": ""
+    }
+  ],
+  "mergeStateStatus": "CLEAN",
+  "mergeable": "MERGEABLE",
+  "number": 151,
+  "reviewDecision": "REVIEW_REQUIRED",
+  "statusCheckRollup": [
+    {
+      "__typename": "CheckRun",
+      "name": "test",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "workflowName": "CI",
+      "startedAt": "2026-09-04T10:35:00Z",
+      "completedAt": "2026-09-04T10:40:00Z",
+      "detailsUrl": "https://github.com/org/app/actions/runs/9001"
+    }
+  ],
+  "title": "[archive] #108 セッション仕様のアーカイブ",
+  "url": "https://github.com/org/app/pull/151"
+}
