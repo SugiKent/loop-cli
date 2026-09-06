@@ -1,7 +1,7 @@
 package classify
 
 import (
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // Card は Issue と open PR 群を分類し、最上位の局面を Card.Result に置いたコピーを返す。

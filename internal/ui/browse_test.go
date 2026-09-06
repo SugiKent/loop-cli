@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SugiKent/sugi-loop/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/gh"
 )
 
 var oKey = runeKey('o')

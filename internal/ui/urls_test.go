@@ -9,9 +9,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/SugiKent/sugi-loop/internal/fetch"
-	"github.com/SugiKent/sugi-loop/internal/gh"
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/fetch"
+	"github.com/SugiKent/loop-cli/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 var uKey = runeKey('u')

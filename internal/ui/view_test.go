@@ -9,8 +9,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/SugiKent/sugi-loop/internal/fetch"
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/fetch"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // plain は View から ANSI エスケープを除いた行を返す。

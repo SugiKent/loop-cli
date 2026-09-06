@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // aiComment / humanComment は AI 判定を本文に依存させずに列を組み立てる。

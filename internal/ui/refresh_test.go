@@ -7,8 +7,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/SugiKent/sugi-loop/internal/fetch"
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/fetch"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // findFetched はコマンドを実行し、束なら要素も実行して fetchedMsg を探す。

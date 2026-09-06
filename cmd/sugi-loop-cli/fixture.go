@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/SugiKent/sugi-loop/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/gh"
 )
 
 // fixturesDir は fixture の保存先の親。カレントがリポジトリのルートである確認にも使う。

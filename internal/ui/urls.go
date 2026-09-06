@@ -7,8 +7,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/SugiKent/sugi-loop/internal/gh"
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // urlItem は一覧の 1 件。source は出典の語（本文 / コメント / thread）。

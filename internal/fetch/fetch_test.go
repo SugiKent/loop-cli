@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SugiKent/sugi-loop/internal/gh"
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 const (

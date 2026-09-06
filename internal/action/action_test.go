@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/SugiKent/sugi-loop/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/gh"
 )
 
 const fixtureDir = "../gh/testdata/fixtures/example"

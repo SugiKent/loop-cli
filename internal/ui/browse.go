@@ -6,7 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/SugiKent/sugi-loop/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/gh"
 )
 
 // browsedMsg は 1 回の `gh browse` の完了。成功は画面に出さない（ブラウザが開くこと自体が結果）。

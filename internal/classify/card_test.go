@@ -3,7 +3,7 @@ package classify
 import (
 	"testing"
 
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 func mergedPR(number int, labels ...string) model.PR {

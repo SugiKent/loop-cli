@@ -10,10 +10,10 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 
-	"github.com/SugiKent/sugi-loop/internal/classify"
-	"github.com/SugiKent/sugi-loop/internal/fetch"
-	"github.com/SugiKent/sugi-loop/internal/gh"
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/classify"
+	"github.com/SugiKent/loop-cli/internal/fetch"
+	"github.com/SugiKent/loop-cli/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // screen は画面の状態。詳細は Model の中の状態で持ち、別 Model に委譲しない。

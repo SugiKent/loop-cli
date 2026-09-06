@@ -5,7 +5,7 @@ import (
 
 	"charm.land/huh/v2"
 
-	"github.com/SugiKent/sugi-loop/internal/config"
+	"github.com/SugiKent/loop-cli/internal/config"
 )
 
 // Run は初回起動のフォームを標準入出力で実行し、回答を path に書き出す。

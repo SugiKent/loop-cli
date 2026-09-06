@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // Snapshot は前回の取得結果。At はその取得が完了した（保存した）時刻。

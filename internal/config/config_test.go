@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SugiKent/sugi-loop/internal/config"
+	"github.com/SugiKent/loop-cli/internal/config"
 )
 
 // writeConfig は一時ディレクトリに config.yml を書き、そのパスを返す。

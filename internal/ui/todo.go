@@ -5,9 +5,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/SugiKent/sugi-loop/internal/action"
-	"github.com/SugiKent/sugi-loop/internal/gh"
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/action"
+	"github.com/SugiKent/loop-cli/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // toggledMsg は 1 回の stage:todo 切り替えの完了。

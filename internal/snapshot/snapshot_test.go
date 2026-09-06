@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SugiKent/sugi-loop/internal/fetch"
-	"github.com/SugiKent/sugi-loop/internal/gh"
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/fetch"
+	"github.com/SugiKent/loop-cli/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // savedAt は往復のテストで使う保存時刻。JSON から戻した time.Time の場所情報が

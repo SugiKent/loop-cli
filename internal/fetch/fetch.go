@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SugiKent/sugi-loop/internal/classify"
-	"github.com/SugiKent/sugi-loop/internal/gh"
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/classify"
+	"github.com/SugiKent/loop-cli/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // CallTimeout は gh 呼び出し 1 回あたりの期限（s03 design.md が s07 に委ねた値）。

@@ -1,4 +1,4 @@
-module github.com/SugiKent/sugi-loop
+module github.com/SugiKent/loop-cli
 
 go 1.26.6
 

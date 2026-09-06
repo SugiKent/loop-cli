@@ -5,7 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // Notifier はデスクトップ通知を 1 件出す。cmd/sugi-loop が beeep を包んで渡し、

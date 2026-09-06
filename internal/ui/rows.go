@@ -4,7 +4,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // row は表の 1 行。主体（Card.Result を出した Issue または PR）から引いた値を持ち、

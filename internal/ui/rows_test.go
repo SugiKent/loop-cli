@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 func TestSubjectIsPRWhenPRDecidedSituation(t *testing.T) {

@@ -8,9 +8,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/SugiKent/sugi-loop/internal/fetch"
-	"github.com/SugiKent/sugi-loop/internal/model"
-	"github.com/SugiKent/sugi-loop/internal/snapshot"
+	"github.com/SugiKent/loop-cli/internal/fetch"
+	"github.com/SugiKent/loop-cli/internal/model"
+	"github.com/SugiKent/loop-cli/internal/snapshot"
 )
 
 // nowPRCard は主体が PR の今やるカードを 1 枚作る。

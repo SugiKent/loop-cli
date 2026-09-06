@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SugiKent/sugi-loop/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/gh"
 )
 
 func TestIssueStagesReturnsStageLabelsInStageOrder(t *testing.T) {

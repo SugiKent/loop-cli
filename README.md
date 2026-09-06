@@ -16,7 +16,7 @@
 ## インストールと起動
 
 ```sh
-go install github.com/SugiKent/sugi-loop/cmd/sugi-loop@latest
+go install github.com/SugiKent/loop-cli/cmd/sugi-loop@latest
 sugi-loop
 ```
 

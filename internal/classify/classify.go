@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/SugiKent/sugi-loop/internal/gh"
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 func result(s model.Situation, summary string) model.Result {

@@ -8,7 +8,7 @@ import (
 
 	"charm.land/glamour/v2"
 
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // routineMarkers は落とすマーカー行。エスケープ済みの形はレンダラの出力に混ざるので両方見る。

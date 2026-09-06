@@ -5,7 +5,7 @@ package model
 import (
 	"time"
 
-	"github.com/SugiKent/sugi-loop/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/gh"
 )
 
 // ラベル名はプラグイン規約に固定で、設定では変えられない（mvp.md）。

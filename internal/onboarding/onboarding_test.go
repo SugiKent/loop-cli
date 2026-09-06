@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SugiKent/sugi-loop/internal/config"
-	"github.com/SugiKent/sugi-loop/internal/onboarding"
+	"github.com/SugiKent/loop-cli/internal/config"
+	"github.com/SugiKent/loop-cli/internal/onboarding"
 )
 
 func TestParseReposTrimsAndDropsEmptyLines(t *testing.T) {

@@ -13,12 +13,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SugiKent/sugi-loop/internal/config"
-	"github.com/SugiKent/sugi-loop/internal/fetch"
-	"github.com/SugiKent/sugi-loop/internal/gh"
-	"github.com/SugiKent/sugi-loop/internal/onboarding"
-	"github.com/SugiKent/sugi-loop/internal/snapshot"
-	"github.com/SugiKent/sugi-loop/internal/ui"
+	"github.com/SugiKent/loop-cli/internal/config"
+	"github.com/SugiKent/loop-cli/internal/fetch"
+	"github.com/SugiKent/loop-cli/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/onboarding"
+	"github.com/SugiKent/loop-cli/internal/snapshot"
+	"github.com/SugiKent/loop-cli/internal/ui"
 )
 
 // stubForm は呼ばれた回数とパスを記録し、固定のエラーを返す。

@@ -11,7 +11,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/SugiKent/sugi-loop/internal/config"
+	"github.com/SugiKent/loop-cli/internal/config"
 )
 
 // ErrAborted は利用者がフォームを中止したこと。設定ファイルは書かれていない。

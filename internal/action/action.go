@@ -8,7 +8,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/SugiKent/sugi-loop/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/gh"
 )
 
 // routine が自分のコメント先頭に置くマーカー（model.IsAI が見る形と同じ）。

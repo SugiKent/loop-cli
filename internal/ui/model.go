@@ -8,10 +8,10 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/SugiKent/sugi-loop/internal/fetch"
-	"github.com/SugiKent/sugi-loop/internal/gh"
-	"github.com/SugiKent/sugi-loop/internal/model"
-	"github.com/SugiKent/sugi-loop/internal/snapshot"
+	"github.com/SugiKent/loop-cli/internal/fetch"
+	"github.com/SugiKent/loop-cli/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/model"
+	"github.com/SugiKent/loop-cli/internal/snapshot"
 )
 
 // Options は New の起動時の選択肢。ゼロ値は

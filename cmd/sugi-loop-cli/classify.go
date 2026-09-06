@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SugiKent/sugi-loop/internal/classify"
-	"github.com/SugiKent/sugi-loop/internal/gh"
-	"github.com/SugiKent/sugi-loop/internal/model"
+	"github.com/SugiKent/loop-cli/internal/classify"
+	"github.com/SugiKent/loop-cli/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // row は出力の 1 行と、節内の並び順のキー。
