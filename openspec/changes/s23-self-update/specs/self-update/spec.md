@@ -2,30 +2,37 @@
 
 ### Requirement: 現在の版とモジュールパスは build info から取る
 
-`internal/version` は、実行中のバイナリのモジュールパスと版を返す関数を MUST 公開する。値は `runtime/debug.ReadBuildInfo()` の `Main.Path` と `Main.Version` から取り、ネットワークもファイルも読まない。
+`internal/version` は、実行中のバイナリのモジュールパス・版・手元 build かどうかを返す関数を MUST 公開する。値は `runtime/debug.ReadBuildInfo()` から取り、ネットワークもファイルも読まない。
 
-- `ReadBuildInfo` が読めない場合、モジュールパスは空文字列、版は `(devel)` とする
-- `Main.Version` が空文字列の場合も版は `(devel)` とする（`go install <module>@<version>` で入れたバイナリはタグまたは擬似バージョン、手元の `go build` は `(devel)` になる）
+- 版は `Main.Version`。空文字列なら `(devel)` とする
+- 手元 build かどうかは、`Settings` に `vcs.revision` があるか、版が `(devel)` かで決める。Go はリポジトリの作業ツリーで `go build` したバイナリにも VCS 由来の擬似バージョン（末尾 `+dirty`）を刻むため、版の文字列だけでは `go install <module>@<version>` と区別できない。`vcs.*` の設定は module cache から入れたバイナリには付かない
+- `ReadBuildInfo` が読めない場合、モジュールパスは空文字列、版は `(devel)`、手元 build とする
 - 呼び出し側はモジュールパスをこの関数からのみ得る。Go のコードにモジュールパスの定数を書かない（`go.mod` と import パスを除く）
 
-#### Scenario: go install で入れたバイナリの版
+#### Scenario: go install で入れたバイナリ
 
 - **WHEN** `go install <module>/cmd/sugi-loop@latest` で入れたバイナリで現在の版を取る
-- **THEN** モジュールパスは `go.mod` の `module` の値と等しく、版は `v` で始まる（タグまたは擬似バージョン）
+- **THEN** モジュールパスは `go.mod` の `module` の値と等しく、版は `v` で始まり（タグまたは擬似バージョン）、手元 build ではない
 
-#### Scenario: 手元の go build は (devel) になる
+#### Scenario: リポジトリで go build したバイナリは手元 build になる
 
-- **WHEN** `go build ./cmd/sugi-loop` で作ったバイナリで現在の版を取る
-- **THEN** 版は `(devel)` である
+- **WHEN** 作業ツリーで `go build ./cmd/sugi-loop` して作ったバイナリで現在の版を取る
+- **THEN** 手元 build であり、版は `(devel)` または VCS 由来の擬似バージョンである
 
 ### Requirement: 最新の版は go list -m -json で取る
 
 `internal/version` は、モジュールパスを受け取って最新の版の文字列を返す関数を MUST 公開する。`go list -m -json <module>@latest` を実行し、標準出力の JSON の `Version` を返す。
 
 - `go` の呼び出しは差し替え可能な関数を通して行い、テストは本物の `go` とネットワークを使わない
+- `go` は module の外（`os.TempDir()`）で走らせる。vendor ディレクトリを持つプロジェクトの中では `-mod=vendor` が自動で効き、`@latest` を問い合わせられないため
 - コマンドが失敗したら、コマンドと標準エラーを含むエラーを返す。`go` が PATH に無い場合は `exec.ErrNotFound` を包んだエラーになる
 - 標準出力が JSON として読めない、または `Version` が空なら、その出力を含むエラーを返す
 - 呼び出し側が渡した `context.Context` で中断できる
+
+#### Scenario: vendor ディレクトリを持つプロジェクトの中でも問い合わせられる
+
+- **WHEN** `vendor/` を持つ Go プロジェクトのディレクトリで `update` を実行する
+- **THEN** `cannot query module due to -mod=vendor` にはならず、最新の版の問い合わせが行われる
 
 #### Scenario: 最新の版が返る
 
@@ -49,7 +56,7 @@
 #### Scenario: 版が出る
 
 - **WHEN** 引数 `version` で実行する
-- **THEN** 標準出力は `sugi-loop <現在の版>` の 1 行で、終了コードは 0 である
+- **THEN** 標準出力は `sugi-loop <現在の版>` の 1 行で、終了コードは 0 である（手元 build なら擬似バージョンか `(devel)` がそのまま出る）
 
 ### Requirement: update は新しい版があるときだけ go install で入れ直す
 
@@ -57,7 +64,7 @@
 
 1. 現在の版とモジュールパスを取る
 2. 最新の版を取る。失敗したらそのエラーを標準エラーに書き、終了コード 1 で終わる（`go` が PATH に無い場合は `go が見つかりません` と `https://go.dev/dl/` の 2 行を書く）
-3. 現在の版が `(devel)` でなく、最新の版と文字列として等しければ、標準出力に `最新版です: <版>` と書き、`go install` を実行せず終了コード 0 で終わる
+3. 手元 build ではなく、現在の版が最新の版と文字列として等しければ、標準出力に `最新版です: <版>` と書き、`go install` を実行せず終了コード 0 で終わる
 4. それ以外は `go install <モジュールパス>/cmd/sugi-loop@latest` を実行する。`go` の標準出力と標準エラーはそのまま流す。失敗したらそのエラーを標準エラーに書き、終了コード 1 で終わる
 5. 成功したら標準出力に `更新しました: <現在の版> → <最新の版>` と書き、終了コード 0 で終わる
 
@@ -73,9 +80,9 @@
 - **WHEN** 現在の版と最新の版が等しい状態で `update` を実行する
 - **THEN** `go install` は実行されず、標準出力に `最新版です: <その版>` が出て、終了コードは 0 である
 
-#### Scenario: (devel) は比較せず install する
+#### Scenario: 手元 build は比較せず install する
 
-- **WHEN** 現在の版が `(devel)` の状態で `update` を実行する
+- **WHEN** 現在の版が手元 build のものである状態で `update` を実行する
 - **THEN** 最新の版と等しいかによらず `go install` が実行され、終了コードは 0 である
 
 #### Scenario: go install の失敗
@@ -90,11 +97,11 @@
 
 ### Requirement: TUI は起動時に 1 度だけ更新を調べ、あればヘッダに出す
 
-`ui.Options` は更新の確認を行う関数の欄を MUST 持ち、`nil` なら確認を行わない。関数は `context.Context` を受け取り、新しい版があるかどうかと最新の版を返す。`Model` は `Init` が返すコマンドで、取得のコマンドと並べてこの確認を 1 度だけ MUST 開始する。自動更新の tick（s13）や `R`（s12）では再度行わない。
+`ui.Options` は更新の確認を行う関数の欄を MUST 持ち、`nil` なら確認を行わない。関数は `context.Context` を受け取り、新しい版があるかどうかだけを返す（ヘッダに版を出さないので版は使わない）。`Model` は `Init` が返すコマンドで、取得のコマンドと並べてこの確認を 1 度だけ MUST 開始する。自動更新の tick（s13）や `R`（s12）では再度行わない。
 
 結果のメッセージを受け取ったら、新しい版があるときだけ `Model` に印を持ち、キュー画面のヘッダに `↑ update` を出す（Requirement「ヘッダはタブ名と件数と最終更新時刻、フッタはキーヒントとステータスを出す」）。確認が失敗した場合と、新しい版が無い場合は、画面に何も出さず、フッタのステータス（`errText` 等）も変えない。確認は画面の他の動きを止めない。
 
-`cmd/sugi-loop` が渡す関数は、現在の版が `(devel)` なら何も調べずに「新しい版は無い」を返し、そうでなければ 10 秒の時間制限を付けて最新の版を取り、現在の版と違えば「新しい版がある」を返す（design.md 未決事項の既定値）。
+`cmd/sugi-loop` が渡す関数は、手元 build なら何も調べずに「新しい版は無い」を返し、そうでなければ 10 秒の時間制限を付けて最新の版を取り、現在の版と違えば「新しい版がある」を返す（design.md 未決事項の既定値）。
 
 #### Scenario: 新しい版があるとヘッダに出る
 
@@ -108,7 +115,7 @@
 
 #### Scenario: 確認の失敗は画面を変えない
 
-- **WHEN** 確認が失敗した結果のメッセージを与えた `Model` の `View` から ANSI エスケープを除いて読む
+- **WHEN** 確認関数が失敗を「新しい版は無い」に畳んだ結果のメッセージを与えた `Model` の `View` から ANSI エスケープを除いて読む
 - **THEN** 1 行目に `↑ update` は含まれず、最終行にエラーのステータスも出ない
 
 #### Scenario: 確認しない設定では確認関数を呼ばない

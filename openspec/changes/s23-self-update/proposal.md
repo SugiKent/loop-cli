@@ -7,9 +7,9 @@
 ## What Changes
 
 - `go.mod` のモジュールパスを `github.com/SugiKent/loop-cli` に変え、リポジトリ内の全 import パスを追随させる（利用者の決定）。README のインストール手順も新しいパスに直す
-- `internal/version` を新設する。現在の版は `debug.ReadBuildInfo()` の `Main.Version`（`go install` で入れたバイナリはタグまたは擬似バージョン、手元の `go build` は `(devel)`）、最新の版は `go list -m -json <module>@latest` の `Version` から取る
+- `internal/version` を新設する。現在の版は `debug.ReadBuildInfo()` の `Main.Version`（`go install` で入れたバイナリはタグまたは擬似バージョン）。作業ツリーでの `go build` にも Go は擬似バージョンを刻むので、手元 build かどうかは `vcs.revision` の build setting の有無で見分ける、最新の版は `go list -m -json <module>@latest` の `Version` から取る
 - `cmd/sugi-loop` に `version` と `update` のサブコマンドを足す。引数なしは今までどおり TUI。`update` は最新版を調べ、現在の版と違えば `go install <module>/cmd/sugi-loop@latest` を実行し、`更新しました: <現在> → <最新>` を出す。同じなら install せず `最新版です: <版>` を出す
-- TUI は起動時に 1 度だけ非同期で最新版を調べ、新しい版があればキュー画面のヘッダ右に `↑ update` を出す。調べに失敗したとき・現在の版が `(devel)` のときは何も出さない（画面を止めない、エラーも出さない）
+- TUI は起動時に 1 度だけ非同期で最新版を調べ、新しい版があればキュー画面のヘッダ右に `↑ update` を出す。調べに失敗したとき・手元 build のときは何も出さない（画面を止めない、エラーも出さない）
 - GitHub Releases からのバイナリ配布は行わない。Go は README の前提であり、リリースのワークフローも無いため、`go install` に一本化する
 
 ## Capabilities

@@ -16,9 +16,9 @@
 - **WHEN** `*.go` / `go.mod` / `README.md` を `github.com/SugiKent/sugi-loop` で検索する
 - **THEN** 一致する行は無い（openspec の spec と docs の記述は経緯として残ってよい）
 
-#### Scenario: proxy が最新版を返す
-- **WHEN** モジュールを含まないディレクトリで `go list -m -json github.com/SugiKent/loop-cli@latest` を実行する
-- **THEN** 終了コード 0 で `Version` を含む JSON が返る
+#### Scenario: 公開されたモジュールを go install できる
+- **WHEN** この change を push した後、モジュールを含まないディレクトリで `GOBIN=<一時ディレクトリ> go install github.com/SugiKent/loop-cli/cmd/sugi-loop@latest` を実行する
+- **THEN** 終了コード 0 で `<一時ディレクトリ>/sugi-loop` が作られる（`go list -m -json ...@latest` の成功だけでは足りない。proxy は `go.mod` の `module` 行を検証しないので、パスが食い違ったままでも `Version` を返す）
 
 #### Scenario: 依存 5 つが go.mod に固定されている
 - **WHEN** `go list -m all` を実行する

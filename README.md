@@ -26,6 +26,17 @@ sugi-loop
 go run ./cmd/sugi-loop
 ```
 
+## 更新
+
+```sh
+sugi-loop update    # 新しい版があれば go install で入れ直す
+sugi-loop version   # 今入っている版を出す
+```
+
+`update` は `go list -m -json <module>@latest` で最新の版を調べ、今の版と違えば `go install github.com/SugiKent/loop-cli/cmd/sugi-loop@latest` を実行します。同じなら何もせず `最新版です: <版>` と出ます。`go` が必要です。入れ先は `go install` と同じ `$GOBIN`（未設定なら `$GOPATH/bin`）なので、そこ以外に置いたバイナリを実行している場合は入れ替わりません。
+
+TUI は起動時に 1 度だけ最新の版を調べ、新しい版があればヘッダの右（時刻の左）に `↑ update` を出します。調べに失敗したときと、手元の `go build` で作ったバイナリのときは何も出ません。
+
 ## 初回起動
 
 設定ファイル `~/.config/sugi-loop/config.yml` が無いとき、起動すると入力フォームが出ます。順に `repos`（owner/name を 1 行に 1 つ）、`merge_method`、`notify`、`editor` を聞き、回答を設定ファイルに書き出してからキュー画面に進みます。ディレクトリは `0700`、ファイルは `0600` で作られます。

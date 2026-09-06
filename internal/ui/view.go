@@ -86,20 +86,36 @@ func (m Model) queueHint() string {
 // header はアプリ名・4 タブの件数・最終更新時刻を 1 行で書く。
 // 端末幅を超えるときは [4] → [3] → [2] の順にタブ名を落とし、次に時刻を省き、最後に幅で切る。
 func (m Model) header() string {
-	right := "↻ --:--"
+	clock := "↻ --:--"
 	if !m.at.IsZero() {
-		right = "↻ " + m.at.Format("15:04")
+		clock = "↻ " + m.at.Format("15:04")
+	}
+	// 新しい版があるときだけ時刻の左に印を出す（s23 self-update）。打つコマンドは README にある。
+	right := clock
+	if m.updateAvailable {
+		right = "↑ update  " + clock
 	}
 
+	fits := func(shortened int, right string) bool {
+		return ansi.StringWidth(m.headerLeft(shortened, false))+1+ansi.StringWidth(right) <= m.width
+	}
 	shortened := 0
 	for ; shortened < len(tabOrder)-1; shortened++ {
-		if ansi.StringWidth(m.headerLeft(shortened, false))+1+ansi.StringWidth(right) <= m.width {
+		if fits(shortened, right) {
 			break
 		}
 	}
+	// 全部短縮しても収まらなければ 更新の印 → 時刻 の順に落とす。
+	if !fits(shortened, right) {
+		right = clock
+	}
+	if !fits(shortened, right) {
+		right = ""
+	}
+
 	left := m.headerLeft(shortened, true)
 	plain := ansi.StringWidth(m.headerLeft(shortened, false))
-	if plain+1+ansi.StringWidth(right) > m.width {
+	if right == "" {
 		return ansi.Truncate(left, m.width, "")
 	}
 	return left + strings.Repeat(" ", m.width-plain-ansi.StringWidth(right)) + right

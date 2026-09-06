@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -21,16 +22,96 @@ import (
 	"github.com/SugiKent/loop-cli/internal/onboarding"
 	"github.com/SugiKent/loop-cli/internal/snapshot"
 	"github.com/SugiKent/loop-cli/internal/ui"
+	"github.com/SugiKent/loop-cli/internal/version"
 )
 
 func main() {
-	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+// usage はサブコマンドの一覧。未知のサブコマンドのときに標準エラーへ出す。
+const usage = `使い方:
+  sugi-loop            今やるキュー画面を開く
+  sugi-loop version    現在の版を出す
+  sugi-loop update     最新の版に入れ直す（go install）
+`
+
+// updater は版の確認と入れ直し。テストは version.Client の代わりにスタブを渡す。
+type updater interface {
+	Current() (module, current string, local bool)
+	Latest(ctx context.Context, module string) (string, error)
+	Install(ctx context.Context, module string, stdout, stderr io.Writer) error
+}
+
+// run は第 1 引数でサブコマンドに振り分ける。引数なしは TUI を起動する。
+// サブコマンドは設定ファイルを読まず gh も呼ばない。
+func run(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		if err := runTUI(); err != nil {
+			_, _ = fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	}
+	switch args[0] {
+	case "version":
+		_, current, _ := version.NewClient().Current()
+		_, _ = fmt.Fprintf(stdout, "sugi-loop %s\n", current)
+		return 0
+	case "update":
+		return runUpdate(context.Background(), version.NewClient(), stdout, stderr)
+	default:
+		_, _ = fmt.Fprintf(stderr, "unknown command: %s\n", args[0])
+		_, _ = fmt.Fprint(stderr, usage)
+		return 1
 	}
 }
 
-func run() error {
+// runUpdate は最新版を調べ、現在の版と違えば go install で入れ直す。
+func runUpdate(ctx context.Context, up updater, stdout, stderr io.Writer) int {
+	module, current, local := up.Current()
+	latest, err := up.Latest(ctx, module)
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			_, _ = fmt.Fprintln(stderr, "go が見つかりません")
+			_, _ = fmt.Fprintln(stderr, "https://go.dev/dl/ から Go をインストールしてください")
+			return 1
+		}
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
+	}
+	// 手元 build の版は公開された版と比べられない。明示的に打たれた以上は入れ直す。
+	if !local && current == latest {
+		_, _ = fmt.Fprintf(stdout, "最新版です: %s\n", latest)
+		return 0
+	}
+	if err := up.Install(ctx, module, stdout, stderr); err != nil {
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
+	}
+	_, _ = fmt.Fprintf(stdout, "更新しました: %s → %s\n", current, latest)
+	return 0
+}
+
+// updateChecker は起動時の更新確認を作る。手元 build は調べず、
+// 失敗は「新しい版は無い」と同じに扱う（ネットワークが無い場所で画面にエラーを常駐させないため）。
+func updateChecker(up updater) ui.UpdateChecker {
+	return func(ctx context.Context) bool {
+		module, current, local := up.Current()
+		if local {
+			return false
+		}
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		latest, err := up.Latest(ctx, module)
+		if err != nil {
+			return false
+		}
+		return latest != current
+	}
+}
+
+func runTUI() error {
 	path, err := config.DefaultPath()
 	if err != nil {
 		return err
@@ -56,7 +137,7 @@ func run() error {
 	var fetcher ui.Fetcher = func(ctx context.Context) (*fetch.Result, error) {
 		return fetch.Fetch(ctx, client, repos)
 	}
-	opts := ui.Options{RefreshInterval: time.Duration(cfg.RefreshIntervalSec) * time.Second}
+	opts := ui.Options{RefreshInterval: time.Duration(cfg.RefreshIntervalSec) * time.Second, CheckUpdate: updateChecker(version.NewClient())}
 	if cfg.Notify {
 		// icon は string か []byte でなければならない。空文字列でアイコンなし（s06 と同じ）。
 		opts.Notify = func(title, body string) error { return beeep.Notify(title, body, "") }

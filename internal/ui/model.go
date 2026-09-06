@@ -20,7 +20,14 @@ type Options struct {
 	Snapshot        *snapshot.Snapshot // 起動時の stale 表示に使う前回の Card 群と保存時刻
 	RefreshInterval time.Duration      // 自動更新の間隔。0 なら自動更新しない
 	Notify          Notifier           // デスクトップ通知。nil なら通知しない
+	CheckUpdate     UpdateChecker      // 起動時の更新確認。nil なら確認しない
 }
+
+// UpdateChecker は新しい版があるかどうかを返す（s23 self-update）。
+type UpdateChecker func(ctx context.Context) bool
+
+// updateCheckedMsg は起動時の更新確認の結果。
+type updateCheckedMsg struct{ available bool }
 
 // Fetcher は Card 群の取得。cmd/sugi-loop が fetch.Fetch を client と repos で閉じて渡す。
 type Fetcher func(ctx context.Context) (*fetch.Result, error)
@@ -67,6 +74,9 @@ type Model struct {
 	refreshInterval time.Duration
 	notify          Notifier
 
+	checkUpdate     UpdateChecker
+	updateAvailable bool
+
 	spinner spinner.Model
 }
 
@@ -84,6 +94,7 @@ func New(fetcher Fetcher, client gh.GHClient, editor Editor, opts Options) Model
 		height:          24,
 		refreshInterval: opts.RefreshInterval,
 		notify:          opts.Notify,
+		checkUpdate:     opts.CheckUpdate,
 		spinner:         spinner.New(spinner.WithSpinner(spinner.MiniDot)),
 	}
 	// スナップショットがあれば前回の表と保存時刻から始める（D-002「起動直後は stale 表示」）。
@@ -104,10 +115,16 @@ func fetchCmd(fetcher Fetcher) tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
+	cmds := []tea.Cmd{m.spinner.Tick, fetchCmd(m.fetcher)}
 	if m.refreshInterval > 0 {
-		return tea.Batch(m.spinner.Tick, fetchCmd(m.fetcher), tickCmd(m.refreshInterval))
+		cmds = append(cmds, tickCmd(m.refreshInterval))
 	}
-	return tea.Batch(m.spinner.Tick, fetchCmd(m.fetcher))
+	// 更新の確認は起動につき 1 度だけ。版はセッション中にまず変わらない。
+	if m.checkUpdate != nil {
+		check := m.checkUpdate
+		cmds = append(cmds, func() tea.Msg { return updateCheckedMsg{available: check(context.Background())} })
+	}
+	return tea.Batch(cmds...)
 }
 
 // startFetch は 2 回目以降の取得を始める。R（s12）と自動更新（s13）が使う共通の経路で、
@@ -122,6 +139,9 @@ func (m *Model) startFetch() tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case updateCheckedMsg:
+		m.updateAvailable = msg.available
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		if m.screen == screenCard || m.screen == screenPR {
