@@ -1,7 +1,7 @@
 schema: spec-driven
 
 context: |
-  プロジェクト: sugi-loop。issue-driven-sdd（Claude Code Routines が GitHub Issue のラベルで propose → apply → archive を回す構成）で
+  プロジェクト: loop-cli。issue-driven-sdd（Claude Code Routines が GitHub Issue のラベルで propose → apply → archive を回す構成）で
   「人の出番だけ」を複数リポジトリ横断で 1 本のキューに並べて捌く TUI。`gh` CLI をサブプロセスとして使い、DB は持たない。
   技術スタック: Go 1.26 / Bubble Tea v2 / Bubbles v2 / Lip Gloss v2 / Glamour / huh。配布は go install。
   正本ドキュメント（必ず読む）:
@@ -10,7 +10,7 @@ context: |
     - docs/mvp/implementation-tasks.md（実装順序。change はこの粒度）
     - docs/mvp/validation-plan.md（V-1 / V-2。未定事項あり）
     - docs/domain/issue-driven-sdd/human-turn-signals.md（局面 A〜G の判定表と書き込み不変条件 1〜8）
-  内部構成（D-003）: cmd/sugi-loop, cmd/sugi-loop-cli, internal/{config,gh,model,classify,ui,action}
+  内部構成（D-003）: cmd/loop-cli, cmd/loop-cli-dev, internal/{config,gh,model,classify,ui,action}
   ラベル名と routine マーカー（<!-- routine -->）はプラグイン規約に固定。TUI が書くラベルは stage:todo と s の stage:propose のみ。
   プロジェクトの CLAUDE.md（シンプルさ最優先・投機的機能を書かない）に従う。
 

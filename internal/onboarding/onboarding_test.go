@@ -64,7 +64,7 @@ func TestMarshalMatchesMVPExample(t *testing.T) {
 
 func TestWriteIsReadableByConfigLoad(t *testing.T) {
 	t.Setenv("EDITOR", "nvim")
-	path := filepath.Join(t.TempDir(), "sugi-loop", "config.yml")
+	path := filepath.Join(t.TempDir(), "loop-cli", "config.yml")
 
 	if err := onboarding.Write(path, onboarding.Answers{
 		Repos:       []string{"org/app"},

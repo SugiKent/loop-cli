@@ -156,7 +156,7 @@ func TestInstallRunsGoInstall(t *testing.T) {
 	if err := f.client().Install(context.Background(), module, &stdout, &stderr); err != nil {
 		t.Fatalf("Install: %v", err)
 	}
-	want := "install " + module + "/cmd/sugi-loop@latest"
+	want := "install " + module + "/cmd/loop-cli@latest"
 	if strings.Join(f.args, " ") != want {
 		t.Errorf("args = %v, want %q", f.args, want)
 	}

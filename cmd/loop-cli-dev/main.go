@@ -1,4 +1,4 @@
-// Command sugi-loop-cli は sugi-loop の動作確認用 CLI。
+// Command loop-cli-dev は loop-cli の動作確認用 CLI。
 package main
 
 import (
@@ -7,18 +7,18 @@ import (
 	"os"
 )
 
-const usage = `sugi-loop-cli は sugi-loop の動作確認用 CLI です。
+const usage = `loop-cli-dev は loop-cli の動作確認用 CLI です。
 
 使い方:
-  sugi-loop-cli help
+  loop-cli-dev help
       この使い方を表示する
-  sugi-loop-cli fixture capture --repo owner/name --alias <alias>
+  loop-cli-dev fixture capture --repo owner/name --alias <alias>
       指定リポジトリの open issue / PR を採取し、伏せ字にして
       internal/gh/testdata/fixtures/<alias>/ に保存する（リポジトリのルートで実行する）
-  sugi-loop-cli classify --fixture <alias>
+  loop-cli-dev classify --fixture <alias>
       internal/gh/testdata/fixtures/<alias>/ の open issue / PR を分類し、4 タブ別に
       優先 / 種別 / リポジトリ / 番号 / タイトル / 経過 をタブ区切りで出す（リポジトリのルートで実行する）
-  sugi-loop-cli notify test
+  loop-cli-dev notify test
       デスクトップ通知を 1 件出す
 `
 

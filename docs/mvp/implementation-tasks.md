@@ -18,18 +18,18 @@ A と B はどちらも「`question` が付いたものにコメントで答え�
 
 - [ ] `go mod init` と依存追加（Bubble Tea v2 / Bubbles v2 / Lip Gloss v2 / Glamour / huh）
 - [ ] gofmt / `go vet` / golangci-lint のセットアップ
-- [ ] `cmd/sugi-loop` の hello world（起動して 1 フレーム描画、`q` で終了）で `go build` が通る状態にする
+- [ ] `cmd/loop-cli` の hello world（起動して 1 フレーム描画、`q` で終了）で `go build` が通る状態にする
 - [ ] CI（build / vet / test）を通す
 
 ## 2. 実装のための仕組み
 
 DB は持たない（[D-002](./decisions.md)）。seed / testData の代わりに **fixture** を使う。
 
-- [ ] `internal/config`: `~/.config/sugi-loop/config.yml` の読み込み
+- [ ] `internal/config`: `~/.config/loop-cli/config.yml` の読み込み
 - [ ] `internal/gh`: `GHClient` interface、`gh` サブプロセス実装、JSON fixture の fake
 - [ ] fixture 採取: 稼働中リポジトリ 1 件から `gh search` / `gh issue view` / `gh pr view` の JSON を取り、個人・組織情報を伏せて保存
 - [ ] `internal/classify`: 局面 A〜G と「その他」バケットを純粋関数で実装し、fixture でテストする（V-1。このツールの価値の本体なので UI より先に書く）
-- [ ] 動作確認用 CLI の導入（`go run ./cmd/sugi-loop-cli help`。用途: gh の生 JSON を fixture に保存、fixture に分類器をかけてキューをプレーンテキスト出力、テスト通知の発火。詳細は 85-create-cli を参照）
+- [ ] 動作確認用 CLI の導入（`go run ./cmd/loop-cli-dev help`。用途: gh の生 JSON を fixture に保存、fixture に分類器をかけてキューをプレーンテキスト出力、テスト通知の発火。詳細は 85-create-cli を参照）
 
 ## 3. ユーザー体験順の実装
 
@@ -51,7 +51,7 @@ DB は持たない（[D-002](./decisions.md)）。seed / testData の代わり�
 - [ ] (P3) GraphQL 1 リクエストへの統合、`/` 絞り込み保存、通知クリックで該当カードを開く
 - [ ] (P3) GitHub Notifications をソースに追加（設定に無いリポジトリの mention）
 - [ ] (P3) Routine の実行状況（run 一覧）の表示
-- [ ] (P1) 自己更新: `sugi-loop update` / `sugi-loop version` と、起動時に 1 度だけ最新版を調べてヘッダに `↑ update` を出す（配布は `go install` のみ）
+- [ ] (P1) 自己更新: `loop-cli update` / `loop-cli version` と、起動時に 1 度だけ最新版を調べてヘッダに `↑ update` を出す（配布は `go install` のみ）
 
 ---
 

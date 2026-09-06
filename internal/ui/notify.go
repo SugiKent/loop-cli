@@ -8,7 +8,7 @@ import (
 	"github.com/SugiKent/loop-cli/internal/model"
 )
 
-// Notifier はデスクトップ通知を 1 件出す。cmd/sugi-loop が beeep を包んで渡し、
+// Notifier はデスクトップ通知を 1 件出す。cmd/loop-cli が beeep を包んで渡し、
 // internal/ui は beeep を import しない。nil なら通知しない。
 type Notifier func(title, body string) error
 
@@ -58,7 +58,7 @@ func notifyBody(c model.Card) string {
 func notifyCmd(notify Notifier, cards []model.Card) tea.Cmd {
 	return func() tea.Msg {
 		for _, c := range cards {
-			_ = notify("sugi-loop", notifyBody(c))
+			_ = notify("loop-cli", notifyBody(c))
 		}
 		return nil
 	}

@@ -49,6 +49,8 @@ func (m Model) render() string {
 	switch m.screen {
 	case screenConfirm:
 		return m.renderConfirm()
+	case screenMergeConfirm:
+		return m.renderMergeConfirm()
 	case screenCard, screenPR:
 		return m.renderDetail()
 	case screenHelp:
@@ -80,7 +82,7 @@ func (m Model) renderDetail() string {
 // queueHint はキュー画面のフッタ左。
 func (m Model) queueHint() string {
 	// 移動系のキー（j / k / 1–4 / Tab）は出さず `?` のヘルプに委ねる（既定幅 80 に収めるため）。
-	return "Enter 開く  a 回答  t todo  o ブラウザ  R 更新  ? ヘルプ  u URL  q 終了"
+	return "Enter 開く  a 回答  t todo  m merge  o ブラウザ  R 更新  ? ヘルプ  u URL  q 終了"
 }
 
 // header はアプリ名・4 タブの件数・最終更新時刻を 1 行で書く。
@@ -136,7 +138,7 @@ func (m Model) headerLeft(shortened int, styled bool) string {
 		}
 		parts = append(parts, label)
 	}
-	return "sugi-loop  " + strings.Join(parts, "  ")
+	return "loop-cli  " + strings.Join(parts, "  ")
 }
 
 // emptyHint は取得成功で 0 件のときに表の領域へ出す 2 行（mvp.md「初回起動（onboarding）」）。

@@ -180,7 +180,7 @@ func exampleFetcher(t *testing.T) (ui.Fetcher, *fetch.Result) {
 
 func TestSavingFetcherSavesOnSuccess(t *testing.T) {
 	fetcher, res := exampleFetcher(t)
-	path := filepath.Join(t.TempDir(), "sugi-loop", "snapshot.json")
+	path := filepath.Join(t.TempDir(), "loop-cli", "snapshot.json")
 
 	before := time.Now()
 	got, err := savingFetcher(fetcher, path)(context.Background())
@@ -234,5 +234,21 @@ func TestSavingFetcherIgnoresSaveFailure(t *testing.T) {
 	}
 	if got != res {
 		t.Errorf("返った Result が元のものでない: %p, want %p", got, res)
+	}
+}
+
+// TestMergeMethods は対応表がリポジトリ別の merge_method を反映することを検証する
+// （s14 merge-pr「merge 方式はリポジトリ名から引く」。internal/ui は internal/config を見ない）。
+func TestMergeMethods(t *testing.T) {
+	path := writeConfig(t, "repos:\n  - org/app\n  - name: org/web\n    merge_method: rebase\nmerge_method: merge\n")
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	got := mergeMethods(cfg)
+	want := map[string]string{"org/app": "merge", "org/web": "rebase"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("mergeMethods = %v, want %v", got, want)
 	}
 }

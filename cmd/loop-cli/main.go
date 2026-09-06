@@ -1,4 +1,4 @@
-// Command sugi-loop は今やるキュー画面を出す TUI。
+// Command loop-cli は今やるキュー画面を出す TUI。
 package main
 
 import (
@@ -31,9 +31,9 @@ func main() {
 
 // usage はサブコマンドの一覧。未知のサブコマンドのときに標準エラーへ出す。
 const usage = `使い方:
-  sugi-loop            今やるキュー画面を開く
-  sugi-loop version    現在の版を出す
-  sugi-loop update     最新の版に入れ直す（go install）
+  loop-cli            今やるキュー画面を開く
+  loop-cli version    現在の版を出す
+  loop-cli update     最新の版に入れ直す（go install）
 `
 
 // updater は版の確認と入れ直し。テストは version.Client の代わりにスタブを渡す。
@@ -56,7 +56,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "version":
 		_, current, _ := version.NewClient().Current()
-		_, _ = fmt.Fprintf(stdout, "sugi-loop %s\n", current)
+		_, _ = fmt.Fprintf(stdout, "loop-cli %s\n", current)
 		return 0
 	case "update":
 		return runUpdate(context.Background(), version.NewClient(), stdout, stderr)
@@ -137,7 +137,11 @@ func runTUI() error {
 	var fetcher ui.Fetcher = func(ctx context.Context) (*fetch.Result, error) {
 		return fetch.Fetch(ctx, client, repos)
 	}
-	opts := ui.Options{RefreshInterval: time.Duration(cfg.RefreshIntervalSec) * time.Second, CheckUpdate: updateChecker(version.NewClient())}
+	opts := ui.Options{
+		RefreshInterval: time.Duration(cfg.RefreshIntervalSec) * time.Second,
+		CheckUpdate:     updateChecker(version.NewClient()),
+		MergeMethods:    mergeMethods(cfg),
+	}
 	if cfg.Notify {
 		// icon は string か []byte でなければならない。空文字列でアイコンなし（s06 と同じ）。
 		opts.Notify = func(title, body string) error { return beeep.Notify(title, body, "") }
@@ -154,6 +158,16 @@ func runTUI() error {
 	m := ui.New(fetcher, client, ui.ExternalEditor(cfg.Editor), opts)
 	_, err = tea.NewProgram(m).Run()
 	return err
+}
+
+// mergeMethods は リポジトリ名 -> merge 方式 の対応表を作る（s14 merge-pr）。
+// internal/ui は internal/config を import しないので、対応表はここで作って Options に渡す。
+func mergeMethods(cfg *config.Config) map[string]string {
+	out := make(map[string]string, len(cfg.Repos))
+	for _, r := range cfg.Repos {
+		out[r.Name] = string(r.MergeMethod)
+	}
+	return out
 }
 
 // savingFetcher は取得が成功するたびにスナップショットを保存する包み。

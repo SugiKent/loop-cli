@@ -3,9 +3,8 @@
 ## Purpose
 TBD - created by archiving change s13-auto-refresh-notify. Update Purpose after archive.
 ## Requirements
-
 ### Requirement: refresh_interval_sec ごとに取得を開始し、取得中と書き込み中の tick は次まで待つ
-`Model` は `New` で受け取った自動更新の間隔（`Options.RefreshInterval`。`cmd/sugi-loop` は `Config.RefreshIntervalSec` 秒を渡す。既定 120 秒は s02 が埋める）で MUST 次のとおり動く（D-002「自動更新は既定 120 秒（設定可）」）。
+`Model` は `New` で受け取った自動更新の間隔（`Options.RefreshInterval`。`cmd/loop-cli` は `Config.RefreshIntervalSec` 秒を渡す。既定 120 秒は s02 が埋める）で MUST 次のとおり動く（D-002「自動更新は既定 120 秒（設定可）」）。
 - 間隔が 0 より大きいとき、`Init` は初回取得の開始（s12 `manual-refresh` の `startFetch()`）に加えて、間隔の経過後に `internal/ui` 内の tick メッセージを返すコマンドを返す
 - tick メッセージが届いたら、取得中（`fetching` が true）または書き込み中（s10 / s11 の投稿中フラグが true）なら取得を開始せず、そうでなければ `startFetch()` で取得を開始する（`R` と同じ経路。`errText` / `partial` / 書き込みステータスが消える。s10 / s11 の「次の取得が始まったとき消える」のとおり）。どちらの場合も次の tick のコマンドを返し、tick は止まらない
 - tick はどの画面（キュー / カード詳細 / PR 詳細 / 確認 / ヘルプ）でも同じに扱う。詳細画面を開いている間の取得完了は s09「詳細を開いている間の取得完了は対象の Card を差し替えない」のとおりで、`Cards` と最終更新時刻は更新し、詳細の対象・確認画面の下書きは閉じるまで旧 Card のまま保持する。キュー画面の選択行は s08 の丸め規則だけで先頭に戻さない
@@ -36,3 +35,4 @@ tick の間隔は `Model` が壁時計を読まずにコマンドの遅延で作
 #### Scenario: 手動確認で 2 分ごとに更新される
 - **WHEN** 稼働リポジトリ 1 件を設定し `refresh_interval_sec` を省略した状態で起動し、2 分以上待つ
 - **THEN** フッタに `取得中` のスピナーが出た後、ヘッダの `↻ HH:MM` が更新される
+

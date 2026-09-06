@@ -139,8 +139,8 @@ func TestNotifiesEachAddedCard(t *testing.T) {
 	if len(*got) != 1 {
 		t.Fatalf("通知 = %d 件, want 1: %+v", len(*got), *got)
 	}
-	if (*got)[0].title != "sugi-loop" {
-		t.Errorf("title = %q, want sugi-loop", (*got)[0].title)
+	if (*got)[0].title != "loop-cli" {
+		t.Errorf("title = %q, want loop-cli", (*got)[0].title)
 	}
 	lines := bodyLines(t, (*got)[0])
 	if want := cardOf(t, res, 108).Result.Summary; lines[0] != want {

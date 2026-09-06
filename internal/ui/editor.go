@@ -46,7 +46,7 @@ func failedEdit(err error) tea.Cmd {
 
 // writeTemp は initial を書いた一時ファイルを作り、そのパスを返す。
 func writeTemp(initial string) (string, error) {
-	f, err := os.CreateTemp("", "sugi-loop-answer-*.md")
+	f, err := os.CreateTemp("", "loop-cli-answer-*.md")
 	if err != nil {
 		return "", err
 	}

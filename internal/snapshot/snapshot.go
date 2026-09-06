@@ -17,14 +17,14 @@ type Snapshot struct {
 	At    time.Time
 }
 
-// DefaultPath はスナップショットの既定パス $HOME/.cache/sugi-loop/snapshot.json を返す。
+// DefaultPath はスナップショットの既定パス $HOME/.cache/loop-cli/snapshot.json を返す。
 // os.UserCacheDir は macOS で ~/Library/Caches になり D-002 のパスと一致しないので使わない。
 func DefaultPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".cache", "sugi-loop", "snapshot.json"), nil
+	return filepath.Join(home, ".cache", "loop-cli", "snapshot.json"), nil
 }
 
 // Save は path に Snapshot を書く。ディレクトリが無ければ作る。

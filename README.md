@@ -1,8 +1,8 @@
-# sugi-loop
+# loop-cli
 
 複数の GitHub リポジトリを横断して、**人が手を動かすべき issue / PR だけ**を 1 本のキューに優先度順で並べる TUI です。
 
-[issue-driven-sdd](https://github.com/SugiKent/sugiken-dev-plugin-public/tree/main/plugins/issue-driven-sdd) のように、AI の routine が GitHub Issue のラベルで propose → apply → archive を回す運用では、AI は「人の判断待ち」で止まります。リポジトリが増えるほど、どこで何が待っているかを GitHub の通知やタブから拾い直す手間が増えます。sugi-loop はその待ちだけを集めて、先頭から捌けるようにします。
+[issue-driven-sdd](https://github.com/SugiKent/sugiken-dev-plugin-public/tree/main/plugins/issue-driven-sdd) のように、AI の routine が GitHub Issue のラベルで propose → apply → archive を回す運用では、AI は「人の判断待ち」で止まります。リポジトリが増えるほど、どこで何が待っているかを GitHub の通知やタブから拾い直す手間が増えます。loop-cli はその待ちだけを集めて、先頭から捌けるようにします。
 
 データ層は `gh` CLI です。サーバーもトークン管理も持たず、手元で動きます。
 
@@ -16,38 +16,40 @@
 ## インストールと起動
 
 ```sh
-go install github.com/SugiKent/loop-cli/cmd/sugi-loop@latest
-sugi-loop
+go install github.com/SugiKent/loop-cli/cmd/loop-cli@latest
+loop-cli
 ```
 
 リポジトリを clone して直接動かす場合:
 
 ```sh
-go run ./cmd/sugi-loop
+go run ./cmd/loop-cli
 ```
 
 ## 更新
 
 ```sh
-sugi-loop update    # 新しい版があれば go install で入れ直す
-sugi-loop version   # 今入っている版を出す
+loop-cli update    # 新しい版があれば go install で入れ直す
+loop-cli version   # 今入っている版を出す
 ```
 
-`update` は `go list -m -json <module>@latest` で最新の版を調べ、今の版と違えば `go install github.com/SugiKent/loop-cli/cmd/sugi-loop@latest` を実行します。同じなら何もせず `最新版です: <版>` と出ます。`go` が必要です。入れ先は `go install` と同じ `$GOBIN`（未設定なら `$GOPATH/bin`）なので、そこ以外に置いたバイナリを実行している場合は入れ替わりません。
+`update` は `go list -m -json <module>@latest` で最新の版を調べ、今の版と違えば `go install github.com/SugiKent/loop-cli/cmd/loop-cli@latest` を実行します。同じなら何もせず `最新版です: <版>` と出ます。`go` が必要です。入れ先は `go install` と同じ `$GOBIN`（未設定なら `$GOPATH/bin`）なので、そこ以外に置いたバイナリを実行している場合は入れ替わりません。
 
 TUI は起動時に 1 度だけ最新の版を調べ、新しい版があればヘッダの右（時刻の左）に `↑ update` を出します。調べに失敗したときと、手元の `go build` で作ったバイナリのときは何も出ません。
 
 ## 初回起動
 
-設定ファイル `~/.config/sugi-loop/config.yml` が無いとき、起動すると入力フォームが出ます。順に `repos`（owner/name を 1 行に 1 つ）、`merge_method`、`notify`、`editor` を聞き、回答を設定ファイルに書き出してからキュー画面に進みます。ディレクトリは `0700`、ファイルは `0600` で作られます。
+設定ファイル `~/.config/loop-cli/config.yml` が無いとき、起動すると入力フォームが出ます。順に `repos`（owner/name を 1 行に 1 つ）、`merge_method`、`notify`、`editor` を聞き、回答を設定ファイルに書き出してからキュー画面に進みます。ディレクトリは `0700`、ファイルは `0600` で作られます。
 
 途中で中止（Ctrl+C）した場合、設定ファイルは書かれません。標準入力が端末でない場合はフォームを出さず、`設定ファイルがありません: <path>` で終了します。
 
 設定ファイルが既にあるときはフォームを出しません（壊れた設定を上書きしないため）。読み込みに失敗した場合はその内容をエラーとして表示します。
 
+以前のバージョン（`sugi-loop`）を使っていた場合、設定は `~/.config/sugi-loop/config.yml`、スナップショットは `~/.cache/sugi-loop/snapshot.json` に残っています。自動では移行しないので、フォームで入れ直すか、設定ファイルを `~/.config/loop-cli/config.yml` へ移してください。
+
 ## 設定ファイル
 
-`~/.config/sugi-loop/config.yml`:
+`~/.config/loop-cli/config.yml`:
 
 ```yaml
 repos:
@@ -177,32 +179,32 @@ issue のタイトル・現在の局面・段階ラベルとバッジ・`depends
 
 ### スナップショット（起動直後の表示）
 
-取得に成功するたびに、その時点のカードと時刻を `~/.cache/sugi-loop/snapshot.json`（ディレクトリ `0700`、ファイル `0600`）に書きます。次の起動では、このファイルの内容とヘッダの `↻ <保存時刻>` をすぐに表示したうえで、背景で通常どおり取得します（起動のたびに空の画面で待たなくて済みます）。取得が完了すると表と時刻が入れ替わります。
+取得に成功するたびに、その時点のカードと時刻を `~/.cache/loop-cli/snapshot.json`（ディレクトリ `0700`、ファイル `0600`）に書きます。次の起動では、このファイルの内容とヘッダの `↻ <保存時刻>` をすぐに表示したうえで、背景で通常どおり取得します（起動のたびに空の画面で待たなくて済みます）。取得が完了すると表と時刻が入れ替わります。
 
 中身は GitHub から取り直せるものだけで、認証情報は含みません。ファイルが無い・壊れているときは無視して空の画面から始め、次の取得成功で上書きします。消しても構いません。
 
 ### デスクトップ通知（`notify: true`）
 
-取得が完了するたびに、前回の `[1]今やる` と比べて増えたカードを 1 件 1 通知で知らせます。タイトルは `sugi-loop`、本文は 1 行目が「いま人が何をすべきか」の要約、2 行目が `org/app PR#131` / `org/app #140` のような対象です。
+取得が完了するたびに、前回の `[1]今やる` と比べて増えたカードを 1 件 1 通知で知らせます。タイトルは `loop-cli`、本文は 1 行目が「いま人が何をすべきか」の要約、2 行目が `org/app PR#131` / `org/app #140` のような対象です。
 
 減ったカードや、要約だけが変わったカードは通知しません。スナップショットが無い状態での初回取得は、比べる相手が無いので通知しません（スナップショットがあれば、前回の起動から増えた分を知らせます）。通知の失敗は無視して画面は動き続けます。
 
-## sugi-loop-cli（開発補助）
+## loop-cli-dev（開発補助）
 
 fixture を採取したり、分類の結果や通知を手元で確認するための CLI です。`fixture capture` と `classify` はリポジトリのルートで実行します。
 
 ```sh
-go run ./cmd/sugi-loop-cli help
+go run ./cmd/loop-cli-dev help
 
 # 指定リポジトリの open issue / PR を採取し、伏せ字にして
 # internal/gh/testdata/fixtures/<alias>/ に保存する
-go run ./cmd/sugi-loop-cli fixture capture --repo org/app --alias example
+go run ./cmd/loop-cli-dev fixture capture --repo org/app --alias example
 
 # 採取済み fixture を分類し、4 タブ別にタブ区切りで出力する（gh は呼ばない）
-go run ./cmd/sugi-loop-cli classify --fixture example
+go run ./cmd/loop-cli-dev classify --fixture example
 
 # デスクトップ通知を 1 件出す
-go run ./cmd/sugi-loop-cli notify test
+go run ./cmd/loop-cli-dev notify test
 ```
 
 ## うまく動かないとき
@@ -211,9 +213,9 @@ go run ./cmd/sugi-loop-cli notify test
 GitHub CLI をインストールして PATH に通してください。
 
 **`gh の認証に失敗しました`**
-`gh auth login` を実行してください。sugi-loop は起動のたびに `gh auth status` で確認します。
+`gh auth login` を実行してください。loop-cli は起動のたびに `gh auth status` で確認します。
 
-**`設定ファイルがありません: ~/.config/sugi-loop/config.yml`**
+**`設定ファイルがありません: ~/.config/loop-cli/config.yml`**
 標準入力が端末でないため初回フォームを出せませんでした。端末から起動するか、設定ファイルを手で置いてください。
 
 **キューが空で「stage:\* ラベルの無いリポジトリは何も出ません。」と出る**
@@ -226,4 +228,4 @@ GitHub CLI をインストールして PATH に通してください。
 設定ファイルの `editor` が空で、環境変数 `EDITOR` も設定されていません。どちらかを設定してください。
 
 **デスクトップ通知が出ない**
-設定の `notify` が `true` か確認してください。`go run ./cmd/sugi-loop-cli notify test` で通知そのものを単体で確認できます。出ない場合は OS 側の通知許可設定を確認してください。TUI は `[1]今やる` に増えたカードだけを通知するので、増えていなければ通知は出ません。
+設定の `notify` が `true` か確認してください。`go run ./cmd/loop-cli-dev notify test` で通知そのものを単体で確認できます。出ない場合は OS 側の通知許可設定を確認してください。TUI は `[1]今やる` に増えたカードだけを通知するので、増えていなければ通知は出ません。

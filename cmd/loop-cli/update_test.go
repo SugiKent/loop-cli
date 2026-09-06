@@ -46,8 +46,8 @@ func TestRunVersionPrintsCurrent(t *testing.T) {
 		t.Fatalf("exit code = %d, want 0 (stderr=%q)", code, stderr.String())
 	}
 	_, current, _ := version.NewClient().Current()
-	if stdout.String() != "sugi-loop "+current+"\n" {
-		t.Errorf("stdout = %q, want %q", stdout.String(), "sugi-loop "+current+"\n")
+	if stdout.String() != "loop-cli "+current+"\n" {
+		t.Errorf("stdout = %q, want %q", stdout.String(), "loop-cli "+current+"\n")
 	}
 }
 

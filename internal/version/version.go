@@ -76,10 +76,10 @@ func (c *Client) Latest(ctx context.Context, module string) (string, error) {
 	return out.Version, nil
 }
 
-// Install は module の sugi-loop を go install で入れ直す。
+// Install は module の loop-cli を go install で入れ直す。
 // go の出力は呼び出し側の Writer にそのまま流す（ダウンロードの進捗と失敗理由が見えるように）。
 func (c *Client) Install(ctx context.Context, module string, stdout, stderr io.Writer) error {
-	args := []string{"install", module + "/cmd/sugi-loop@latest"}
+	args := []string{"install", module + "/cmd/loop-cli@latest"}
 	if err := c.run(ctx, stdout, stderr, args...); err != nil {
 		return fmt.Errorf("go %s: %w", strings.Join(args, " "), err)
 	}

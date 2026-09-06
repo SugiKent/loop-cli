@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// GHClient は sugi-loop が使う GitHub 操作の集合。
+// GHClient は loop-cli が使う GitHub 操作の集合。
 // Client（gh サブプロセス）と Fake（JSON fixture）が実装する。
 type GHClient interface {
 	SearchIssues(ctx context.Context, repos []string) ([]SearchIssue, error)

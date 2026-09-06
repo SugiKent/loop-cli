@@ -29,9 +29,9 @@ TBD - created by archiving change s10-answer-question. Update Purpose after arch
 - **THEN** コマンドが返り、対象は `Target{Repo: "org/app", Number: 140, IsPR: false}`、スタブに渡る `initial` は空文字列である
 
 ### Requirement: ExternalEditor は設定のエディタを一時ファイルで開く
-`internal/ui` は `ExternalEditor(command string) Editor` を MUST 公開する。`command` は config の `editor`（s02 が `$EDITOR` を展開済み）で、`cmd/sugi-loop` がこれを `New` に渡す。返る `Editor` は次の振る舞いをする。
+`internal/ui` は `ExternalEditor(command string) Editor` を MUST 公開する。`command` は config の `editor`（s02 が `$EDITOR` を展開済み）で、`cmd/loop-cli` がこれを `New` に渡す。返る `Editor` は次の振る舞いをする。
 - `command` の前後の空白を除いた結果が空なら、外部プロセスを起動せず、`editor が設定されていません（config の editor か環境変数 EDITOR）` を含むエラーを運ぶメッセージを返すコマンドを返す（s02 `config-loading`「空のときの扱いは s10 が担当」。既定値は design.md の未決事項）
-- それ以外は、一時ディレクトリに `sugi-loop-answer-*.md` の一時ファイルを作って `initial` を書き込み、`command` を空白で分割した先頭を実行ファイル、残りを引数とし、その末尾に一時ファイルのパスを足したプロセスを、Bubble Tea の外部プロセス実行の仕組み（描画を止め、端末の標準入出力をプロセスに渡す）で起動する。シェルを通さない
+- それ以外は、一時ディレクトリに `loop-cli-answer-*.md` の一時ファイルを作って `initial` を書き込み、`command` を空白で分割した先頭を実行ファイル、残りを引数とし、その末尾に一時ファイルのパスを足したプロセスを、Bubble Tea の外部プロセス実行の仕組み（描画を止め、端末の標準入出力をプロセスに渡す）で起動する。シェルを通さない
 - プロセスが終了コード 0 で終わったら一時ファイルを読み、その内容を編集後の本文としてメッセージで返し、一時ファイルを削除する。終了コードが非 0 か起動に失敗したら、そのエラーを運ぶメッセージを返し、一時ファイルは削除する
 
 #### Scenario: editor が空なら起動せずエラーになる

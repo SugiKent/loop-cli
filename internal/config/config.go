@@ -1,4 +1,4 @@
-// Package config は sugi-loop の設定ファイル（~/.config/sugi-loop/config.yml）を読み込む。
+// Package config は loop-cli の設定ファイル（~/.config/loop-cli/config.yml）を読み込む。
 package config
 
 import (
@@ -38,13 +38,13 @@ type Config struct {
 	Notify             bool        `yaml:"notify"`
 }
 
-// DefaultPath は設定ファイルの既定パス $HOME/.config/sugi-loop/config.yml を返す。
+// DefaultPath は設定ファイルの既定パス $HOME/.config/loop-cli/config.yml を返す。
 func DefaultPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".config", "sugi-loop", "config.yml"), nil
+	return filepath.Join(home, ".config", "loop-cli", "config.yml"), nil
 }
 
 // UnmarshalYAML は repos の要素を「文字列」または「{name, merge_method} のマッピング」として読む。

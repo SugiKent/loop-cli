@@ -69,9 +69,22 @@ func TestHeaderHidesUpdateMarkWithoutUpdate(t *testing.T) {
 	}
 }
 
-// TestHeaderDropsTabNameOfFourthAtDefaultWidth は既定幅 80 で [4] のタブ名だけが落ちることを検証する。
-func TestHeaderDropsTabNameOfFourthAtDefaultWidth(t *testing.T) {
+// TestHeaderFitsAtDefaultWidth は既定幅 80 で印つきのヘッダが短縮せずに収まることを検証する。
+func TestHeaderFitsAtDefaultWidth(t *testing.T) {
 	m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at}, updateCheckedMsg{available: true})
+
+	header := plain(m)[0]
+	for _, want := range []string{"[1]今やる 1", "[2]バックログ 1", "[3]進行中 0", "[4]異常 0", "↑ update", "↻ 12:04"} {
+		if !strings.Contains(header, want) {
+			t.Errorf("ヘッダに %q が無い: %q", want, header)
+		}
+	}
+}
+
+// TestHeaderDropsTabNameOfFourthAtWidth79 は幅 79 で [4] のタブ名だけが落ちることを検証する。
+func TestHeaderDropsTabNameOfFourthAtWidth79(t *testing.T) {
+	m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at}, updateCheckedMsg{available: true},
+		tea.WindowSizeMsg{Width: 79, Height: 40})
 
 	header := plain(m)[0]
 	for _, want := range []string{"[1]今やる 1", "[2]バックログ 1", "[3]進行中 0", "[4] 0", "↑ update", "↻ 12:04"} {
@@ -87,7 +100,7 @@ func TestHeaderDropsTabNameOfFourthAtDefaultWidth(t *testing.T) {
 // TestHeaderDropsUpdateMarkBeforeClock は幅が足りないとき時刻より先に印が落ちることを検証する。
 func TestHeaderDropsUpdateMarkBeforeClock(t *testing.T) {
 	m, _ := send(newModel(nil), fetchedMsg{res: exampleResult(t), at: at}, updateCheckedMsg{available: true},
-		tea.WindowSizeMsg{Width: 60, Height: 40})
+		tea.WindowSizeMsg{Width: 59, Height: 40})
 
 	header := plain(m)[0]
 	if !strings.Contains(header, "↻ 12:04") {

@@ -244,7 +244,7 @@ func TestTodoStatusIsReplacedByNextToggle(t *testing.T) {
 }
 
 // TestWritingBlocksTodoAndAnswer は書き込み中の t / a がどちらも効かないことを検証する
-// （s10 answer-question「投稿中は a を無視」をラベル切り替え中にも広げたもの）。
+// （s10 answer-question「投稿中は a を無視」をラベル切り替え中と s14 の merge 中にも広げたもの）。
 func TestWritingBlocksTodoAndAnswer(t *testing.T) {
 	t.Run("切り替え中の t と a", func(t *testing.T) {
 		fake := gh.NewFake(fixtureDir)
@@ -264,6 +264,25 @@ func TestWritingBlocksTodoAndAnswer(t *testing.T) {
 		}
 		if ed.calls != 0 {
 			t.Errorf("エディタが起動している: %d 回", ed.calls)
+		}
+		if len(fake.Calls) != 0 {
+			t.Errorf("呼び出し = %+v, want 空（コマンドをまだ実行していない）", fake.Calls)
+		}
+	})
+
+	t.Run("merge 中の t と a", func(t *testing.T) {
+		m, fake := mergeModel(t, "testdata/merge", Options{})
+		m = confirmed(t, m)
+
+		m, cmd := send(m, runeKey('y'))
+		if cmd == nil {
+			t.Fatal("y で merge のコマンドが返っていない")
+		}
+		if _, again := send(m, tKey); again != nil {
+			t.Errorf("merge 中の t が無視されていない: %T", again())
+		}
+		if _, answered := send(m, aKey); answered != nil {
+			t.Errorf("merge 中の a が無視されていない: %T", answered())
 		}
 		if len(fake.Calls) != 0 {
 			t.Errorf("呼び出し = %+v, want 空（コマンドをまだ実行していない）", fake.Calls)

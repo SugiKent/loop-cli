@@ -60,12 +60,12 @@ func TestHeaderShortensTabNamesFromRight(t *testing.T) {
 
 	header := plain(m)[0]
 
-	for _, want := range []string{"[1]今やる 1", "[2] 1", "[3] 0", "[4] 0", "↻ 12:04"} {
+	for _, want := range []string{"[1]今やる 1", "[2]バックログ 1", "[3] 0", "[4] 0", "↻ 12:04"} {
 		if !strings.Contains(header, want) {
 			t.Errorf("ヘッダに %q が無い: %q", want, header)
 		}
 	}
-	for _, ng := range []string{"バックログ", "進行中", "異常"} {
+	for _, ng := range []string{"進行中", "異常"} {
 		if strings.Contains(header, ng) {
 			t.Errorf("短縮後のヘッダに %q が残っている: %q", ng, header)
 		}
@@ -75,7 +75,7 @@ func TestHeaderShortensTabNamesFromRight(t *testing.T) {
 func TestHeaderBeforeFirstFetch(t *testing.T) {
 	header := plain(newModel(nil))[0]
 
-	if !strings.Contains(header, "sugi-loop") {
+	if !strings.Contains(header, "loop-cli") {
 		t.Errorf("ヘッダにアプリ名が無い: %q", header)
 	}
 	if !strings.Contains(header, "[1]今やる 0") || !strings.Contains(header, "↻ --:--") {
@@ -84,26 +84,37 @@ func TestHeaderBeforeFirstFetch(t *testing.T) {
 }
 
 func TestFooterShowsOnlyImplementedKeys(t *testing.T) {
-	lines := plain(newModel(nil))
+	// ヒントは 80 列ちょうどなので、取得中のステータスと並ぶ幅で読む。
+	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: 90, Height: 24})
+	lines := plain(m)
 	footer := lines[len(lines)-1]
 
-	order(t, footer, "Enter 開く", "a 回答", "t todo", "o ブラウザ", "R 更新", "? ヘルプ", "u URL", "q 終了")
-	for _, ng := range []string{"j/k 移動", "1-4/Tab タブ", "m merge", "Esc 戻る"} {
+	order(t, footer, "Enter 開く", "a 回答", "t todo", "m merge", "o ブラウザ", "R 更新", "? ヘルプ", "u URL", "q 終了")
+	for _, ng := range []string{"j/k 移動", "1-4/Tab タブ", "Esc 戻る"} {
 		if strings.Contains(footer, ng) {
 			t.Errorf("フッタに出さないキー %q がある: %q", ng, footer)
 		}
 	}
 }
 
-// TestFooterFitsHintAndSpinnerAtWidth80 は既定幅 80 の初回取得中でもヒントが消えないことを検証する。
-// s01 tui-entrypoint の「初期フレームに q 終了」が取得中でも成り立つ幅の担保である。
-func TestFooterFitsHintAndSpinnerAtWidth80(t *testing.T) {
-	lines := plain(newModel(nil))
-	footer := lines[len(lines)-1]
+// TestFooterFitsHintAndSpinnerAtWidth90 は、キューのヒント（80 列）が取得中のステータスと
+// 並ばない幅ではステータスが優先され、両方が入る幅では両方出ることを検証する（s08 のフッタの規則）。
+func TestFooterFitsHintAndSpinnerAtWidth90(t *testing.T) {
+	narrow := plain(newModel(nil))
+	footer := narrow[len(narrow)-1]
+	if !strings.Contains(footer, "取得中") {
+		t.Errorf("幅 80 の取得中のフッタにステータスが無い: %q", footer)
+	}
+	if strings.Contains(footer, "Enter 開く") {
+		t.Errorf("幅 80 でヒントとステータスが両方出ている: %q", footer)
+	}
 
+	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: 90, Height: 24})
+	wide := plain(m)
+	footer = wide[len(wide)-1]
 	for _, want := range []string{"Enter 開く", "q 終了", "取得中"} {
 		if !strings.Contains(footer, want) {
-			t.Errorf("幅 80 の取得中のフッタに %q が無い: %q", want, footer)
+			t.Errorf("幅 90 の取得中のフッタに %q が無い: %q", want, footer)
 		}
 	}
 }
@@ -407,8 +418,8 @@ func indexOf(lines []string, s string) (int, bool) {
 	return 0, false
 }
 
-// TestHintWidths はフッタのヒントが既定幅 80 に収まる設計どおりの表示幅であることを検証する。
-// キューは 71 列（取得中でも 71 + 1 + 8 = 80 で両方出る）、カード詳細は 108 列だが
+// TestHintWidths はフッタのヒントが設計どおりの表示幅であることを検証する。
+// キューは m merge を足して 80 列ちょうど、カード詳細は 117 列だが
 // `? ヘルプ` が 65 列目、`u URL` が 72 列目で終わるのでヘルプと URL 一覧の入口は幅 80 でも見える。
 func TestHintWidths(t *testing.T) {
 	card := Model{screen: screenCard, detail: detailState{card: model.Card{PRs: []model.PR{{Number: 131}}}}}
@@ -416,9 +427,9 @@ func TestHintWidths(t *testing.T) {
 		hint string
 		want int
 	}{
-		"キュー":   {newModel(nil).queueHint(), 71},
-		"PR 詳細": {Model{screen: screenPR}.detailHint(), 73},
-		"カード詳細": {card.detailHint(), 108},
+		"キュー":   {newModel(nil).queueHint(), 80},
+		"PR 詳細": {Model{screen: screenPR}.detailHint(), 82},
+		"カード詳細": {card.detailHint(), 117},
 	}
 	for name, tc := range cases {
 		if got := ansi.StringWidth(tc.hint); got != tc.want {

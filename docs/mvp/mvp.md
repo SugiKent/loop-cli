@@ -1,4 +1,4 @@
-# sugi-loop MVP
+# loop-cli MVP
 
 最終更新: 2026-09-05-1805
 
@@ -49,7 +49,7 @@ issue-driven-sdd（Claude Code Routines が GitHub Issue のラベルで propose
 ### 画面構成（今やるキュー）
 
 ```
-┌ sugi-loop ── [1]今やる 7  [2]バックログ 12  [3]進行中 5  [4]異常 1 ────── ↻ 12:04 ─┐
+┌ loop-cli ── [1]今やる 7  [2]バックログ 12  [3]進行中 5  [4]異常 1 ────── ↻ 12:04 ─┐
 │  優先 種別    リポジトリ           #    タイトル                              経過   │
 │ ▶ !!  質問    org/app             PR131 [propose] #108 選択 UI をモーダル化する…   12m   │
 │   !!  質問    org/web             PR 88 [apply] #48 監視ツールを導入する…          1h    │
@@ -76,7 +76,7 @@ issue-driven-sdd（Claude Code Routines が GitHub Issue のラベルで propose
   GitHub 側のラベル色（`question` D876E3、`blocked` B60205、`propose` 0E8A16 など）と揃える。
 - 下段: 選択行のプレビュー。Issue 本文 / PR 本文を Markdown レンダリングし、コメントは AI 発を左バーで区別する。
 - 端末サイズによらず常に上下 2 ペインで出す。狭い端末では表とプレビューがそれぞれ短くなる。
-- ヘッダ右の `↻ 12:04` は最後に取得が完了した時刻。新しい版が出ているときは、その左に `↑ update` が出る（`sugi-loop update` で入れ直す）。幅が足りないときはタブ名 → `↑ update` → 時刻 の順に落とす。
+- ヘッダ右の `↻ 12:04` は最後に取得が完了した時刻。新しい版が出ているときは、その左に `↑ update` が出る（`loop-cli update` で入れ直す）。幅が足りないときはタブ名 → `↑ update` → 時刻 の順に落とす。
 
 ### カード詳細（Enter）
 
@@ -120,7 +120,7 @@ issue-driven-sdd（Claude Code Routines が GitHub Issue のラベルで propose
 
 ---
 
-## 設定ファイル `~/.config/sugi-loop/config.yml`
+## 設定ファイル `~/.config/loop-cli/config.yml`
 
 ```yaml
 repos:
@@ -138,7 +138,7 @@ notify: true                  # 人の出番が新しく増えたらデスクト
 
 ### 初回起動（onboarding）
 
-- `~/.config/sugi-loop/config.yml` が無いときは、エラーで終了せず huh のフォームで `repos`（`owner/name` を 1 件以上。改行区切りで複数可）、`merge_method`（squash / merge / rebase、既定 squash）、`notify`（既定 true）、`editor`（既定 `$EDITOR`）を聞き、設定ファイルを書き出して、そのまま TUI を起動する。`refresh_interval_sec` は聞かず既定 120。
+- `~/.config/loop-cli/config.yml` が無いときは、エラーで終了せず huh のフォームで `repos`（`owner/name` を 1 件以上。改行区切りで複数可）、`merge_method`（squash / merge / rebase、既定 squash）、`notify`（既定 true）、`editor`（既定 `$EDITOR`）を聞き、設定ファイルを書き出して、そのまま TUI を起動する。`refresh_interval_sec` は聞かず既定 120。
 - `gh` が無い、または `gh auth status` が失敗するときは、標準エラーに原因と次の一手（`gh` のインストール先 URL または `gh auth login`）を 1 行ずつ出して終了コード 1。
 - キューが 0 件（全タブ空）のときは、画面中央に「`stage:*` ラベルの無いリポジトリは何も出ません。issue-driven-sdd の `routines-setup` を回したリポジトリを設定してください」のヒントを出す（「前提と未決事項」の 1 項目目を利用者に見せる形）。
 - 設定ファイルが壊れているとき（YAML エラーや検証エラー）は onboarding に入らず、従来どおり原因を出して終了する（上書きしない）。
@@ -153,8 +153,8 @@ notify: true                  # 人の出番が新しく増えたらデスクト
   TUI は読むだけで書かない。TUI が書くラベルは `stage:todo` と `s` の `stage:propose` だけ。
 - 上流の「人が持つ操作」にある「取り下げる・止める（段階ラベルを外す）」は TUI に対応キーが無い。必要になったら追加する。
 - merge method はリポジトリ設定に従うが、`gh pr merge` の既定は対話式なので設定で明示する。
-- ツール名 `sugi-loop`（リポジトリ名）で進める。gh extension にするなら `gh-sugi-loop`。
-- 上流プラグインは「複数リポジトリの横断」をスコープ外（1 Routine 1 リポジトリ）と明記している。この隙間を埋めるのが sugi-loop。
+- ツール名 `loop-cli`（リポジトリ名）で進める。gh extension にするなら `gh-loop-cli`。
+- 上流プラグインは「複数リポジトリの横断」をスコープ外（1 Routine 1 リポジトリ）と明記している。この隙間を埋めるのが loop-cli。
 
 ---
 

@@ -4,10 +4,12 @@
 TBD - created by archiving change s08-queue-screen. Update Purpose after archive.
 ## Requirements
 ### Requirement: Model は Card をタブ別に並べ、選択行を 1 つ持つ
-`internal/ui` は Bubble Tea の Model として型 `Model` と、取得関数・`gh` クライアント・エディタ起動・起動時の選択肢を受け取る `New(fetcher Fetcher, client gh.GHClient, editor Editor, opts Options) Model` を MUST 提供する。`Fetcher` は `func(ctx context.Context) (*fetch.Result, error)` で、s07 の `fetch.Fetch` を `client` と `repos` で閉じ、s13 `snapshot-cache`「取得が成功するたびにスナップショットを保存する」の保存で包んだものを `cmd/sugi-loop` が渡す。`client` は書き込み（s10 `answer-question` の `a`。後続の `t` / `m` / `n` / `s` も同じ `client` を使う）に使い、取得には使わない。`Editor` は s10 `answer-question`「a は画面の対象を決めて回答テンプレートを入れたエディタを開く」の型で、`cmd/sugi-loop` は `ExternalEditor(Config.Editor)` を、テストは固定文字列を返すスタブを渡す。`Options` は公開する構造体で、次の 3 つのフィールドを持ち、ゼロ値は「スナップショット無し・自動更新無し・通知無し」である（s13 が導入。テストは `Options{}` を渡してよい）。
+`internal/ui` は Bubble Tea の Model として型 `Model` と、取得関数・`gh` クライアント・エディタ起動・起動時の選択肢を受け取る `New(fetcher Fetcher, client gh.GHClient, editor Editor, opts Options) Model` を MUST 提供する。`Fetcher` は `func(ctx context.Context) (*fetch.Result, error)` で、s07 の `fetch.Fetch` を `client` と `repos` で閉じ、s13 `snapshot-cache`「取得が成功するたびにスナップショットを保存する」の保存で包んだものを `cmd/loop-cli` が渡す。`client` は書き込み（s10 `answer-question` の `a`。後続の `t` / `m` / `n` / `s` も同じ `client` を使う）に使い、取得には使わない。`Editor` は s10 `answer-question`「a は画面の対象を決めて回答テンプレートを入れたエディタを開く」の型で、`cmd/loop-cli` は `ExternalEditor(Config.Editor)` を、テストは固定文字列を返すスタブを渡す。`Options` は公開する構造体で、次の 5 つのフィールドを持ち、ゼロ値は「スナップショット無し・自動更新無し・通知無し・更新の確認無し・merge 方式は既定」である（s13 が導入。テストは `Options{}` を渡してよい）。
 - `Snapshot *snapshot.Snapshot`: `Model` が起動時の stale 表示に使う Card 群と保存時刻を持つ。`nil` なら `Model` は空の画面から始める（s13 `snapshot-cache`「起動時にスナップショットがあれば stale 表示から始める」）
 - `RefreshInterval time.Duration`: 自動更新の間隔。0 なら自動更新しない（s13 `auto-refresh`）
 - `Notify Notifier`: デスクトップ通知の関数。`nil` なら通知しない（s13 `desktop-notify`）
+- `CheckUpdate UpdateChecker`: 起動時に 1 度だけ新しい版があるかを調べる関数。`nil` なら調べない（s23 `self-update`）
+- `MergeMethods map[string]string`: リポジトリ名から merge 方式を引く対応表。`nil` または該当が無ければ `squash` を使う（s14 `merge-pr`「merge 方式はリポジトリ名から引く」）
 `Model` は `classify` を呼ばず、`fetch.Result.Cards` の `Card.Result` をそのまま使う。
 `Model` は保持中の `Cards` を `Card.Result.Tab` で mvp.md の 4 タブ（`model.TabNow` / `TabBacklog` / `TabInProgress` / `TabAbnormal`）に振り分け、1 枚の Card を 1 行にする。Card は必ずどれか 1 つのタブに入る（s05 の `classify.Card` は `Card.Result.Tab` を空にしない）。タブ内の並びは第 1 キー `Card.Result.Priority` 昇順、第 2 キー行の主体の `UpdatedAt` 降順（新しいものが上）、第 3 キー主体の `Repo` 昇順、第 4 キー主体の番号昇順とする（第 1 キーは s05 が定め、第 2 キー以降は design.md の未決事項で定めた既定値）。
 `Model` は現在のタブ（初期値は今やる）と、画面全体で 1 つの選択行の添字（初期値 0）を持つ。選択行の添字をタブごとに持たないのは、タブ切替のたびに先頭を見る mvp.md の「先頭から捌く」体験に合わせるためである。選択行の添字は常に `0 ≤ 添字 < そのタブの行数` に収め、行数 0 のタブでは選択行が無い。タブ切替と `Cards` の差し替えで行数が減ったら添字を末尾に丸める。
@@ -99,12 +101,13 @@ TBD - created by archiving change s08-queue-screen. Update Purpose after archive
 - `Enter`: 選択行の Card のカード詳細画面（`Issue` が nil なら PR 詳細画面）を開く。選択行が無ければ何もしない。振る舞いは s09 `card-detail` が定める
 - `a`: 選択行の主体に回答するエディタを開く。選択行が無ければ何もしない。振る舞いは s10 `answer-question` が定める
 - `t`: 選択行の Card の `Issue` の `stage:todo` を切り替える。選択行が無い、または `Issue` が nil なら何もしない。振る舞いは s11 `todo-toggle` が定める
+- `m`: 選択行の主体が PR なら、その PR の状態を取り直して merge の確認画面を開く。選択行が無い、または主体が issue なら何もしない。振る舞いは s14 `merge-pr` が定める
 - `o`: 選択行の主体をブラウザで開く。選択行が無ければ何もしない。振る舞いは s12 `browse-open` が定める
 - `R`: 全件を再取得する。取得中なら何もしない。振る舞いは s12 `manual-refresh` が定める
 - `?`: ヘルプ画面を開く。振る舞いは s12 `help-screen` が定める
 - `u`: 選択行の主体に含まれる URL の一覧画面を開く。URL が 1 件も無ければ画面を変えずステータスに出す。選択行が無ければ何もしない。振る舞いは s22 `url-picker` が定める
 - `q` / `Ctrl+C`: 終了コマンドを返す（s01 `tui-entrypoint`「q で終了する」を `internal/ui` の `Model` が満たす）
-- mvp.md の表にある他のキー `A` / `s` / `m` / `n` / `g` / `x` / `/` / `v` / `h` / `l` / `←` / `→` と、表に無いキー（`p` と `Esc` を含む）は、キュー画面では `Model` を変えず、コマンドも返さない。担当は `m` が s14、`n` / `s` が s15、`A` が s16、`v` / `h` / `l` / `←` / `→` が s17、`/` が s19。`g` / `x` / `Esc` は詳細画面のキーであり s09 `card-detail` が定める（キュー画面では何もしない）。`p` は s21 まで表とプレビューの切替だったが、2 ペインが常設になったため何もしないキーに戻った。`u` は s22 が mvp.md キーバインド表に足すキーで、上の箇条書きのとおりキュー画面で動く
+- mvp.md の表にある他のキー `A` / `s` / `n` / `g` / `x` / `/` / `v` / `h` / `l` / `←` / `→` と、表に無いキー（`p` と `Esc` を含む）は、キュー画面では `Model` を変えず、コマンドも返さない。担当は `n` / `s` が s15、`A` が s16、`v` / `h` / `l` / `←` / `→` が s17、`/` が s19。`g` / `x` / `Esc` は詳細画面のキーであり s09 `card-detail` が定める（キュー画面では何もしない）。`p` は s21 まで表とプレビューの切替だったが、2 ペインが常設になったため何もしないキーに戻った。`u` は s22 が mvp.md キーバインド表に足すキーで、上の箇条書きのとおりキュー画面で動く
 
 #### Scenario: j と k で選択行が動く
 - **WHEN** 今やるタブに 3 行ある `Model` に `j` を 2 回、`k` を 1 回、`↓` を 1 回、`↑` を 1 回の順で与える
@@ -119,7 +122,7 @@ TBD - created by archiving change s08-queue-screen. Update Purpose after archive
 - **THEN** 現在のタブは順に バックログ、異常、今やる、今やる、進行中 になる
 
 #### Scenario: 未実装のキーは何も変えない
-- **WHEN** 今やるタブに 2 行あり選択行が 1 の `Model` に `v`、`m`、`n`、`s`、`A`、`g`、`x`、`Esc`、`/`、`p` を 1 つずつ与える
+- **WHEN** 今やるタブに 2 行あり選択行が 1 の `Model` に `v`、`n`、`s`、`A`、`g`、`x`、`Esc`、`/`、`p` を 1 つずつ与える
 - **THEN** どのキーでもコマンドは返らず、画面の状態はキューのままで、現在のタブ・選択行・`Cards` は変わらない
 
 #### Scenario: q で終了する
@@ -127,9 +130,9 @@ TBD - created by archiving change s08-queue-screen. Update Purpose after archive
 - **THEN** 終了コマンドが返る
 
 ### Requirement: ヘッダはタブ名と件数と最終更新時刻、フッタはキーヒントとステータスを出す
-画面の状態がキューのとき、`View` の 1 行目（ヘッダ）は、アプリ名 `sugi-loop` と空白 2 列に続けて 4 タブを mvp.md の形式 `[1]今やる <n>  [2]バックログ <n>  [3]進行中 <n>  [4]異常 <n>`（タブ間は空白 2 列）で MUST 出す。`<n>` はそのタブの行数。現在のタブは太字で、他のタブは通常で描く。ヘッダの右端に右寄せで、左に最低 1 列の空白を置いて `↻ HH:MM`（最後に取得が完了した時刻。24 時間表記。完了時刻はメッセージが運ぶ `time.Time` をそのタイムゾーンのまま書く。`cmd/sugi-loop` は `time.Now()` を渡すのでローカル時刻になる）を出し、初回取得の完了前は `↻ --:--` とする。
-ヘッダの表示幅が端末幅を超えるときは、件数付きタブ名を `[4]` → `[3]` → `[2]` の順に `[n] <n>`（タブ名を落とし番号と件数だけ）に短縮し、収まった時点で止める。`[1]` は短縮しない。`[2]`〜`[4]` を全部短縮しても超えれば `↻ HH:MM` を省き、それでも超えれば行を端末幅で切る。この規則で `example` のヘッダ `sugi-loop  [1]今やる 1  [2]バックログ 1  [3]進行中 0  [4]異常 0` + 空白 1 + `↻ 12:04` は 71 列（全角 2 列）になる。
-`View` の最終行（フッタ = ステータスバー）は、左にキュー画面で動く操作キーのヒント `Enter 開く  a 回答  t todo  o ブラウザ  R 更新  ? ヘルプ  u URL  q 終了`（表示幅 71 列。mvp.md の画面構成のフッタ例と同じ構成で、移動系のキー `j` / `k` / `1`–`4` / `Tab` はヒントに出さず `?` のヘルプに委ねる。s11 までのヒント `j/k 移動  1-4/Tab タブ  …` に 3 キーを足すと 88 列になり、`Model` の既定幅 80 で `q 終了` が切れ、取得中はステータスに押されてヒント全体が消えるため。design.md 未決事項）を出し、右にステータス（Requirement「取得は非同期に行い、取得中はスピナー、失敗時は前回結果を維持する」と、s10 `answer-question` の回答のステータス、s11 `todo-toggle` の切り替えのステータス、s12 `browse-open` の失敗のステータス、s22 `url-picker` の `URL がありません` と失敗のステータス）を出す。後続 change が自分のキーのヒントを足す。動かないキーのヒントは出さない。カード詳細画面と PR 詳細画面のヘッダとフッタは s09 `card-detail` が、確認画面は s10 `answer-question` が、ヘルプ画面は s12 `help-screen` が定める。
+画面の状態がキューのとき、`View` の 1 行目（ヘッダ）は、アプリ名 `loop-cli` と空白 2 列に続けて 4 タブを mvp.md の形式 `[1]今やる <n>  [2]バックログ <n>  [3]進行中 <n>  [4]異常 <n>`（タブ間は空白 2 列）で MUST 出す。`<n>` はそのタブの行数。現在のタブは太字で、他のタブは通常で描く。ヘッダの右端に右寄せで、左に最低 1 列の空白を置いて `↻ HH:MM`（最後に取得が完了した時刻。24 時間表記。完了時刻はメッセージが運ぶ `time.Time` をそのタイムゾーンのまま書く。`cmd/loop-cli` は `time.Now()` を渡すのでローカル時刻になる）を出し、初回取得の完了前は `↻ --:--` とする。s23 `self-update` の更新の確認が「新しい版がある」を返しているときは、`↻ HH:MM` の左に空白 2 列を空けて `↑ update` を MUST 出す。返していないとき・確認が失敗したとき・確認を行わないときは出さない。
+ヘッダの表示幅が端末幅を超えるときは、件数付きタブ名を `[4]` → `[3]` → `[2]` の順に `[n] <n>`（タブ名を落とし番号と件数だけ）に短縮し、収まった時点で止める。`[1]` は短縮しない。`[2]`〜`[4]` を全部短縮しても超えれば `↑ update` を省き、それでも超えれば `↻ HH:MM` を省き、それでも超えれば行を端末幅で切る。この規則で `example` のヘッダ `loop-cli  [1]今やる 1  [2]バックログ 1  [3]進行中 0  [4]異常 0` + 空白 1 + `↻ 12:04` は 70 列（全角 2 列）になり、`↑ update` が出ているときは 80 列ちょうどになる。
+`View` の最終行（フッタ = ステータスバー）は、左にキュー画面で動く操作キーのヒント `Enter 開く  a 回答  t todo  m merge  o ブラウザ  R 更新  ? ヘルプ  u URL  q 終了`（表示幅 80 列。`m merge` は mvp.md の画面構成のフッタ例と同じく `t todo` の次に置く。この 9 列を足したことで、幅 80 の端末では取得中や書き込みのステータスが出ている間ヒントが丸ごと消える（s08 のフッタは両方が入らなければステータスを優先する）。キーを隠すよりキーを出すことを採った。s14 design.md。mvp.md の画面構成のフッタ例と同じ構成で、移動系のキー `j` / `k` / `1`–`4` / `Tab` はヒントに出さず `?` のヘルプに委ねる。s11 までのヒント `j/k 移動  1-4/Tab タブ  …` に 3 キーを足すと 88 列になり、`Model` の既定幅 80 で `q 終了` が切れ、取得中はステータスに押されてヒント全体が消えるため。design.md 未決事項）を出し、右にステータス（Requirement「取得は非同期に行い、取得中はスピナー、失敗時は前回結果を維持する」と、s10 `answer-question` の回答のステータス、s11 `todo-toggle` の切り替えのステータス、s12 `browse-open` の失敗のステータス、s22 `url-picker` の `URL がありません` と失敗のステータス、s14 `merge-pr` の取り直し・merge のステータス）を出す。後続 change が自分のキーのヒントを足す。動かないキーのヒントは出さない。カード詳細画面と PR 詳細画面のヘッダとフッタは s09 `card-detail` が、回答の確認画面は s10 `answer-question` が、merge の確認画面は s14 `merge-pr` が、ヘルプ画面は s12 `help-screen` が定める。
 
 #### Scenario: ヘッダの件数
 - **WHEN** `example` の `Result` を完了時刻 `2026-09-05T12:04:00+09:00` で `Model` に渡し、`View` から ANSI エスケープを除いて読む
@@ -137,7 +140,23 @@ TBD - created by archiving change s08-queue-screen. Update Purpose after archive
 
 #### Scenario: 狭い端末ではタブ名を右から短縮する
 - **WHEN** `example` の `Result` を完了時刻 `2026-09-05T12:04:00+09:00` で渡した `Model` に幅 60・高さ 40 のサイズメッセージを与え、`View` から ANSI エスケープを除いて読む
-- **THEN** 1 行目に `[1]今やる 1`、`[2] 1`、`[3] 0`、`[4] 0`、`↻ 12:04` が含まれ、`バックログ` / `進行中` / `異常` は含まれない
+- **THEN** 1 行目に `[1]今やる 1`、`[2]バックログ 1`、`[3] 0`、`[4] 0`、`↻ 12:04` が含まれ、`進行中` / `異常` は含まれない（`[4]` と `[3]` を短縮した時点で 60 列に収まり、`[2]` は短縮しない）
+
+#### Scenario: 更新があるとヘッダに印が出る
+- **WHEN** `example` の `Result` を完了時刻 `2026-09-05T12:04:00+09:00` で渡した `Model` に「新しい版がある」の結果のメッセージを与え、`View` から ANSI エスケープを除いて読む
+- **THEN** 1 行目に `↑ update` が `↻ 12:04` より左に含まれる
+
+#### Scenario: 既定幅 80 では短縮せずに収まる
+- **WHEN** 同じ `Model`（幅 80・高さ 24）の `View` から ANSI エスケープを除いて読む
+- **THEN** 1 行目に `[1]今やる 1`、`[2]バックログ 1`、`[3]進行中 0`、`[4]異常 0`、`↑ update`、`↻ 12:04` が含まれる
+
+#### Scenario: 幅 79 では [4] のタブ名だけが落ちる
+- **WHEN** 同じ `Model` に幅 79・高さ 40 のサイズメッセージを与え、`View` から ANSI エスケープを除いて読む
+- **THEN** 1 行目に `[1]今やる 1`、`[2]バックログ 1`、`[3]進行中 0`、`[4] 0`、`↑ update`、`↻ 12:04` が含まれ、`異常` は含まれない
+
+#### Scenario: 幅が足りなければ更新の印を先に落とす
+- **WHEN** 同じ `Model` に幅 59・高さ 40 のサイズメッセージを与え、`View` から ANSI エスケープを除いて読む
+- **THEN** 1 行目に `↻ 12:04` は含まれ、`↑ update` は含まれない
 
 #### Scenario: 初回取得前のヘッダ
 - **WHEN** `New` 直後の `Model` の `View` から ANSI エスケープを除いて読む
@@ -145,11 +164,15 @@ TBD - created by archiving change s08-queue-screen. Update Purpose after archive
 
 #### Scenario: フッタのキーヒント
 - **WHEN** `Model` の `View` から ANSI エスケープを除いて読む
-- **THEN** 最終行に `Enter 開く`、`a 回答`、`t todo`、`o ブラウザ`、`R 更新`、`? ヘルプ`、`u URL`、`q 終了` がこの順で含まれ、`j/k 移動` / `1-4/Tab タブ` / `m merge` / `Esc 戻る` は含まれない
+- **THEN** 最終行に `Enter 開く`、`a 回答`、`t todo`、`m merge`、`o ブラウザ`、`R 更新`、`? ヘルプ`、`u URL`、`q 終了` がこの順で含まれ、`j/k 移動` / `1-4/Tab タブ` / `Esc 戻る` は含まれない
 
-#### Scenario: 既定幅 80 で取得中でもヒントとスピナーが両方出る
+#### Scenario: 既定幅 80 で取得中はステータスだけになる
 - **WHEN** `New` 直後（幅 80・高さ 24、初回取得中）の `Model` の `View` から ANSI エスケープを除いて読む
-- **THEN** 最終行に `Enter 開く` と `q 終了` と `取得中` がすべて含まれる
+- **THEN** 最終行に `取得中` が含まれ、`Enter 開く` と `q 終了` は含まれない（ヒント 80 列とステータスが幅 80 に収まらず、s08 のフッタの規則でステータスを優先する）
+
+#### Scenario: 幅 90 では取得中でもヒントとスピナーが両方出る
+- **WHEN** `New` 直後の `Model` に幅 90・高さ 24 のサイズメッセージを与え、`View` から ANSI エスケープを除いて読む
+- **THEN** 最終行に `Enter 開く` と `m merge` と `q 終了` と `取得中` がすべて含まれる
 
 ### Requirement: プレビューは選択行の 1 行目・本文・コメントを出す
 `View` はプレビュー領域に、選択行の Card について MUST 次を上から順に描く。
@@ -262,3 +285,4 @@ issue-driven-sdd の routines-setup を回したリポジトリを設定して�
 #### Scenario: 幅 60 でもヒントは表の領域に出てプレビューも描かれる
 - **WHEN** `Cards` が空の `Result` を渡した `Model` に幅 60・高さ 40 のサイズメッセージを与え、`View` から ANSI エスケープを除いて読む
 - **THEN** `routines-setup` を含む行と、プレビュー領域の `（このタブにはカードがありません）` の両方が含まれる
+

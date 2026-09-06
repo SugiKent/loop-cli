@@ -21,6 +21,7 @@ type Options struct {
 	RefreshInterval time.Duration      // 自動更新の間隔。0 なら自動更新しない
 	Notify          Notifier           // デスクトップ通知。nil なら通知しない
 	CheckUpdate     UpdateChecker      // 起動時の更新確認。nil なら確認しない
+	MergeMethods    map[string]string  // リポジトリ名 -> merge 方式。無いリポジトリは squash
 }
 
 // UpdateChecker は新しい版があるかどうかを返す（s23 self-update）。
@@ -29,7 +30,7 @@ type UpdateChecker func(ctx context.Context) bool
 // updateCheckedMsg は起動時の更新確認の結果。
 type updateCheckedMsg struct{ available bool }
 
-// Fetcher は Card 群の取得。cmd/sugi-loop が fetch.Fetch を client と repos で閉じて渡す。
+// Fetcher は Card 群の取得。cmd/loop-cli が fetch.Fetch を client と repos で閉じて渡す。
 type Fetcher func(ctx context.Context) (*fetch.Result, error)
 
 // fetchedMsg は 1 回の取得の完了。at は完了時刻で、経過とヘッダの時刻の基準になる。
@@ -67,6 +68,8 @@ type Model struct {
 	urls     urlListState
 
 	answer         answerState
+	merge          mergeState
+	mergeMethods   map[string]string
 	writing        bool
 	writeStatus    string
 	writeStatusErr bool
@@ -95,6 +98,7 @@ func New(fetcher Fetcher, client gh.GHClient, editor Editor, opts Options) Model
 		refreshInterval: opts.RefreshInterval,
 		notify:          opts.Notify,
 		checkUpdate:     opts.CheckUpdate,
+		mergeMethods:    opts.MergeMethods,
 		spinner:         spinner.New(spinner.WithSpinner(spinner.MiniDot)),
 	}
 	// スナップショットがあれば前回の表と保存時刻から始める（D-002「起動直後は stale 表示」）。
@@ -193,6 +197,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case toggledMsg:
 		return m.updateToggled(msg), nil
 
+	case mergeFetchedMsg:
+		return m.updateMergeFetched(msg), nil
+
+	case mergedMsg:
+		return m.updateMerged(msg), nil
+
 	case browsedMsg:
 		return m.updateBrowsed(msg), nil
 
@@ -209,6 +219,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.screen == screenConfirm {
 			return m.updateConfirmKey(key)
+		}
+		// merge の確認画面も a / t / m / o / ? / u より先に振り分ける（確認中に裏の対象を触らせない）。
+		if m.screen == screenMergeConfirm {
+			return m.updateMergeConfirmKey(key)
 		}
 		// ヘルプ画面は a / t / o より先に振り分ける（後ろだと閉じずに書き込みが起きる）。
 		if m.screen == screenHelp {
@@ -230,6 +244,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// t の対象は常に Issue で、キュー画面とカード詳細の 2 画面で効く。
 		if key == "t" {
 			return m.todoKey()
+		}
+		// m の対象は常に PR で、キュー画面（主体が PR）と 2 つの詳細画面で効く。
+		if key == "m" {
+			return m.mergeKey()
 		}
 		// o と ? も 3 画面すべてで効く。updateDetailKey は Cmd を返せないのでここに置く。
 		if key == "o" {

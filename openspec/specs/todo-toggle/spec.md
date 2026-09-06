@@ -3,7 +3,6 @@
 ## Purpose
 TBD - created by archiving change s11-todo-toggle. Update Purpose after archive.
 ## Requirements
-
 ### Requirement: t は画面の Card の Issue に対して確認なしで stage:todo を切り替える
 `Model` の `Update` は `t` を画面の状態ごとに MUST 次のとおり扱う。対象は「画面に出ている Card の `Issue`」の 1 つの規則で決め、PR を対象にしない（`stage:todo` は issue のラベルであり、`gh issue edit` で書く）。
 - キュー画面: 選択行の Card の `Card.Issue`。選択行が無い、または `Issue` が nil（PR 単独のカード）なら何もしない（design.md 未決事項の既定値）
@@ -69,16 +68,21 @@ TBD - created by archiving change s11-todo-toggle. Update Purpose after archive.
 - **THEN** フッタに `付けました` は含まれず `切り替え中` が含まれる
 
 ### Requirement: 書き込み中は t と a を受け付けない
-`Model` は書き込み（この change のラベル切り替え、s10 のコメント投稿）のコマンドを返してから結果のメッセージを受け取るまでを「書き込み中」として MUST 扱い、その間の `t` と `a` はどの画面でも何もしない（コマンドを返さず、`Model` を変えない）。s10「前の投稿の結果を待っている間は `a` を押しても何もしない」を、ラベル切り替え中にも広げたものである（s10 の Requirement の範囲を狭めない）。同じ対象への二重の書き込みを防ぐためであり、対象ごとの排他は持たない。書き込み中のフラグは s10 の投稿中フラグと 1 つで共有してよい（design.md）。
+`Model` は書き込み（s11 のラベル切り替え、s10 のコメント投稿、s14 の merge）のコマンドを返してから結果のメッセージを受け取るまでを「書き込み中」として MUST 扱い、その間の `t` と `a` と `m` はどの画面でも何もしない（コマンドを返さず、`Model` を変えない）。s14 の `m` が押されてから merge の判断材料を取り直している間（まだ書き込んでいない）も同じ扱いにし、merge の手続きを重ねて始めさせない（s14 `merge-pr`「m は画面の対象 PR を決めて GitHub から状態を取り直す」）。s10「前の投稿の結果を待っている間は `a` を押しても何もしない」を、ラベル切り替え中と merge の手続き中にも広げたものである（s10 の Requirement の範囲を狭めない）。同じ対象への二重の書き込みを防ぐためであり、対象ごとの排他は持たない。書き込み中のフラグは s10 の投稿中フラグと 1 つで共有してよい（design.md）。
 
-#### Scenario: 切り替え中の t と a は効かない
-- **WHEN** バックログの issue 140 を選んだ `Model` に `t` を与えた直後（返ったコマンドを実行する前）に、もう一度 `t` を与え、続けて `a` を与える
-- **THEN** どちらもコマンドは返らず、`Fake.Calls` は空のまま（最初の `t` のコマンドをまだ実行していないため）で、スタブ `Editor` は呼ばれない
+#### Scenario: 切り替え中の t と a と m は効かない
+- **WHEN** 今やるタブの issue 108 の Card（主体は PR 131）を選んだ `Model` に `t` を与えた直後（返ったコマンドを実行する前）に、もう一度 `t` を与え、続けて `a` と `m` を与える
+- **THEN** どれもコマンドは返らず、`Fake.Calls` は空のまま（最初の `t` のコマンドをまだ実行していないため）で、スタブ `Editor` は呼ばれない
 
 #### Scenario: コメント投稿中の t は効かない
 - **WHEN** s10 の手順（固定文字列 `Q1: A` を返すスタブ `Editor`、主体が PR 131 の Card を選んだ `Model` に `a` → 編集完了のメッセージを `Update` に渡して投稿のコマンドが返った直後）で `t` を与える
 - **THEN** コマンドは返らず、`Fake.Calls` は空である
 
+#### Scenario: merge 中の t と a は効かない
+- **WHEN** s14 の手順（今やるタブで `m` → 取り直しの結果のメッセージを `Update` に渡して確認画面に移り、`y` を与えて merge のコマンドが返った直後）で `t` と `a` を与える
+- **THEN** どちらもコマンドは返らず、`Fake.Calls` に `AddLabel` / `RemoveLabel` / `CommentPR` は無い
+
 #### Scenario: 結果を受け取った後は再び効く
 - **WHEN** 1 つ目の Scenario の手順で結果のメッセージを `Update` に渡した後に、もう一度 `t` を与える
 - **THEN** コマンドが返る
+

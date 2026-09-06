@@ -26,6 +26,7 @@ const (
 	screenConfirm
 	screenHelp
 	screenURL
+	screenMergeConfirm
 )
 
 // detailState は開いている詳細。Card は開いた時点のコピーで、取得完了では差し替えない。
@@ -388,10 +389,10 @@ func (m Model) reviewThreadLines(threads []gh.ReviewThread) []string {
 // detailHint は詳細画面のフッタ左。動くキーだけを出す。
 func (m Model) detailHint() string {
 	if m.screen == screenPR {
-		return "Esc 戻る  x 展開  g issue へ  ? ヘルプ  u URL  a 回答  o ブラウザ  q 終了"
+		return "Esc 戻る  x 展開  g issue へ  ? ヘルプ  u URL  a 回答  m merge  o ブラウザ  q 終了"
 	}
 	if len(m.detail.card.PRs) == 0 {
 		return "Esc 戻る  x 展開  ? ヘルプ  u URL  a 回答  t todo  o ブラウザ  q 終了"
 	}
-	return "Esc 戻る  Tab PR 選択  Enter PR を開く  x 展開  g PR へ  ? ヘルプ  u URL  a 回答  t todo  o ブラウザ  q 終了"
+	return "Esc 戻る  Tab PR 選択  Enter PR を開く  x 展開  g PR へ  ? ヘルプ  u URL  a 回答  t todo  m merge  o ブラウザ  q 終了"
 }

@@ -459,7 +459,7 @@ func TestOpenURLExitCodeError(t *testing.T) {
 // TestRunBrowserMissingCommand は起動できないコマンドを error として返すことを検証する
 // （OpenURL はこれをコマンド名と URL を含むエラーに包む）。
 func TestRunBrowserMissingCommand(t *testing.T) {
-	_, _, err := runBrowser(t.Context(), "sugi-loop-no-such-command", "https://example.com/a")
+	_, _, err := runBrowser(t.Context(), "loop-cli-no-such-command", "https://example.com/a")
 	if err == nil {
 		t.Fatal("起動できないコマンドでエラーが返っていない")
 	}

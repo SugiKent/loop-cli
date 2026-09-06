@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// 伏せ字の規則と同じ形。redact（cmd/sugi-loop-cli）が置き換えた結果を検査する。
+// 伏せ字の規則と同じ形。redact（cmd/loop-cli-dev）が置き換えた結果を検査する。
 var (
 	fixtureLoginRe = regexp.MustCompile(`"login"\s*:\s*"([^"]*)"`)
 	fixtureUserRe  = regexp.MustCompile(`^user-[0-9]+$`)

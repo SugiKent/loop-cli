@@ -2,7 +2,7 @@
 
 最終更新: 2026-09-05-1805
 
-sugi-loop の分類器（`internal/classify`）と action 層はこの文書を仕様の正本とする。
+loop-cli の分類器（`internal/classify`）と action 層はこの文書を仕様の正本とする。
 関連文書として [MVP 定義](../../mvp/mvp.md) と [技術的意思決定](../../mvp/decisions.md) を参照する。
 
 ## 人の出番と検知シグナル

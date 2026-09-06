@@ -28,7 +28,7 @@ TBD - created by archiving change s06-dev-cli. Update Purpose after archive.
 - **THEN** 標準エラーに `live` を含むエラーが出て、終了コードは 1 である
 
 ### Requirement: classify は fixture を分類してキューを 4 タブ別にプレーンテキストで出す
-`sugi-loop-cli classify --fixture <alias>` は、カレントディレクトリからの相対パス `internal/gh/testdata/fixtures/<alias>` を s03 の `gh.NewFake` で読み、全 open issue / open PR を s05 の `classify.Issue` / `classify.PR` で分類し、結果を標準出力に MUST 書く。live の `gh` は実行しない。
+`loop-cli-dev classify --fixture <alias>` は、カレントディレクトリからの相対パス `internal/gh/testdata/fixtures/<alias>` を s03 の `gh.NewFake` で読み、全 open issue / open PR を s05 の `classify.Issue` / `classify.PR` で分類し、結果を標準出力に MUST 書く。live の `gh` は実行しない。
 - `internal/gh/testdata/fixtures` が存在しなければ、s04 `fixture capture` と同じくリポジトリのルートで実行するよう促すエラーを返す。`<alias>` ディレクトリが無ければ、そのパスを含むエラーを返す（どちらも `Fake` を呼ぶ前に確認する）
 - 入力の組み立ては s05 `human-turn-classify`「fixture と期待値表で分類器をテストする」と同じ: 各 issue は `model.IssueFromSearch` に `ViewIssue` の `Comments` を `model.CommentFrom` で入れ、各 PR は `model.PRFromSearch` に `ViewPR` の `Comments`、`ViewPRMergeState`、`ReviewThreads` を入れる。D-001 の遅延取得による絞り込みはしない（fixture は全詳細を持つ）。`Fake` の読み取りが 1 つでも失敗したら、そのエラーを返し、出力を書かない
 - Issue と PR の紐づけ（`classify.Card`）は行わない。行は issue 1 件または PR 1 件である
@@ -53,18 +53,29 @@ TBD - created by archiving change s06-dev-cli. Update Purpose after archive.
 - **THEN** 戻り値はそれぞれ `12m` / `3h` / `2d` / `0m` である
 
 ### Requirement: notify test はデスクトップ通知を 1 件出す
-`sugi-loop-cli notify test` は、タイトル `sugi-loop`、本文 `テスト通知` のデスクトップ通知を 1 件 MUST 出し、成功したら標準出力に `通知を送りました` と書いて終了コード 0 で終わる。通知の発行に失敗したら、そのエラーを返し、終了コード 1 で終わる（s04 の失敗時の Requirement に従う）。通知ライブラリは `github.com/gen2brain/beeep` を使い、この change で依存に加える。s13 の自動更新通知はこの依存を再利用する。設定ファイル（`notify:` 項目）は読まない。
+`loop-cli-dev notify test` は、タイトル `loop-cli`、本文 `テスト通知` のデスクトップ通知を 1 件 MUST 出し、成功したら標準出力に `通知を送りました` と書いて終了コード 0 で終わる。通知の発行に失敗したら、そのエラーを返し、終了コード 1 で終わる（s04 の失敗時の Requirement に従う）。通知ライブラリは `github.com/gen2brain/beeep` を使い、この change で依存に加える。s13 の自動更新通知はこの依存を再利用する。設定ファイル（`notify:` 項目）は読まない。
 
 #### Scenario: 通知が出る
 - **WHEN** デスクトップ通知が使える環境で `notify test` を実行する
-- **THEN** タイトル `sugi-loop`、本文 `テスト通知` の通知が 1 件表示され、標準出力に `通知を送りました` が出て、終了コードは 0 である
+- **THEN** タイトル `loop-cli`、本文 `テスト通知` の通知が 1 件表示され、標準出力に `通知を送りました` が出て、終了コードは 0 である
 
 #### Scenario: 通知の発行に失敗する
 - **WHEN** 通知ライブラリがエラーを返す環境で `notify test` を実行する
 - **THEN** 標準エラーにそのエラーが出て、終了コードは 1 である
 
-### Requirement: sugi-loop-cli はサブコマンドを振り分け help で使い方を出す
-`go build ./cmd/sugi-loop-cli` は `sugi-loop-cli` バイナリを MUST 生成する。`cmd/sugi-loop-cli` は動作確認用の CLI（implementation-tasks.md §2）で、標準ライブラリの `flag` と `os.Args` だけで書き、CLI フレームワークを依存に加えない。
+### Requirement: サブコマンドの失敗は標準エラーに出て終了コード 1 になる
+サブコマンドがエラーを返した場合、CLI はエラー文字列を標準エラーに 1 行書き、終了コード 1 で MUST 終わる。panic しない。フラグの解析エラー（未知のフラグ・必須フラグの欠落）も同じ扱いにする。成功時は終了コード 0 である。
+
+#### Scenario: 必須フラグの欠落
+- **WHEN** 引数 `fixture capture --repo org/app`（`--alias` 無し）で実行する
+- **THEN** 標準エラーに `--alias` を含むエラーが出て、終了コードは 1 である
+
+#### Scenario: 未知のフラグ
+- **WHEN** 引数 `fixture capture --repo org/app --alias app --out x` で実行する
+- **THEN** 標準エラーに `out` を含むエラーが出て、終了コードは 1 である
+
+### Requirement: loop-cli-dev はサブコマンドを振り分け help で使い方を出す
+`go build ./cmd/loop-cli-dev` は `loop-cli-dev` バイナリを MUST 生成する。`cmd/loop-cli-dev` は動作確認用の CLI（implementation-tasks.md §2）で、標準ライブラリの `flag` と `os.Args` だけで書き、CLI フレームワークを依存に加えない。
 第 1 引数をサブコマンド名として振り分ける。`help` / `-h` / `--help`、または引数なしのときは使い方を標準出力に書き、終了コード 0 で終わる。使い方には `help` と `fixture capture --repo owner/name --alias <alias>` の 1 行説明を含める。
 未知のサブコマンド、または `fixture` の後に `capture` 以外（無しを含む）が続く場合は、`unknown command: <args[0]>`（第 1 引数のみ。`fixture foo` でも `fixture` 単独でも `unknown command: fixture`）と使い方を標準エラーに書き、終了コード 1 で終わる。
 振り分けは `run(args []string, stdout, stderr io.Writer) int` のような関数で行い、`main` はその返り値で `os.Exit` する（テストがプロセスを起動せずに検証するため）。この change で定義するサブコマンドは `help` と `fixture capture` だけである。`classify` / `notify test` は s06 が ADDED で足す。
@@ -88,15 +99,4 @@ TBD - created by archiving change s06-dev-cli. Update Purpose after archive.
 #### Scenario: fixture の後が capture 以外
 - **WHEN** 引数 `fixture foo` で実行する
 - **THEN** 標準エラーに `unknown command: fixture` と使い方が出て、終了コードは 1 である
-
-### Requirement: サブコマンドの失敗は標準エラーに出て終了コード 1 になる
-サブコマンドがエラーを返した場合、CLI はエラー文字列を標準エラーに 1 行書き、終了コード 1 で MUST 終わる。panic しない。フラグの解析エラー（未知のフラグ・必須フラグの欠落）も同じ扱いにする。成功時は終了コード 0 である。
-
-#### Scenario: 必須フラグの欠落
-- **WHEN** 引数 `fixture capture --repo org/app`（`--alias` 無し）で実行する
-- **THEN** 標準エラーに `--alias` を含むエラーが出て、終了コードは 1 である
-
-#### Scenario: 未知のフラグ
-- **WHEN** 引数 `fixture capture --repo org/app --alias app --out x` で実行する
-- **THEN** 標準エラーに `out` を含むエラーが出て、終了コードは 1 である
 

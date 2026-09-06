@@ -4,12 +4,12 @@
 TBD - created by archiving change s08a-onboarding. Update Purpose after archive.
 ## Requirements
 ### Requirement: 設定ファイルが無いときだけ onboarding に入る
-`cmd/sugi-loop` は `config.Load` を呼ぶ前に、`config.DefaultPath()` のパスにファイルが存在するかを MUST 確認する。判定順は 存在確認 → （無ければ）onboarding フォーム → 書き出し → `config.Load` → `gh.Client.Check` → TUI である（`Check` 以降は `tui-entrypoint`「sugi-loop バイナリが起動して 1 フレーム描画する」の手順 2 以降と同じ）。
+`cmd/loop-cli` は `config.Load` を呼ぶ前に、`config.DefaultPath()` のパスにファイルが存在するかを MUST 確認する。判定順は 存在確認 → （無ければ）onboarding フォーム → 書き出し → `config.Load` → `gh.Client.Check` → TUI である（`Check` 以降は `tui-entrypoint`「loop-cli バイナリが起動して 1 フレーム描画する」の手順 2 以降と同じ）。
 - ファイルが存在する: onboarding に入らず `config.Load` へ進む。壊れた設定（YAML エラー・検証エラー）は `config.Load` のエラーで終了し、ファイルを上書きしない（mvp.md「設定ファイルが壊れているときは onboarding に入らず、従来どおり原因を出して終了する」）
 - ファイルが存在しない（`os.Stat` が「存在しない」を返す）: 標準入力が端末なら onboarding フォームを出し、書き出しが成功したら同じパスを `config.Load` で読む。`Config` を自前で組み立てない
 - 存在確認がそれ以外のエラーを返す（権限不足など）: そのエラーをパス付きで標準エラーに出して終了コード 1
 - 標準入力が端末でない: フォームを出さず、`設定ファイルがありません: <パス>` を標準エラーに出して終了コード 1（`tui-entrypoint`「起動失敗は標準エラーに出て終了コード 1 になる」）
-この判定は `cmd/sugi-loop` の非公開関数（設定ファイルのパス・端末かどうかの真偽値・フォームを起動する関数を引数に取る）に置き、テストではフォームを起動する関数を呼ばれた回数を数えるスタブに差し替える。
+この判定は `cmd/loop-cli` の非公開関数（設定ファイルのパス・端末かどうかの真偽値・フォームを起動する関数を引数に取る）に置き、テストではフォームを起動する関数を呼ばれた回数を数えるスタブに差し替える。
 
 #### Scenario: 設定ファイルがあればフォームに入らない
 - **WHEN** 一時ディレクトリに `repos:\n  - org/app\n` の設定ファイルを置き、そのパス・端末 true・呼ばれた回数を数えるスタブを判定関数に渡す
@@ -67,7 +67,7 @@ TBD - created by archiving change s08a-onboarding. Update Purpose after archive.
   ```
 
 #### Scenario: 書き出した YAML を config.Load が読める
-- **WHEN** 環境変数 `EDITOR` を `nvim` にし、`Answers{Repos: []string{"org/app"}, MergeMethod: "rebase", Notify: false, Editor: "$EDITOR"}` を一時ディレクトリの `sugi-loop/config.yml`（`sugi-loop` ディレクトリは事前に無い）へ `Write` し、同じパスを `config.Load` で読む
+- **WHEN** 環境変数 `EDITOR` を `nvim` にし、`Answers{Repos: []string{"org/app"}, MergeMethod: "rebase", Notify: false, Editor: "$EDITOR"}` を一時ディレクトリの `loop-cli/config.yml`（`loop-cli` ディレクトリは事前に無い）へ `Write` し、同じパスを `config.Load` で読む
 - **THEN** `Write` はエラー無しで返り、ファイルが存在し、`Load` の `Config` は `Repos` が `[{org/app rebase}]`、`MergeMethod` が `rebase`、`RefreshIntervalSec` が 120、`Notify` が false、`Editor` が `nvim` である
 
 #### Scenario: editor を空にしても読める
@@ -75,9 +75,9 @@ TBD - created by archiving change s08a-onboarding. Update Purpose after archive.
 - **THEN** `Load` はエラー無しで返り、`Editor` は空文字列である
 
 ### Requirement: 中止したときは設定ファイルを書かない
-`Run` が huh の既定の中止操作（Ctrl+C）で `ErrAborted` を返したとき、`path` にファイルは MUST 存在しない。`cmd/sugi-loop` は `ErrAborted` を受けたら `設定の作成を中止しました（<パス> は書いていません）` を標準エラーに出して終了コード 1 で終わる（docs に記述が無い点。design.md の未決事項の既定値）。ファイルが書かれないことは、フォームを起動しない単体テストでは常に真になるので、tasks 6.1 の手動確認（フォームで Ctrl+C）で見る。
+`Run` が huh の既定の中止操作（Ctrl+C）で `ErrAborted` を返したとき、`path` にファイルは MUST 存在しない。`cmd/loop-cli` は `ErrAborted` を受けたら `設定の作成を中止しました（<パス> は書いていません）` を標準エラーに出して終了コード 1 で終わる（docs に記述が無い点。design.md の未決事項の既定値）。ファイルが書かれないことは、フォームを起動しない単体テストでは常に真になるので、tasks 6.1 の手動確認（フォームで Ctrl+C）で見る。
 
 #### Scenario: 中止のエラーは設定ファイルを残さない
-- **WHEN** フォームを起動する関数が `ErrAborted` を返すスタブの状態で、存在しないパスに対して `cmd/sugi-loop` の判定関数を呼び、返ったエラーを起動失敗の文言にする
+- **WHEN** フォームを起動する関数が `ErrAborted` を返すスタブの状態で、存在しないパスに対して `cmd/loop-cli` の判定関数を呼び、返ったエラーを起動失敗の文言にする
 - **THEN** 文言に `設定の作成を中止しました` とそのパスを含む
 

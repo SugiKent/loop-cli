@@ -46,7 +46,7 @@ func TestDefaultPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DefaultPath: %v", err)
 	}
-	if want := "/tmp/h/.cache/sugi-loop/snapshot.json"; got != want {
+	if want := "/tmp/h/.cache/loop-cli/snapshot.json"; got != want {
 		t.Errorf("DefaultPath() = %q, want %q", got, want)
 	}
 }
@@ -54,7 +54,7 @@ func TestDefaultPath(t *testing.T) {
 func TestSaveLoadRoundTrip(t *testing.T) {
 	cards := exampleCards(t)
 	before := Snapshot{Cards: cards, At: savedAt}
-	path := filepath.Join(t.TempDir(), "sugi-loop", "snapshot.json")
+	path := filepath.Join(t.TempDir(), "loop-cli", "snapshot.json")
 
 	if err := Save(path, before); err != nil {
 		t.Fatalf("Save: %v", err)

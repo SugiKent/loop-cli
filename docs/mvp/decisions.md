@@ -1,8 +1,8 @@
-# sugi-loop 技術的意思決定
+# loop-cli 技術的意思決定
 
 最終更新: 2026-09-05-1805
 
-sugi-loop の技術・データ層の判断とその理由。古い決定は上書きせず、変更日時と理由を追記する。
+loop-cli の技術・データ層の判断とその理由。古い決定は上書きせず、変更日時と理由を追記する。
 体験と画面の仕様は [mvp.md](./mvp.md)、分類ルールは [人の出番（判定ルール）](../domain/issue-driven-sdd/human-turn-signals.md) を見る。
 
 ---
@@ -50,7 +50,7 @@ gh search prs --repo O/a --repo O/b … --state open --limit 200 \
 search 枠（30 req/分）のままで変わらず、増えるのは GraphQL 枠（5,000 point/時）だけである。GraphQL は回数ではなく
 point で数えるので単価は実測が要るが、**仮に 1 呼び出し 1 point とする**と `refresh_interval_sec` の既定値 120 秒
 （30 回/時）では 1 更新あたり 166 回が上限の境目で、search の 2 回を除くと `N + 3M ≤ 164` になる。issue 100 件 +
-PR 20 件（160）は余裕、issue 200 件 + PR 50 件（350）は超える。この枠は sugi-loop の専有ではなく、手動の `R` と
+PR 20 件（160）は余裕、issue 200 件 + PR 50 件（350）は超える。この枠は loop-cli の専有ではなく、手動の `R` と
 利用者自身の他の `gh` 利用が同じトークンの枠を使う。取得件数の上限やレート制限のガードは設けていない。
 `detailConcurrency` は 4 のままなので、呼び出しが増えた分だけ 1 回の更新にかかる時間は伸びる。
 
@@ -87,7 +87,7 @@ Phase 2（[implementation-tasks.md](./implementation-tasks.md)）では `gh api 
 
 決定日時: 2026-09-05-1407
 
-- 永続 DB は持たない。メモリ上のスナップショットを `~/.cache/sugi-loop/snapshot.json` に保存し、起動直後は stale 表示 → 背景で再取得。
+- 永続 DB は持たない。メモリ上のスナップショットを `~/.cache/loop-cli/snapshot.json` に保存し、起動直後は stale 表示 → 背景で再取得。
   スナップショットは消しても GitHub から全部作り直せる派生データに限る。
 - 手動 `R`、自動更新は既定 120 秒（設定可）。書き込み後は対象 1 件だけ再取得する。
 - 取得中はステータスバーにスピナー、失敗時は前回結果を維持してエラーを赤で表示。
@@ -107,7 +107,7 @@ Phase 2（[implementation-tasks.md](./implementation-tasks.md)）では `gh api 
 | Markdown | **Glamour** | Issue / PR 本文とコメントを色付きで端末表示 |
 | フォーム | **huh** | Issue 作成フォーム（リポジトリ選択・タイトル・本文） |
 | GitHub | **`gh` サブプロセス**（`gh search` / `gh issue` / `gh pr` / `gh api`） | 利用者の要件。認証・GHES・credential store を再利用。すべて `--json` で受ける |
-| 配布 | `go install` + GoReleaser。**gh extension（`gh sugi-loop`）としての配布も候補** | `gh` 前提のツールなので `gh extension install <owner>/gh-sugi-loop` が自然 |
+| 配布 | `go install` + GoReleaser。**gh extension（`gh loop-cli`）としての配布も候補** | `gh` 前提のツールなので `gh extension install <owner>/gh-loop-cli` が自然 |
 
 比較した代替: Rust + ratatui（入力・非同期ループを自作する範囲が広い）、TypeScript + Ink v7 / OpenTUI（単一バイナリ化に手間、OpenTUI は 0.x）、
 Python + Textual（最速で作れるが配布サイズと起動速度で劣る）。
@@ -115,7 +115,7 @@ Python + Textual（最速で作れるが配布サイズと起動速度で劣る�
 ### 内部構成
 
 ```
-cmd/sugi-loop/main.go
+cmd/loop-cli/main.go
 internal/
   config/      # config.yml 読み込み
   gh/          # GHClient interface と gh サブプロセス実装（+ JSON fixture の fake）
@@ -138,7 +138,7 @@ internal/
 「`stage:todo` を付ける / `question` の PR・issue にコメントで答える / PR を merge する」の 3 つに固定された。
 `blocked` / `question` / 段階ラベルの付け外しと worker の再起動は dispatcher と sweep が行う。
 
-sugi-loop 側の変更:
+loop-cli 側の変更:
 
 | 変更 | 理由 |
 | --- | --- |
@@ -149,7 +149,7 @@ sugi-loop 側の変更:
 | `## PR リスク評価` 見出しの AI 判定は維持 | `assess-pr-risk` はプラグインから外れたが、既存コメントは残っている。外すと人の発言と誤判定して A の PR がキューから消える |
 
 TUI が書くラベルは `stage:todo` と `s` の `stage:propose` の 2 つだけになり、書き込み面が小さくなった。
-上流は複数リポジトリの横断をスコープ外と明記しており、sugi-loop の位置づけは変わらない。
+上流は複数リポジトリの横断をスコープ外と明記しており、loop-cli の位置づけは変わらない。
 
 ---
 

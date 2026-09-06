@@ -232,7 +232,7 @@ func TestDefaultPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DefaultPath が失敗した: %v", err)
 	}
-	if want := "/Users/alice/.config/sugi-loop/config.yml"; got != want {
+	if want := "/Users/alice/.config/loop-cli/config.yml"; got != want {
 		t.Errorf("DefaultPath() = %q, want %q", got, want)
 	}
 }
