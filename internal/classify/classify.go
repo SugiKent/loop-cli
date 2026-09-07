@@ -42,6 +42,12 @@ func Issue(is model.Issue) model.Result {
 		return result(model.SituationInProgress, fmt.Sprintf("#%d は question のみ。dispatcher の回収待ち", is.Number))
 	}
 
+	// 規則 6: 2 回書きの途中（段階ラベルが無く、最新の routine コメントが release: / restart: / advance:）。
+	// sweep が続きの段階ラベルを書くので、人に stage:todo を付けさせない。
+	if len(stages) == 0 && !blocked && model.IsMidRelabel(is.Comments) {
+		return result(model.SituationInProgress, fmt.Sprintf("#%d は段階ラベルの書き直し中。sweep 待ち", is.Number))
+	}
+
 	if question && blocked && hasComments && aiLatest {
 		return result(model.SituationB, fmt.Sprintf("#%d の方針を決めてコメントする", is.Number))
 	}
@@ -78,6 +84,11 @@ func PR(pr model.PR) model.Result {
 
 	if question && hasComments && aiLatest {
 		return result(model.SituationA, fmt.Sprintf("PR #%d の質問に答える", pr.Number))
+	}
+	// 規則 7: AI リスク評価が走っている最中。assess がラベルを外すまで merge 待ちにしない。
+	// 行 A の後に置くのは、質問が残っている PR では人の番が先だから。
+	if model.HasLabel(pr.Labels, model.LabelAIAssess) {
+		return result(model.SituationInProgress, fmt.Sprintf("PR #%d は AI 評価待ち", pr.Number))
 	}
 	if isC(pr, stages, question) {
 		return result(model.SituationC, fmt.Sprintf("PR #%d を merge する", pr.Number))

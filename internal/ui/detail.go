@@ -252,6 +252,9 @@ func (m Model) cardBodyLines() []string {
 	if c, value, ok := model.LatestBlockedBy(issue.Comments); ok {
 		lines = append(lines, "blocked-by: "+value)
 		if value == "human" {
+			if when, ok := model.UnblockWhen(c.Body); ok {
+				lines = append(lines, "unblock-when: "+when)
+			}
 			lines = append(lines, questionLines(c.Body)...)
 		}
 	}
@@ -259,13 +262,15 @@ func (m Model) cardBodyLines() []string {
 }
 
 // questionLines は blocked-by: human のコメントから質問と選択肢を作る。
-// 質問が 1 件も無ければ、マーカー行と blocked-by: 行を除いた本文をそのまま出す。
+// 質問が 1 件も無ければ、マーカー行と blocked-by: 行と unblock-when: 行を除いた本文をそのまま出す
+// （blocked-by: と unblock-when: は cardBodyLines が既に 1 行ずつ出している）。
 func questionLines(body string) []string {
 	qs := model.ParseQuestions(body)
 	if len(qs) == 0 {
 		var rest []string
 		for _, l := range strings.Split(stripMarkers(body), "\n") {
-			if strings.HasPrefix(strings.TrimSpace(l), "blocked-by:") {
+			t := strings.TrimSpace(l)
+			if strings.HasPrefix(t, "blocked-by:") || strings.HasPrefix(t, "unblock-when:") {
 				continue
 			}
 			rest = append(rest, l)

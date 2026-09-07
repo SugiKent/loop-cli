@@ -232,6 +232,14 @@ func TestSituationE(t *testing.T) {
 			t.Errorf("Situation = %q, want in-progress", got)
 		}
 	})
+
+	t.Run("blocked が付いていれば書き直しの途中でも E ではない", func(t *testing.T) {
+		is := issue(140, model.LabelBlocked)
+		is.Comments = []model.Comment{{Body: "<!-- routine -->\nrelease: stage:apply", AI: true}}
+		if got := Issue(is).Situation; got != model.SituationInProgress {
+			t.Errorf("Situation = %q, want in-progress", got)
+		}
+	})
 }
 
 func TestSituationF(t *testing.T) {
@@ -353,6 +361,43 @@ func TestInProgressRules(t *testing.T) {
 		}
 		if got.Summary != "#108 は question のみ。dispatcher の回収待ち" {
 			t.Errorf("Summary = %q", got.Summary)
+		}
+	})
+
+	t.Run("規則 6: 2 回書きの途中の issue", func(t *testing.T) {
+		is := issue(140)
+		is.Comments = []model.Comment{{Body: "<!-- routine -->\nrestart: 1/3", AI: true}}
+
+		got := Issue(is)
+		if got.Situation != model.SituationInProgress {
+			t.Errorf("Situation = %q, want in-progress（E には当たらない）", got.Situation)
+		}
+		if got.Summary != "#140 は段階ラベルの書き直し中。sweep 待ち" {
+			t.Errorf("Summary = %q", got.Summary)
+		}
+	})
+
+	t.Run("規則 7: AI 評価待ちの PR", func(t *testing.T) {
+		pr := withComments(openPR(151, model.LabelApply, model.LabelAIAssess), aiComment())
+		pr.Body = "未確定の判断: 0 件 — レビューをお願いします"
+		pr.MergeState = mergeable()
+
+		got := PR(pr)
+		if got.Situation != model.SituationInProgress {
+			t.Errorf("Situation = %q, want in-progress（C を満たしていても評価待ちが先）", got.Situation)
+		}
+		if got.Summary != "PR #151 は AI 評価待ち" {
+			t.Errorf("Summary = %q", got.Summary)
+		}
+	})
+
+	t.Run("規則 7: AI 評価待ちでも question があれば A", func(t *testing.T) {
+		pr := withComments(openPR(151, model.LabelApply, model.LabelAIAssess, model.LabelQuestion), aiComment())
+		pr.Body = "未確定の判断: 0 件 — レビューをお願いします"
+		pr.MergeState = mergeable()
+
+		if got := PR(pr).Situation; got != model.SituationA {
+			t.Errorf("Situation = %q, want A", got)
 		}
 	})
 

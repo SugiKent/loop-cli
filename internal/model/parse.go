@@ -12,7 +12,12 @@ const (
 	routineMarkerEscaped = "&lt;!-- routine --&gt;"
 	riskHeading          = "## PR リスク評価"
 	blockedByPrefix      = "blocked-by:"
+	unblockWhenPrefix    = "unblock-when:"
 )
+
+// relabelPrefixes は 2 回書き（`[]` を書いてから `[stage:X]` を書く）の 1 回目の前に
+// routine が投稿する行の目印。sweep はこの目印で続きを書く（routine-common / routine-sweep）。
+var relabelPrefixes = []string{"release:", "restart:", "advance:"}
 
 var (
 	undecidedRe = regexp.MustCompile(`^未確定の判断:\s*(\d+)\s*件`)
@@ -66,6 +71,38 @@ func LatestBlockedBy(comments []Comment) (*Comment, string, bool) {
 		}
 	}
 	return nil, "", false
+}
+
+// IsMidRelabel は最新の routine コメントが 2 回書きの途中を示すかを返す。
+// 段階ラベルの無い issue がこれに当たるとき、sweep が続きの段階ラベルを書く途中である。
+func IsMidRelabel(comments []Comment) bool {
+	for i := len(comments) - 1; i >= 0; i-- {
+		if !comments[i].AI {
+			continue
+		}
+		for _, line := range strings.Split(comments[i].Body, "\n") {
+			line = strings.TrimSpace(line)
+			for _, p := range relabelPrefixes {
+				if strings.HasPrefix(line, p) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return false
+}
+
+// UnblockWhen は `blocked-by: human` のコメントに書かれた解除条件を返す。
+// 値は comment / docs / #m のいずれかで、人が何をすれば動き出すかを示す。
+func UnblockWhen(body string) (string, bool) {
+	for _, line := range strings.Split(body, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, unblockWhenPrefix) {
+			return strings.TrimSpace(strings.TrimPrefix(line, unblockWhenPrefix)), true
+		}
+	}
+	return "", false
 }
 
 // Option は質問の選択肢。

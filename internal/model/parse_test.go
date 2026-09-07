@@ -178,3 +178,47 @@ func TestParseLinks(t *testing.T) {
 		})
 	}
 }
+
+func TestIsMidRelabel(t *testing.T) {
+	tests := []struct {
+		name     string
+		comments []Comment
+		want     bool
+	}{
+		{
+			name:     "最新の routine コメントが restart",
+			comments: []Comment{{Body: "<!-- routine -->\nadvance: stage:apply", AI: true}, {Body: "<!-- routine -->\nrestart: 1/3", AI: true}},
+			want:     true,
+		},
+		{
+			name:     "人のコメントが後にあっても最新の routine コメントを見る",
+			comments: []Comment{{Body: "<!-- routine -->\nrelease: stage:apply", AI: true}, {Body: "了解しました"}},
+			want:     true,
+		},
+		{
+			name:     "通常の routine コメント",
+			comments: []Comment{{Body: "<!-- routine -->\nblocked-by: human\nunblock-when: comment", AI: true}},
+		},
+		{
+			name:     "AI のコメントが 1 件も無い",
+			comments: []Comment{{Body: "restart: 1/3"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsMidRelabel(tt.comments); got != tt.want {
+				t.Errorf("IsMidRelabel = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUnblockWhen(t *testing.T) {
+	body := "<!-- routine -->\nblocked-by: human\nunblock-when: docs\n\n方針を決めてください"
+	if got, ok := UnblockWhen(body); !ok || got != "docs" {
+		t.Errorf("UnblockWhen = %q, %v; want docs, true", got, ok)
+	}
+	if got, ok := UnblockWhen("<!-- routine -->\nblocked-by: #589"); ok || got != "" {
+		t.Errorf("UnblockWhen = %q, %v; want \"\", false", got, ok)
+	}
+}

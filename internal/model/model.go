@@ -19,6 +19,7 @@ const (
 	LabelArchive      = "archive"
 	LabelDocs         = "docs"
 	LabelQuestion     = "question"
+	LabelAIAssess     = "ai-assess:requested"
 	LabelBlocked      = "blocked"
 	LabelWip          = "wip"
 )
