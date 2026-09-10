@@ -1,6 +1,10 @@
-# tasks: 2026-09-10-s26-wrap-titles
+# tasks: 2026-09-10-s27-wrap-titles
 
 Refs #2
+
+## 0. 前提
+
+- [ ] 0.1 先行 change `s26-issue-label-driven` が archive 済みであることを、`origin/main` の `openspec/specs/card-detail/spec.md` に `Options.Modes` と `model.IssueStages(mode, Issue.Labels)` の記述があることで確認する。まだなら着手せず、`blocked-by: change s26-issue-label-driven` を issue へ書き戻す（proposal の「先行 change への依存」）
 
 ## 1. 折り返しヘルパー
 
@@ -32,5 +36,5 @@ Refs #2
 
 ## 6. 仕上げ
 
-- [ ] 6.1 `openspec validate 2026-09-10-s26-wrap-titles --strict` が通ることを確認する
+- [ ] 6.1 `openspec validate 2026-09-10-s27-wrap-titles --strict` が通ることを確認する
 - [ ] 6.2 `go build ./... && go vet ./... && go test ./...` が通ることを確認する

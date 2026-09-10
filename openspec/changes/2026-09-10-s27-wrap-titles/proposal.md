@@ -1,4 +1,4 @@
-# 2026-09-10-s26-wrap-titles
+# 2026-09-10-s27-wrap-titles
 
 Refs #2
 
@@ -30,6 +30,25 @@ Refs #2
 
 - `queue-screen`: 表のタイトル列を折り返しにし、1 枚の Card が複数行を占めることを認める。経過と `▶` は 1 行目にだけ出す
 - `card-detail`: カード詳細と PR 詳細のヘッダ 1 行目を折り返しにし、ヘッダ領域の切り詰め規則からタイトル行を除く。折り返しでヘッダが端末高を超えないよう上限を定める
+
+## 先行 change への依存
+
+**この change は `s26-issue-label-driven` の後に apply / archive しなければならない。**
+
+`s26-issue-label-driven`（issue #5。proposal は PR #12 で merge 済み）は、`card-detail` の Requirement
+「ヘッダはリポジトリ・番号・いま人が何をすべきか・現在の段階・バッジ・depends on を出す」を MODIFIED しており、
+この change も同じ Requirement を MODIFIED する。MODIFIED は Requirement ブロック全体を置き換えるので、
+後から archive した側の内容だけが残り、先に archive した側の変更は消える。
+
+`openspec/config.yaml` の `rules.specs`（「先行 change の specs から Requirement ブロック全体をコピーして書き換える」）
+に従い、この change の delta は `s26-issue-label-driven` の版を土台にしている。つまりこの delta には
+`Options.Modes` と `model.IssueStages(mode, Issue.Labels)` と `label` 方式のバッジ規則、および
+`label` 方式の Scenario 2 本が既に入っている。**先にこの change を archive すると、まだ実装されていない
+方式まわりの記述がメイン spec に入ってしまう。**
+
+`queue-screen` は衝突しない。`s26-issue-label-driven` が MODIFIED するのは
+「取得が成功して Card が 0 件のときは表の領域にヒントを出す」で、この change が MODIFIED する
+「表の行は優先記号・種別・リポジトリ・番号・タイトル・経過を種別の色で出す」とは別の Requirement である。
 
 ## Impact
 

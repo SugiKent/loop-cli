@@ -1,4 +1,4 @@
-# design: 2026-09-10-s26-wrap-titles
+# design: 2026-09-10-s27-wrap-titles
 
 Refs #2
 
@@ -18,6 +18,10 @@ Refs #2
 - `detailHeader` は `[]string` を不透明に受け取るので、今のままではどの要素がタイトル行かを区別できない
 - 表はスクロールを持たない。折り返しで増えた行はそのぶん表から溢れる
 - 折り返しでヘッダが伸びると本文領域が痩せる。`detailHeader` は本文領域の高さをヘッダの行数から引いて出すので、折り返しで増えた行もそのまま引かれる。ただし固定ヘッダ自体が端末高を超える経路が、折り返しによって新たに現実的になる
+
+`card-detail` のヘッダの Requirement は、先行する `s26-issue-label-driven`（issue #5）も MODIFIED している。
+この change の delta はその版を土台に組んであり、apply / archive の順序が入れ替わると片方の変更が消える。
+詳しくは proposal の「先行 change への依存」を読む。
 
 ## Goals / Non-Goals
 

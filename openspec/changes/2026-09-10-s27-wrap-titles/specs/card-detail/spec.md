@@ -1,10 +1,10 @@
 ## MODIFIED Requirements
 
 ### Requirement: ヘッダはリポジトリ・番号・いま人が何をすべきか・現在の段階・バッジ・depends on を出す
-カード詳細画面の `View` はヘッダ領域の先頭に、詳細の対象の Card について MUST 次の行をこの順で出す（mvp.md「カード詳細」のヘッダ）。行番号は固定せず順序だけを定める（s17 が ADDED で行を足せるようにするため）。
+カード詳細画面の `View` はヘッダ領域の先頭に、詳細の対象の Card について MUST 次の行をこの順で出す（mvp.md「カード詳細」のヘッダ）。行番号は固定せず順序だけを定める（s17 が ADDED で行を足せるようにするため）。方式は `Options.Modes`（設定由来。`queue-screen`「リポジトリごとの運用方式を設定から受け取る」）に対象の `Repo` を引いて決め、Card の中の値からは決めない。
 - `<Repo> #<Number>  <Title>`（`Card.Issue` の値）
 - `Card.Result.Summary`（空なら出さない。s05 が定めた「いま人が何をすべきか」。mvp.md「カードは『いま人が何をすべきか』を 1 行目に出す」。s08 のプレビューはこれを出さず、この change のヘッダに委ねている）
-- `段階: ` に続けて `model.IssueStages(Issue.Labels)` の段階ラベルを空白区切りで並べる。1 件も無ければ `段階なし`。2 件以上あればすべて並べる（異常の状態を隠さない）。続けてバッジを `[blocked]` / `[wip]` / `[question]` の順で、`Labels` にあるものだけ出す
+- `段階: ` に続けて `model.IssueStages(mode, Issue.Labels)` の段階ラベルを空白区切りで並べる。1 件も無ければ `段階なし`。2 件以上あればすべて並べる（異常の状態を隠さない）。続けてバッジを出す。`sdd`（ゼロ値を含む）なら `[blocked]` / `[wip]` / `[question]` の順、`label` なら `[blocked]` / `[question]` の順で、`Labels` にあるものだけ出す（`label` の方式に `wip` ラベルは無く、作業中は段階ラベル `In Progress` が示す）
 - `Issue.Body` の中に `depends on #<n>`（大文字小文字を区別しない。`<n>` は 10 進整数）が 1 つ以上あれば `depends on: #<n> #<m> …` を出現順に出す。無ければこの行を出さない（書式は design.md 未決事項の既定値）
 
 1 行目 `<Repo> #<Number>  <Title>` は**タイトル行**である。タイトル行は `<Repo> #<Number>  ` を接頭辞として `Title` を続け、表示幅が端末の幅を超えれば端末の幅で MUST 折り返し、`Title` を全文出す。折り返して生まれた継続行の行頭には接頭辞と同じ表示幅の空白を置き、`Title` の開始位置に縦を揃える。幅の判定と折り返し位置は表示幅（`ansi.StringWidth` が返す値）で決め、全角文字と絵文字を含むタイトルでも桁がずれないようにする。端末の幅から接頭辞の表示幅を引いた残りが 1 列未満になるときは、空白を置かずに端末の幅で折り返す。タイトル行とその継続行は、いずれも表示幅が端末の幅を超えない。
@@ -32,6 +32,14 @@
 #### Scenario: 段階ラベルが 2 つある issue は両方出す
 - **WHEN** `Labels` が `stage:propose` と `stage:apply` と `blocked` と `wip` の issue の Card の詳細を開き、`View` を読む
 - **THEN** `段階: stage:propose stage:apply` と `[blocked]` と `[wip]` がこの順で含まれる
+
+#### Scenario: label 方式の issue の段階とバッジ
+- **WHEN** `Options.Modes` が `org/board` を `label` にした `Model` で、`org/board` の `Labels` が `In Progress` と `question` の issue の Card の詳細を開き、`View` を読む
+- **THEN** `段階: In Progress` と `[question]` が含まれ、`[wip]` は含まれない
+
+#### Scenario: label 方式では sdd の段階ラベルを段階行に出さない
+- **WHEN** 同じ `Model` で、`org/board` の `Labels` が `stage:propose` の issue の Card の詳細を開き、`View` を読む
+- **THEN** `段階なし` が含まれる
 
 ### Requirement: PR 詳細は 1 行目判定・紐づけ・本文・会話・review thread・checks を出す
 PR 詳細画面の `View` は、対象の `model.PR` について MUST 次を上から順に出す。ヘッダ領域は 1〜2、本文領域は 3〜8（Requirement「詳細の本文領域はスクロールし、ヘッダ領域は固定する」）。
