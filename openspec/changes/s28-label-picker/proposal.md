@@ -44,6 +44,7 @@ Refs #3
 - `internal/action`: `Target` と「付ける名前の並び・外す名前の並び」を受け取って 1 回で書き込む関数（`ToggleTodo` の隣）
 - `docs/mvp/mvp.md`: キーバインド表に `L` の行と、変更履歴に 1 行
 - `docs/domain/issue-driven-sdd/human-turn-signals.md`: 不変条件 1 と 2、および冒頭の「`ai-assess:requested` は この TUI からは行わない」の 3 か所の改訂（後述）
+- `openspec/config.yaml` の `context`: 「TUI が書くラベルは `stage:todo` と s の `stage:propose` のみ」は Q1 の回答で偽になる。後続のすべての propose がこの context を読むので、直さないと次の change が誤った前提で書かれる
 - `l` はカンバンの列移動（s17、未着手）の予約のまま残るので、`docs/mvp/mvp.md` の既存行は変えない
 - **未 archive の先行 change との衝突。** `origin/main` の `openspec/changes/` 直下に `s15-new-issue`（issue #6）・`s26-issue-label-driven`（issue #5）・`2026-09-10-s27-wrap-titles`（issue #2）の 3 つが未実装で置かれており、この change の 5 つの MODIFIED はすべてどれかと重なる。MODIFIED は Requirement ブロック全体を置き換えるので、写し忘れると先に archive された change の変更が消える。
 
@@ -91,6 +92,8 @@ Refs #3
 - **`gh label list --limit 100` を超えるラベルは出ない。** ページングも「切れている」の表示もしない。切れているかを知るには 101 件目を取りに行くしかなく、`L` の反応を鈍らせる
 - **ラベル一覧のキャッシュはセッション中に捨てない。** 他の経路でラベルを新しく作っても、loop-cli を起動し直すまで `L` には出ない
 - **ラベル名にコンマが含まれると壊れる。** `gh` の `--add-label` はコンマで分割するので、フラグを繰り返しても名前を割ってしまう。issue-driven-sdd のラベルにコンマは無いので対策を持たない
-- **routine の状態機械と merge ガードを人が崩せる。** Q1 の回答（全部触れる）で受け入れた。`stage:apply` を誤って付けると worker が 1 本起動し、`question` を外すと AI 評価前の PR を merge できる。どちらも TUI からは取り消せず、GitHub 側で人が直すことになる
+- **routine の状態機械と merge ガードを人が崩せる。** Q1 の回答（全部触れる）で受け入れた。`stage:apply` を誤って付けると worker が 1 本起動し、`question` を外すと AI 評価前の PR を merge できる。段階ラベルが 2 つ付いた issue（局面 F）も作れてしまい、その issue では `t` が `action.ToggleTodo` の `ErrMultipleStages`（`internal/action/todo.go:37-39`）で以後ずっと拒否される。戻せるのは `L` だけになる
+- **送信が半分だけ通ることがある。** `gh` は「付ける」と「外す」を別の mutation として送るので原子的ではない。付けるほうが成功して外すほうが失敗すると、GitHub 側に半分だけ適用された状態が残る。TUI は「更新できません」と出すだけで、実際の状態は次の取得で分かる
+- **まとめ送信は意図した Routine の起動も抑えることがある。** 付けるほうが先に走るので、`stage:apply` を足して `wip` を外す送信は、書き込み後のラベル集合に `wip` が残った状態で評価され、worker の Routine の `NOT_IN [wip]` に当たって起動しない
 - **キュー画面のフッタで `u URL` が幅 80 で切れる。** `L ラベル` を `t todo` の次に置くと `u URL` は 78〜82 列目に動き、幅 80 の端末では `u U` までしか出ない。s22 は `u URL` を 72 列目までに収めて幅 80 で見せる配置を選んでいたので、その配置は崩れる。`L` を末尾に回すと今度は `L ラベル` 自体が切れるため、Q5 の回答（フッタに `L` を出す）を優先した
 - **印の初期値は最終取得時点のラベル。** 送信時は読み直して差分を作るので書き込みは正しくなるが、他の経路でラベルが変わっていると、利用者が見て切り替えた印と結果が食い違うことはある

@@ -5,7 +5,7 @@
 - `--repo` は `owner/name` 形式（`/` で 2 つに分かれ、どちらも空でない）でなければならない。`--alias` は `^[a-z0-9-]+$` に一致し、`example`（s03 の手書き fixture）以外で、かつ `owner` / `name` のどちらも（大文字小文字を区別せず）部分文字列として含んではならない（alias は `name` の置換先なので、含むと元の名前が fixture に残り、次の Requirement の検査 3 が落ちる）
 - 保存先はカレントディレクトリからの相対パス `internal/gh/testdata/fixtures/<alias>`。`internal/gh/testdata/fixtures` が存在しなければ、リポジトリのルートで実行するよう促すエラーを返す。`<alias>` ディレクトリが既にあれば中身を消してから書く（再採取で古い issue のファイルが残らないようにする）
 - サブコマンドは、s03 `Client.Check`、`Client.Capture`（`progress` で受け取ったファイル名を 1 行ずつ標準エラーに出す）、伏せ字（次の Requirement）、書き込み、自己検査、要約をこの順に実行する。`Check` と `Capture` と伏せ字が失敗したときは、そのエラーをそのまま返し、ファイルを書かない
-- `Capture` は `labels.json`（`ListLabels` の標準出力）も採る。ラベル名は伏せ字の対象ではないが、リポジトリ名や login と同じ文字列のラベルがあれば、次の Requirement の衝突ガードがエラーにして止める
+- `Capture` は `labels.json`（`ListLabels` の標準出力）も採る（採取の順序は s03 `gh-client`「Client は fixture 用に読み取りコマンドの標準出力を採取する」が定める）。`labels.json` のラベル名は `"name": "…"` の形なので、次の Requirement の衝突ガードの (a)（`login` / `name` 以外のキーの値）には当たらない。固定 12 語（`todo` / `propose` / … ）に一致するラベル名だけがガードに掛かり、それ以外のプロジェクト固有ラベルがリポジトリ名や login と同じ文字列だと、伏せ字がラベル名まで書き換える
 - 自己検査: 書き込んだ全ファイルを、s03 の `Fake`（`NewFake(<保存先>)`）で読み直し、`SearchIssues` / `SearchPRs` / `ListLabels` と、各 issue の `ViewIssue` / `CrossReferencedPRs` / `LabelTimeline`、各 PR の `ViewPR` / `ViewPRMergeState` / `ReviewThreads` がすべてエラー無く返ることを確認する。1 つでも失敗したら保存先ディレクトリを削除してエラーを返す
 - 成功したら標準出力に、保存先・書いたファイル数・issue 数・PR 数・伏せた login 数を 1 行で出す
 

@@ -22,7 +22,7 @@ fixture は `internal/gh/testdata/fixtures/<repo-alias>/` 配下に MUST 置く�
 - **THEN** パスは `internal/gh/testdata/fixtures/example/labels.json` である
 
 ### Requirement: Fake は fixture を読んで GHClient と同じ型を返す
-`internal/gh` は `GHClient` を満たす型 `Fake` と、fixture ディレクトリのパスを受け取るコンストラクタ `NewFake(dir string) *Fake` を MUST 提供する。読み取りメソッドは上記の命名規則でファイルを探し、`Client` と同じデコード関数で型に写して返す。`repo` 引数はファイルの探索に使わない（ディレクトリ 1 つが 1 リポジトリに対応するため）。対応するファイルが無ければ、そのパスを含むエラーを返す。空の結果を返して黙って通さない。`Fake` の `ViewPRMergeState` は再取得も待ちも行わず、`pr-<n>.json` の merge 関連フィールドをそのまま返す。`Fake` の `ListLabels` は `labels.json` を読み、ファイルの並びのまま返す（`gh` の `--sort` に相当する並べ替えは行わない）。
+`internal/gh` は `GHClient` を満たす型 `Fake` と、fixture ディレクトリのパスを受け取るコンストラクタ `NewFake(dir string) *Fake` を MUST 提供する。読み取りメソッドは上記の命名規則でファイルを探し、`Client` と同じデコード関数で型に写して返す。`repo` 引数はファイルの探索に使わない（ディレクトリ 1 つが 1 リポジトリに対応するため）。対応するファイルが無ければ、そのパスを含むエラーを返す。空の結果を返して黙って通さない。`Fake` の `ViewPRMergeState` は再取得も待ちも行わず、`pr-<n>.json` の merge 関連フィールドをそのまま返す。`Fake` の `ListLabels` は `labels.json` を読み、`[]RepoLabel` をファイルの並びのまま返す（`gh` の `--sort` に相当する並べ替えは行わない）。
 
 #### Scenario: search-issues.json を読む
 - **WHEN** `internal/gh/testdata/fixtures/example/search-issues.json` に issue 2 件の配列がある状態で `NewFake("testdata/fixtures/example").SearchIssues(ctx, []string{"org/app"})` を呼ぶ
@@ -38,7 +38,7 @@ fixture は `internal/gh/testdata/fixtures/<repo-alias>/` 配下に MUST 置く�
 
 #### Scenario: labels.json を読む
 - **WHEN** `labels.json` に 3 件の配列がある状態で `ListLabels(ctx, "org/app")` を呼ぶ
-- **THEN** `Label` 3 件がファイルの並びのまま返り、`Name` / `Description` / `Color` がファイルの内容と一致する
+- **THEN** `RepoLabel` 3 件がファイルの並びのまま返り、`Name` / `Description` / `Color` がファイルの内容と一致する
 
 #### Scenario: fixture が無い
 - **WHEN** `issue-999.json` が無い状態で `ViewIssue(ctx, "org/app", 999)` を呼ぶ
