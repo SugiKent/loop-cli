@@ -20,6 +20,8 @@ const (
 	colNumber  = 7
 	colElapsed = 5
 	colFixed   = colMark + colPrio + colKind + colRepo + colNumber + colElapsed
+	// colTitleStart はタイトル列が始まる位置（43 列目）。折り返した継続行の字下げ幅でもある。
+	colTitleStart = colFixed - colElapsed
 )
 
 // prioMark は優先度の記号。mvp.md にある 1 / 2 / 3 以外は design.md の未決事項の既定値。
@@ -202,12 +204,13 @@ func (m Model) tableRow(r row, selected bool) []string {
 
 	var lines []string
 	titleW := m.width - colFixed
-	if titleW <= 0 {
-		// 端末幅 48 以下ではタイトルを出さず、1 行だけを端末幅で切る。
+	if titleW < 2 {
+		// 端末幅 49 以下（タイトル列に全角 1 文字が入らない幅）ではタイトルを出さず、
+		// 1 行だけを端末幅で切る。この幅では折り返しが幅を守れない（wrapToWidth）。
 		lines = []string{ansi.Truncate(fixed+elapsed, m.width, "")}
 	} else {
 		// 継続行も端末幅ちょうどまで空白で埋める（異常の Card の背景色が行ごとに途切れないように）。
-		indent := strings.Repeat(" ", colFixed-colElapsed)
+		indent := strings.Repeat(" ", colTitleStart)
 		for i, frag := range wrapToWidth(r.title, titleW) {
 			if i == 0 {
 				lines = append(lines, fixed+pad(frag, titleW)+elapsed)

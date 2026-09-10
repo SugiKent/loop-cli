@@ -153,6 +153,7 @@ func (m Model) detailHeader() ([]string, int) {
 	keep := min(len(prs), max(m.height-2-len(fixed)-1, 0))
 	header := append(fixed, prs[:keep]...)
 
+	// 3 は区切り線 1 行 + フッタ 1 行 + 本文 1 行（戻り値の高さの下限と対応する）。
 	// タイトルの 1 行目は落とさない（どの Issue / PR を見ているのか分からなくなる）。
 	if over := len(header) + 3 - m.height; over > 0 && titleLines > 1 {
 		drop := min(over, titleLines-1)
@@ -170,7 +171,7 @@ func (m Model) cardHeaderLines() ([]string, int) {
 	card := m.detail.card
 	issue := card.Issue
 	title := wrapTitle(fmt.Sprintf("%s #%d  ", issue.Repo, issue.Number), issue.Title, m.width)
-	lines := slices.Clone(title)
+	lines := title
 	if card.Result.Summary != "" {
 		lines = append(lines, card.Result.Summary)
 	}
@@ -357,7 +358,7 @@ func (m Model) prHeaderLines() ([]string, int) {
 	}
 	title := wrapTitle(fmt.Sprintf("%s PR#%d  ", pr.Repo, pr.Number), pr.Title, m.width)
 	labels := fmt.Sprintf("[%s] %s  labels: %s", stage, prState(pr.State), strings.Join(pr.Labels, " "))
-	return append(slices.Clone(title), labels), len(title)
+	return append(title, labels), len(title)
 }
 
 // prBodyLines は 1 行目判定・紐づけ・checks・本文・会話・review thread を並べる。

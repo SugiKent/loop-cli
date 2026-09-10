@@ -33,13 +33,37 @@ func TestWrapToWidthSplitsByDisplayWidth(t *testing.T) {
 	}
 }
 
-func TestWrapToWidthReturnsOneLineForZeroWidth(t *testing.T) {
+// TestWrapToWidthDropsOnlyBreakSpaces は空白を含む文字列で、折り返し位置の空白 1 個以外は
+// 失われないことを検証する（ansi.Wrap は改行に置き換えた空白を出力しない）。
+func TestWrapToWidthDropsOnlyBreakSpaces(t *testing.T) {
+	title := strings.Repeat("word ", 12) + "end" // 表示幅 63
+
+	got := wrapToWidth(title, 20)
+
+	if len(got) < 3 {
+		t.Fatalf("行数 = %d, want 3 以上: %q", len(got), got)
+	}
+	for i, l := range got {
+		if w := ansi.StringWidth(l); w > 20 {
+			t.Errorf("%d 行目の表示幅 = %d, want <= 20: %q", i+1, w, l)
+		}
+	}
+	strip := func(s string) string { return strings.ReplaceAll(s, " ", "") }
+	if got, want := strip(strings.Join(got, "")), strip(title); got != want {
+		t.Errorf("空白を除いた連結 = %q, want %q", got, want)
+	}
+}
+
+// TestWrapToWidthReturnsOneLineForNarrowWidth は全角 1 文字が入らない幅では折らないことを
+// 検証する。幅 1 の ansi.Wrap は先頭に空行を作り、各行の表示幅が 2 になってしまう。
+func TestWrapToWidthReturnsOneLineForNarrowWidth(t *testing.T) {
 	title := strings.Repeat("あ", 40)
 
-	got := wrapToWidth(title, 0)
-
-	if len(got) != 1 || got[0] != title {
-		t.Errorf("幅 0 の wrapToWidth = %q, want 1 行の元の文字列", got)
+	for _, w := range []int{0, 1} {
+		got := wrapToWidth(title, w)
+		if len(got) != 1 || got[0] != title {
+			t.Errorf("幅 %d の wrapToWidth = %q, want 1 行の元の文字列", w, got)
+		}
 	}
 }
 
@@ -79,14 +103,14 @@ func TestWrapTitleWithoutRoomForIndentDoesNotIndent(t *testing.T) {
 	prefix := "org/app #108  " // 表示幅 14
 	title := strings.Repeat("あ", 20)
 
-	got := wrapTitle(prefix, title, 14)
+	got := wrapTitle(prefix, title, 15)
 
 	if len(got) < 2 {
 		t.Fatalf("行数 = %d, want 2 以上: %q", len(got), got)
 	}
 	for i, l := range got {
-		if w := ansi.StringWidth(l); w > 14 {
-			t.Errorf("%d 行目の表示幅 = %d, want <= 14: %q", i+1, w, l)
+		if w := ansi.StringWidth(l); w > 15 {
+			t.Errorf("%d 行目の表示幅 = %d, want <= 15: %q", i+1, w, l)
 		}
 		if i > 0 && strings.HasPrefix(l, " ") {
 			t.Errorf("字下げの余地が無いのに %d 行目が空白で始まる: %q", i+1, l)

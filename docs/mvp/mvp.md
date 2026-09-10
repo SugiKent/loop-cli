@@ -51,17 +51,17 @@ issue-label-driven（`To Do` / `In Progress` / `Done` の 3 ラベルだけで�
 
 ```
 ┌ loop-cli ── [1]今やる 7  [2]バックログ 12  [3]進行中 5  [4]異常 1 ────── ↻ 12:04 ─┐
-│ 優先 種別    リポジトリ           #     タイトル                             経過    │
-│ ▶ !!  質問    org/app             PR131 [propose] #108 選択 UI をモーダル化  12m     │
-│                                         する                                         │
-│   !!  質問    org/web             PR 88 [apply] #48 監視ツールを導入する     1h      │
-│   !   方針    org/app             #108  選択 UI をモーダル化する             3h      │
-│   !   方針    org/app             #91   旧機能を完全に削除する               2d      │
-│   ●   merge   org/app             PR151 [archive] #89 decouple-feature-      5h      │
-│                                         api-from-web                                 │
-│   ●   merge   org/app             PR144 [archive] #103 block-creation-       9h      │
-│                                         for-archived-orgs                            │
-│   ●   merge   org/template        PR 12 [apply] #3 ログイン画面を作る        1d      │
+│   優先 種別     リポジトリ          #      タイトル                           経過   │
+│ ▶ !!  質問      org/app             PR131  [propose] #108 選択 UI をモーダ    12m    │
+│                                            ル化する                                  │
+│   !!  質問      org/web             PR 88  [apply] #48 監視ツールを導入する   1h     │
+│   !   方針      org/app             #108   選択 UI をモーダル化する           3h     │
+│   !   方針      org/app             #91    旧機能を完全に削除する             2d     │
+│   ●   merge     org/app             PR151  [archive] #89 decouple-feature-    5h     │
+│                                            api-from-web                              │
+│   ●   merge     org/app             PR144  [archive] #103 block-creation-     9h     │
+│                                            for-archived-orgs                         │
+│   ●   merge     org/template        PR 12  [apply] #3 ログイン画面を作る      1d     │
 ├──────────────────────────────────────────────────────────────────────────────────────┤
 │ 未確定の判断: 2 件 — merge しないでください        labels: propose question         │
 │                                                                                      │

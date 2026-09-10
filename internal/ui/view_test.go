@@ -2,6 +2,7 @@ package ui
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -130,12 +131,16 @@ func rowLines(m Model, tab model.Tab, i int) []string {
 	return out
 }
 
+// titleColStart は spec が定めたタイトル列の開始位置。実装の定数ではなくリテラルで持つ
+// （実装と一緒にずれて通るテストにしない）。
+const titleColStart = 43
+
 // titleColumns は各行のタイトル列（先頭から 43 列目以降、経過の列より左）を
 // 末尾の空白を除いて連結する。折り返しても全文が出ていることの検証に使う。
 func titleColumns(lines []string, width int) string {
 	var s string
 	for _, l := range lines {
-		s += strings.TrimRight(ansi.Cut(l, colFixed-colElapsed, width-colElapsed), " ")
+		s += strings.TrimRight(ansi.Cut(l, titleColStart, width-colElapsed), " ")
 	}
 	return s
 }
@@ -164,23 +169,25 @@ func TestRowOfBacklogCard(t *testing.T) {
 	}
 }
 
-// TestLongTitleIsTruncated は端末幅が 48 以下（タイトル列の幅が 0 以下）のとき、
+// TestLongTitleIsTruncated は端末幅が 49 以下（タイトル列に全角 1 文字が入らない幅）のとき、
 // タイトルを出さず 1 行だけを端末幅で切ることを検証する。
 func TestLongTitleIsTruncated(t *testing.T) {
-	card := nowCard("org/app", 1, 1, at)
-	card.Issue.Title = strings.Repeat("長いタイトル", 40)
-	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: 48, Height: 40}, fetchedMsg{res: &fetch.Result{Cards: []model.Card{card}}, at: at})
+	for _, width := range []int{48, 49} {
+		card := nowCard("org/app", 1, 1, at)
+		card.Issue.Title = strings.Repeat("長いタイトル", 40)
+		m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: width, Height: 40}, fetchedMsg{res: &fetch.Result{Cards: []model.Card{card}}, at: at})
 
-	lines := rowLines(m, model.TabNow, 0)
+		lines := rowLines(m, model.TabNow, 0)
 
-	if len(lines) != 1 {
-		t.Fatalf("行数 = %d, want 1: %q", len(lines), lines)
-	}
-	if strings.Contains(lines[0], "長い") {
-		t.Errorf("端末幅 48 でタイトルが出ている: %q", lines[0])
-	}
-	if w := ansi.StringWidth(lines[0]); w > 48 {
-		t.Errorf("行の表示幅 = %d, want <= 48: %q", w, lines[0])
+		if len(lines) != 1 {
+			t.Fatalf("幅 %d の行数 = %d, want 1: %q", width, len(lines), lines)
+		}
+		if strings.Contains(lines[0], "長い") {
+			t.Errorf("幅 %d でタイトルが出ている: %q", width, lines[0])
+		}
+		if w := ansi.StringWidth(lines[0]); w > width {
+			t.Errorf("幅 %d の行の表示幅 = %d: %q", width, w, lines[0])
+		}
 	}
 }
 
@@ -226,33 +233,41 @@ func TestWrappedRowAlignsAndKeepsElapsedOnFirstLine(t *testing.T) {
 	if strings.Contains(lines[1], "12m") {
 		t.Errorf("継続行に経過がある: %q", lines[1])
 	}
-	if head := ansi.Cut(lines[1], 0, colFixed-colElapsed); strings.TrimSpace(head) != "" {
+	if head := ansi.Cut(lines[1], 0, titleColStart); strings.TrimSpace(head) != "" {
 		t.Errorf("継続行の先頭 43 列が空白でない: %q", head)
 	}
-	if got := ansi.Cut(lines[1], colFixed-colElapsed, colFixed-colElapsed+2); got != "あ" {
+	if got := ansi.Cut(lines[1], titleColStart, titleColStart+2); got != "あ" {
 		t.Errorf("継続行の 44 列目からタイトルの続きが始まっていない: %q", got)
 	}
 }
 
+// TestSelectedRowHasMarker は View 全体を読み、折り返した継続行が表の領域に載ること
+// （tableLines が行を平らに並べること）と、▶ が 1 枚目の 1 行目にだけ付くことを検証する。
 func TestSelectedRowHasMarker(t *testing.T) {
 	cards := threeNowCards()[:2]
 	cards[0].Issue.Title = strings.Repeat("あ", 30) // 幅 80 で 2 行になる
 	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: 80, Height: 40}, fetchedMsg{res: &fetch.Result{Cards: cards}, at: at})
 
-	first := rowLines(m, model.TabNow, 0)
-	second := rowLines(m, model.TabNow, 1)
+	lines := plain(m)
+	// 1 行目はヘッダ。表は 2 行目から始まり、1 枚目が 2 行・2 枚目が 1 行を占める。
+	first, cont, second := lines[1], lines[2], lines[3]
 
-	if len(first) < 2 {
-		t.Fatalf("1 枚目が折り返されていない: %q", first)
+	if !strings.HasPrefix(first, "▶") {
+		t.Errorf("選択行の 1 行目に ▶ が無い: %q", first)
 	}
-	if !strings.HasPrefix(first[0], "▶") {
-		t.Errorf("選択行の 1 行目に ▶ が無い: %q", first[0])
+	if strings.HasPrefix(cont, "▶") {
+		t.Errorf("選択行の継続行に ▶ がある: %q", cont)
 	}
-	if strings.HasPrefix(first[1], "▶") {
-		t.Errorf("選択行の継続行に ▶ がある: %q", first[1])
+	if strings.HasPrefix(second, "▶") {
+		t.Errorf("非選択行に ▶ がある: %q", second)
 	}
-	if strings.HasPrefix(second[0], "▶") {
-		t.Errorf("非選択行に ▶ がある: %q", second[0])
+	// 継続行が表の領域に載っており、1 枚目のタイトルが 2 行で全文出ている。
+	if got := titleColumns([]string{first, cont}, 80); got != cards[0].Issue.Title {
+		t.Errorf("表に出た 1 枚目のタイトル = %q, want %q", got, cards[0].Issue.Title)
+	}
+	sep := strings.Repeat("─", 80)
+	if i := slices.Index(lines, sep); i < 4 {
+		t.Errorf("区切り線の位置 = %d, want 4 以上（継続行が表の領域に無い）:\n%s", i, strings.Join(lines, "\n"))
 	}
 }
 
