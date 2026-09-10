@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/SugiKent/loop-cli/internal/action"
 	"github.com/SugiKent/loop-cli/internal/fetch"
 	"github.com/SugiKent/loop-cli/internal/gh"
 	"github.com/SugiKent/loop-cli/internal/model"
@@ -16,8 +17,8 @@ import (
 
 var nKey = runeKey('n')
 
-// newDraft は確認画面まで進むときに使う下書き（1 行目がタイトル、空行を挟んで本文）。
-const newDraft = "キュー画面の色を見直す\n\n種別の色が背景色と競合している。"
+// newDraft は確認画面まで進むときに使う下書き（プレースホルダー行 2 本で分かれる形）。
+const newDraft = "タイトル（この下の行に入力してください）\nキュー画面の色を見直す\n\n概要（この下に入力してください）\n種別の色が背景色と競合している。\n"
 
 // failingCreateIssue は CreateIssue だけが失敗する client。
 type failingCreateIssue struct{ *gh.Fake }
@@ -48,8 +49,8 @@ func TestNewIssueRepoIsWhatTheScreenShows(t *testing.T) {
 			t.Fatal("n でエディタが起動していない")
 		}
 		cmd()
-		if ed.initial != "" {
-			t.Errorf("エディタに渡した初期テキスト = %q, want 空", ed.initial)
+		if ed.initial != action.NewIssueDraft {
+			t.Errorf("エディタに渡した初期テキスト = %q, want %q", ed.initial, action.NewIssueDraft)
 		}
 		if m.newIssue.repo != "org/app" {
 			t.Errorf("作成先 = %q, want org/app", m.newIssue.repo)
@@ -77,8 +78,8 @@ func TestNewIssueRepoIsWhatTheScreenShows(t *testing.T) {
 				if m.newIssue.repo != "org/app" {
 					t.Errorf("作成先 = %q, want org/app", m.newIssue.repo)
 				}
-				if ed.initial != "" {
-					t.Errorf("エディタに渡した初期テキスト = %q, want 空", ed.initial)
+				if ed.initial != action.NewIssueDraft {
+					t.Errorf("エディタに渡した初期テキスト = %q, want %q", ed.initial, action.NewIssueDraft)
 				}
 			})
 		}
@@ -122,6 +123,12 @@ func TestNewIssueChecksEditedDraft(t *testing.T) {
 				t.Errorf("確認画面に %q が無い:\n%s", want, text)
 			}
 		}
+		// 案内の文言が確認画面に出るなら、それは title か body に混ざっている（GitHub へ出ていく）。
+		for _, ng := range []string{"タイトル（この下の行に入力してください）", "概要（この下に入力してください）"} {
+			if strings.Contains(text, ng) {
+				t.Errorf("確認画面にプレースホルダー行 %q が残っている:\n%s", ng, text)
+			}
+		}
 		if len(fake.Calls) != 0 {
 			t.Errorf("確認前に作成している: %+v", fake.Calls)
 		}
@@ -131,8 +138,18 @@ func TestNewIssueChecksEditedDraft(t *testing.T) {
 		edited editedMsg
 		want   string
 	}{
-		"タイトルが空":  {edited: editedMsg{text: "\n本文だけ書いた"}, want: "作成を中止しました（タイトルが空）"},
-		"本文が空":    {edited: editedMsg{text: "タイトルだけ書いた"}, want: "作成を中止しました（本文が空）"},
+		"プレースホルダー行が無い": {
+			edited: editedMsg{text: "キュー画面の色を見直す\n\n種別の色が背景色と競合している。"},
+			want:   "作成を中止しました（プレースホルダー行が見つかりません）",
+		},
+		"タイトルが空": {
+			edited: editedMsg{text: "タイトル（この下の行に入力してください）\n\n概要（この下に入力してください）\n本文だけ書いた"},
+			want:   "作成を中止しました（タイトルが空）",
+		},
+		"本文が空": {
+			edited: editedMsg{text: "タイトル（この下の行に入力してください）\nタイトルだけ書いた\n\n概要（この下に入力してください）\n\n"},
+			want:   "作成を中止しました（本文が空）",
+		},
 		"エディタが失敗": {edited: editedMsg{err: errors.New("exit status 1")}, want: "エディタ: exit status 1"},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -156,7 +173,7 @@ func TestNewIssueChecksEditedDraft(t *testing.T) {
 	}
 
 	t.Run("マーカーを含む下書きは作成の選択肢が出ない", func(t *testing.T) {
-		m, fake := answerModel(exampleResult(t).Cards, &stubEditor{msg: editedMsg{text: "タイトル\n<!-- routine -->\n本文"}})
+		m, fake := answerModel(exampleResult(t).Cards, &stubEditor{msg: editedMsg{text: "タイトル（この下の行に入力してください）\nタイトル\n\n概要（この下に入力してください）\n<!-- routine -->\n本文"}})
 		m = newIssueConfirm(t, m)
 
 		text := plainText(m)
@@ -213,6 +230,7 @@ func TestNewConfirmKeys(t *testing.T) {
 			t.Fatal("e でエディタが起動していない")
 		}
 		cmd()
+		// 渡すのは分割前の下書きそのもの。プレースホルダー行が落ちると、開き直した下書きが分割できない。
 		if ed.initial != newDraft {
 			t.Errorf("エディタに渡した下書き = %q, want %q", ed.initial, newDraft)
 		}

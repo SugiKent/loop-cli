@@ -336,7 +336,7 @@ func TestConfirmKeys(t *testing.T) {
 // 経路を取り違えると、issue の下書きが直前の回答対象へコメントとして投稿される。
 func TestEditRouteSeparatesAnswerFromNewIssue(t *testing.T) {
 	t.Run("n で始めた編集は回答として扱わない", func(t *testing.T) {
-		ed := &stubEditor{msg: editedMsg{text: "タイトル\n\n本文"}}
+		ed := &stubEditor{msg: editedMsg{text: newDraft}}
 		m, fake := answerModel([]model.Card{prCard(nil)}, ed)
 
 		m, cmd := send(m, nKey)

@@ -17,31 +17,69 @@ func (f failingCreateIssue) CreateIssue(context.Context, string, string, string)
 	return "", errors.New("gh issue create -R org/app: exit 1: HTTP 403")
 }
 
-// TestSplitNewIssueTakesFirstLineAsTitle は 1 行目がタイトル、残りが本文になることを検証する。
-func TestSplitNewIssueTakesFirstLineAsTitle(t *testing.T) {
+// TestSplitNewIssueSplitsAtPlaceholders は 2 本のプレースホルダー行を区切りに
+// タイトルと本文が分かれること、区切りが揃わない下書きを分割しないことを検証する。
+func TestSplitNewIssueSplitsAtPlaceholders(t *testing.T) {
 	for name, tc := range map[string]struct {
 		text      string
 		wantTitle string
 		wantBody  string
+		wantOK    bool
 	}{
-		"1 行目がタイトルになり空行が落ちる": {
-			text:      "n キーで issue を作る\n\n選択中の repo に作る。\n本文はここから。\n",
-			wantTitle: "n キーで issue を作る",
-			wantBody:  "選択中の repo に作る。\n本文はここから。",
+		"区切りに挟まれた行がタイトルになり下が本文になる": {
+			text:      "タイトル（この下の行に入力してください）\nキュー画面の色を見直す\n\n概要（この下に入力してください）\n種別の色が背景色と競合している。\n",
+			wantTitle: "キュー画面の色を見直す",
+			wantBody:  "種別の色が背景色と競合している。",
+			wantOK:    true,
 		},
-		"1 行だけの下書きは本文が空になる": {
-			text:      "  タイトルだけ  ",
-			wantTitle: "タイトルだけ",
-			wantBody:  "",
+		"初期の下書きの空行に書き足した形でも分割できる": {
+			text:      "タイトル（この下の行に入力してください）\nキュー画面の色を見直す\n概要（この下に入力してください）\n種別の色が背景色と競合している。\n",
+			wantTitle: "キュー画面の色を見直す",
+			wantBody:  "種別の色が背景色と競合している。",
+			wantOK:    true,
 		},
-		"空行から始まる下書きはタイトルが空になる": {
-			text:      "\n本文だけ書いた",
-			wantTitle: "",
-			wantBody:  "本文だけ書いた",
+		"本文は概要の区切りより下すべてになる": {
+			text:      "タイトル（この下の行に入力してください）\n色を見直す\n\n概要（この下に入力してください）\n\n背景色と競合している。\n\n直したい行は 2 つ。\n",
+			wantTitle: "色を見直す",
+			wantBody:  "背景色と競合している。\n\n直したい行は 2 つ。",
+			wantOK:    true,
+		},
+		"タイトルに複数行書かれたら半角空白 1 つで連結する": {
+			text:      "タイトル（この下の行に入力してください）\nキュー画面の色を見直す\n\n（配色）\n概要（この下に入力してください）\n本文",
+			wantTitle: "キュー画面の色を見直す （配色）",
+			wantBody:  "本文",
+			wantOK:    true,
+		},
+		"行末の空白と CRLF は区切りの判定に影響せず本文に \\r が残らない": {
+			text:      "タイトル（この下の行に入力してください）  \r\n色を見直す\r\n\r\n概要（この下に入力してください）\t\r\n背景色と競合している。\r\n直したい行は 2 つ。\r\n",
+			wantTitle: "色を見直す",
+			wantBody:  "背景色と競合している。\n直したい行は 2 つ。",
+			wantOK:    true,
+		},
+		"プレースホルダー行を消した下書きは分割できない": {
+			text: "キュー画面の色を見直す\n\n種別の色が背景色と競合している。",
+		},
+		"概要のプレースホルダー行だけが無い下書きも分割できない": {
+			text: "タイトル（この下の行に入力してください）\nキュー画面の色を見直す\n\n種別の色が背景色と競合している。",
+		},
+		"概要の区切りがタイトルの区切りより前にある下書きは分割できない": {
+			text: "概要（この下に入力してください）\n本文\n\nタイトル（この下の行に入力してください）\nタイトル",
+		},
+		"プレースホルダー行に書き足した下書きは分割できない": {
+			text: "タイトル（この下の行に入力してください）キュー画面の色を見直す\n\n概要（この下に入力してください）\n本文",
+		},
+		"案内の行を複製した下書きは分割できない": {
+			text: "タイトル（この下の行に入力してください）\nキュー画面の色を見直す\nタイトル（この下の行に入力してください）\n\n概要（この下に入力してください）\n本文",
+		},
+		"案内の文言を本文に引用した下書きは分割できない": {
+			text: "タイトル（この下の行に入力してください）\n案内の文言を直したい\n\n概要（この下に入力してください）\n概要（この下に入力してください）\nこの行の文言を変えたい",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			title, body := SplitNewIssue(tc.text)
+			title, body, ok := SplitNewIssue(tc.text)
+			if ok != tc.wantOK {
+				t.Fatalf("ok = %v, want %v", ok, tc.wantOK)
+			}
 			if title != tc.wantTitle {
 				t.Errorf("title = %q, want %q", title, tc.wantTitle)
 			}
@@ -49,6 +87,21 @@ func TestSplitNewIssueTakesFirstLineAsTitle(t *testing.T) {
 				t.Errorf("body = %q, want %q", body, tc.wantBody)
 			}
 		})
+	}
+}
+
+// TestNewIssueDraftCarriesBothPlaceholders は初期の下書きが区切り 2 本を持ち、
+// 書かずに保存するとタイトルも本文も空になることを検証する。
+func TestNewIssueDraftCarriesBothPlaceholders(t *testing.T) {
+	if NewIssueDraft != "タイトル（この下の行に入力してください）\n\n概要（この下に入力してください）\n\n" {
+		t.Fatalf("NewIssueDraft = %q", NewIssueDraft)
+	}
+	title, body, ok := SplitNewIssue(NewIssueDraft)
+	if !ok {
+		t.Fatalf("ok = false, want true（初期の下書きは自分で分割できなければならない）")
+	}
+	if title != "" || body != "" {
+		t.Errorf("title = %q, body = %q, want どちらも空", title, body)
 	}
 }
 
