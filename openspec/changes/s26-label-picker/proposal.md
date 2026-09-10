@@ -44,7 +44,8 @@ Refs #3
 - `internal/action`: `Target` を受け取ってラベル 1 つをトグルする関数（`ToggleTodo` の隣）と、触れないラベルの判定（`internal/action` の package doc が「不変条件の判定をここ 1 か所に置き、`internal/ui` は判定を持たずにこの層の関数を呼ぶ」と定めているため）
 - `docs/mvp/mvp.md`: キーバインド表（`l` の行、Q3 の結論）
 - `docs/domain/issue-driven-sdd/human-turn-signals.md`: 不変条件 2「TUI が書くラベルは `stage:todo` と `stage:propose` の 2 つに限る」と、冒頭の「`ai-assess:requested` を付け直すと AI 評価を走らせられるが、この TUI からは行わない」の 2 か所の改訂（Q1 の結論）
-- 先行 change との関係: 進行中の change は無く（`openspec/changes/` 直下は archive のみ）、open PR も無い。`l` は s17（カンバンビュー `v` / `h` / `l` / `←` / `→`）が予約しているキーで、s17 は未着手
+- `l` は s17（カンバンビュー `v` / `h` / `l` / `←` / `→`）が予約しているキーで、s17 は未着手
+- 並行して走っている propose との関係: `openspec/changes/` 直下に進行中の change は無いが、issue #2 / #4 / #5 / #6 が同時に propose 段階にある（それぞれ別セッション）。#4（`c` で close）と #6（`n` で issue 作成）は同じく画面とキーを足すので `queue-screen` / `card-detail` / `help-screen` / `gh-client` / `gh-fake` の同じ Requirement を MODIFIED する。#2（タイトルの折り返し）は `card-detail` のヘッダを MODIFIED する。s22 が s21 に対して行ったのと同じく、**先に merge された change の delta を土台に写して MODIFIED を書き、実装と archive は merge 順に行う**。この change の UI 側 delta は回答を受けてから書くので、その時点の `origin/main` を見て土台を決める
 
 ## 確定した判断
 
