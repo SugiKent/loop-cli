@@ -15,6 +15,7 @@ var helpKeys = [][2]string{
 	{"a", "回答・コメント（$EDITOR を開く）"},
 	{"t", "stage:todo / To Do を付ける / 外す"},
 	{"m", "PR を merge する（確認あり）"},
+	{"n", "選択中の repo に issue を作る（確認あり）"},
 	{"o", "ブラウザで開く"},
 	{"u", "URL 一覧を開く"},
 	{"g", "PR ↔ issue を相互ジャンプ（詳細）"},

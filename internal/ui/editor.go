@@ -19,6 +19,24 @@ type editedMsg struct {
 	err  error
 }
 
+// editRoute は今の編集をどちらのキーで始めたか。editedMsg は経路を運ばないので Model が覚える。
+type editRoute int
+
+const (
+	routeAnswer   editRoute = iota // `a`（回答・コメント）
+	routeNewIssue                  // `n`（新しい issue）
+)
+
+// updateEdited は編集の完了を、エディタを開いた経路で振り分ける。
+// 経路はエディタを開くたびに記録し、作成・中止・エラーでは消さない
+// （消すと作成の確認画面の `e` から戻った編集が回答として投稿される）。
+func (m Model) updateEdited(msg editedMsg) (tea.Model, tea.Cmd) {
+	if m.route == routeNewIssue {
+		return m.updateNewEdited(msg)
+	}
+	return m.updateAnswerEdited(msg)
+}
+
 // errNoEditor は config の editor も $EDITOR も空のとき。
 var errNoEditor = errors.New("editor が設定されていません（config の editor か環境変数 EDITOR）")
 
@@ -45,8 +63,10 @@ func failedEdit(err error) tea.Cmd {
 }
 
 // writeTemp は initial を書いた一時ファイルを作り、そのパスを返す。
+// 名前を draft にするのは、この Editor を `a`（回答）と `n`（新しい issue）が共有するため。
+// エディタは開いているファイル名を人に見せる。
 func writeTemp(initial string) (string, error) {
-	f, err := os.CreateTemp("", "loop-cli-answer-*.md")
+	f, err := os.CreateTemp("", "loop-cli-draft-*.md")
 	if err != nil {
 		return "", err
 	}

@@ -299,7 +299,7 @@ func TestURLListIgnoresOtherKeys(t *testing.T) {
 	}
 	before := m.urls
 
-	for _, r := range []rune{'u', 'a', 't', 'o', '?', 'R', 'x', 'g', 'p', '2'} {
+	for _, r := range []rune{'u', 'a', 't', 'n', 'o', '?', 'R', 'x', 'g', 'p', '2'} {
 		var cmd tea.Cmd
 		m, cmd = send(m, runeKey(r))
 		if cmd != nil {

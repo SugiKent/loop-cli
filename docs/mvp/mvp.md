@@ -110,7 +110,7 @@ issue-label-driven（`To Do` / `In Progress` / `Done` の 3 ラベルだけで�
 | `t` | `stage:todo` を付ける / 外す（付け直しは dispatcher への「もう一度評価しろ」の合図） | `gh issue edit --add-label` / `--remove-label`（1 操作 1 ラベル） |
 | `s` | 順番を飛ばして即着手 | 確認 → `stage:todo` が付いていれば外す → `stage:propose` を付ける（段階ラベルは同時に 1 つ）。TUI が段階ラベルを書く唯一の強制操作 |
 | `m` | merge | ガード判定 → 確認 → `gh pr merge -R … --<method>` |
-| `n` | 新規 Issue 作成（フォーム: リポジトリ・タイトル・本文） | `gh issue create -R …`。段階ラベルは付けない |
+| `n` | 新規 Issue 作成。選択中の対象の repo に `$EDITOR` で作成（1 行目がタイトル、以降が本文）→ 確認 → 作成。repo は選ばせない | `gh issue create -R <選択中の repo>`。ラベルは付けない（段階ラベルも assignee も付けない） |
 | `o` | ブラウザで開く | `gh browse` / `open <url>` |
 | `u` | URL 一覧を開く（本文・コメント・review thread の URL を出典付きで並べ、選んで開く） | `open <url>`（macOS 以外は `xdg-open <url>`） |
 | `g` | PR ↔ issue を相互ジャンプ | `Refs #n` / `Closes #n` をパース |
@@ -172,6 +172,7 @@ notify: true                  # 人の出番が新しく増えたらデスクト
 
 | 日時 | 変更内容 | 理由 |
 | --- | --- | --- |
+| 2026-09-10-0800 | キーバインド表の `n` を「選択中の対象の repo に `$EDITOR` で作成」に変更（フォームでの repo 選択を廃止） | 気づいた瞬間に repo を選び直す往復を無くすため。作成先は画面が見せている対象から決まる（#6・s15-new-issue） |
 | 2026-09-10-0700 | 設定ファイルに `mode: sdd \| label` を、0 件ヒントの文言と「前提と未決事項」に issue-label-driven の扱いを追加 | `To Do` / `In Progress` / `Done` の 3 ラベルで進むリポジトリを同じキューに載せるため（#5） |
 | 2026-09-06-1200 | 画面構成にヘッダの `↑ update`（新しい版があるときの印）を追加 | `go install` で入れた後に更新に気づける手立てが無かったため（s23-self-update） |
 | 2026-09-06-0024 | キーバインド表に `u`（URL 一覧を開く）を追加 | PR / issue の本文に貼られた URL へ、GitHub を経由せずキーボードだけで到達できるようにするため（s22-url-picker） |

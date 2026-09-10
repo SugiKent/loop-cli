@@ -52,6 +52,7 @@ func (m Model) answerKey() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.answer = answerState{target: target, label: label, from: m.screen}
+	m.route = routeAnswer
 	m.writeStatus, m.writeStatusErr = "", false
 	return m, m.editor(action.AnswerTemplate(comments))
 }
@@ -90,9 +91,9 @@ func issueLabel(i *model.Issue) string { return fmt.Sprintf("%s #%d", i.Repo, i.
 
 func prLabel(p model.PR) string { return fmt.Sprintf("%s PR#%d", p.Repo, p.Number) }
 
-// updateEdited は編集の完了を扱う。投稿できる本文だけが投稿コマンドに進み、
+// updateAnswerEdited は `a` で始めた編集の完了を扱う。投稿できる本文だけが投稿コマンドに進み、
 // 不変条件 7 / 8 に触れる本文は確認画面へ回す。
-func (m Model) updateEdited(msg editedMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateAnswerEdited(msg editedMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case msg.err != nil:
 		m.writeStatus, m.writeStatusErr = "エディタ: "+msg.err.Error(), true
@@ -149,6 +150,7 @@ func (m Model) updateConfirmKey(key string) (tea.Model, tea.Cmd) {
 		return m.post(m.answer.draft)
 	case "e":
 		m.screen = m.answer.from
+		m.route = routeAnswer
 		return m, m.editor(m.answer.draft)
 	case "esc":
 		m.screen = m.answer.from

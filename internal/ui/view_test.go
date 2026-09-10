@@ -90,7 +90,8 @@ func TestFooterShowsOnlyImplementedKeys(t *testing.T) {
 	footer := lines[len(lines)-1]
 
 	order(t, footer, "Enter 開く", "a 回答", "t todo", "m merge", "o ブラウザ", "R 更新", "? ヘルプ", "u URL", "q 終了")
-	for _, ng := range []string{"j/k 移動", "1-4/Tab タブ", "Esc 戻る"} {
+	// n はキュー画面で動くがヒントには出さない（足すと 88 列になり、幅 80 で `q 終了` が常に切れる）。
+	for _, ng := range []string{"j/k 移動", "1-4/Tab タブ", "Esc 戻る", "n 新規"} {
 		if strings.Contains(footer, ng) {
 			t.Errorf("フッタに出さないキー %q がある: %q", ng, footer)
 		}
@@ -430,8 +431,8 @@ func TestHintWidths(t *testing.T) {
 		want int
 	}{
 		"キュー":   {newModel(nil).queueHint(), 80},
-		"PR 詳細": {Model{screen: screenPR}.detailHint(), 82},
-		"カード詳細": {card.detailHint(), 117},
+		"PR 詳細": {Model{screen: screenPR}.detailHint(), 90},
+		"カード詳細": {card.detailHint(), 125},
 	}
 	for name, tc := range cases {
 		if got := ansi.StringWidth(tc.hint); got != tc.want {
