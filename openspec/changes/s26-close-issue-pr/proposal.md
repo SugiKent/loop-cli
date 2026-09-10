@@ -13,7 +13,8 @@ close は取り消しに手間がかかる操作なので、`m`（merge）と同
 - 確認画面で `y` を押すと `gh issue close <n> -R <repo>` または `gh pr close <n> -R <repo>` を実行する
 - close の結果はフッタ右のステータスに出す。`Cards` は書き換えず、反映は `R` / 自動更新に任せる（`a` / `t` / `m` と同じ）
 - 書き込み中（コメント投稿 / ラベル切り替え / merge / close）は `c` を受け付けない。close の書き込み中も `t` / `a` / `m` / `c` を受け付けない
-- `?` ヘルプのキー一覧に `c` の行を足す（3 画面のフッタのヒントに足すかどうかは下記 Q2 が未確定）
+- `?` ヘルプのキー一覧に `c` の行を足し、キュー・カード詳細・PR 詳細のフッタのヒントに `c close` を `m merge` の次
+  （`PRs` が空のカード詳細では `t todo` の次）で足す
 - `docs/mvp/mvp.md` のキーバインド表に `c` の行を足し、変更履歴に 1 行足す（`c` は表に無いキーなので、`u` を足した s22 と同じ扱い）
 
 close にコメントを添える機能は入れない（コメントは `a` がある）。段階ラベルは触らない（human-turn-signals.md 不変条件 2
@@ -31,13 +32,14 @@ close にコメントを添える機能は入れない（コメントは `a` が
 - `gh-client`: `GHClient` に `CloseIssue` / `ClosePR` を足す（s03 の「後続 change が ADDED で Requirement を足して
   interface・`Client`・`Fake` を同時に拡張する」に従う ADDED）
 - `gh-fake`: `Fake` が記録する書き込みメソッドに `CloseIssue` / `ClosePR` が加わる
-- `queue-screen`: `c` が「何もしないキー」から「主体の close の確認画面を開く」に変わる。フッタ右のステータスの出所に
-  close の中止・実行が加わる
-- `card-detail`: 画面の状態が 7 つから 8 つ（close の確認画面を追加）になり、詳細画面の `c` の対象が決まる
+- `queue-screen`: `c` が「何もしないキー」から「主体の close の確認画面を開く」に変わる。フッタのヒントが 80 列から
+  89 列になり、右のステータスの出所に close の中止・実行が加わる。ヒントの幅が変わって Scenario
+  「幅 90 では取得中でもヒントとスピナーが両方出る」が成り立たなくなるので、フッタの Requirement は REMOVED + ADDED で
+  作り直す（Scenario 名に幅が入っており MODIFIED では書き直せない）
+- `card-detail`: 画面の状態が 7 つから 8 つ（close の確認画面を追加）になり、詳細画面の `c` の対象が決まる。
+  カード詳細・PR 詳細のフッタのヒントに `c close` が入る（126 列 / `PRs` 空で 78 列 / PR 詳細 91 列）
 - `help-screen`: 実装済みキーの一覧に `c` が入る
 - `todo-toggle`: 「書き込み中は `t` と `a` を受け付けない」の対象に `c` が加わる（Requirement 名は変えない）
-
-Q2 が選択肢 B に決まったときは、`queue-screen` と `card-detail` のフッタのキーヒントも Modified に加わる。
 
 ## Impact
 
@@ -50,7 +52,7 @@ Q2 が選択肢 B に決まったときは、`queue-screen` と `card-detail` �
   `routine-sweep` 手順 6 が「孤児 proposal」として人に reopen か取り下げかを問う（sweep は reopen しない）
 - コードは 3 か所を触る。`internal/gh` に `CloseIssue` / `ClosePR` を足し、`internal/action` に close のファイルを足し、
   `internal/ui` に `c` のキー処理と確認画面とステータスを足す。`cmd/loop-cli` の配線は変わらない（設定項目を増やさない）
-- `gh` は `y` の後に `gh issue close` または `gh pr close` を 1 回呼ぶ。読み取りは呼ばない（下記 Q1 が未確定）
+- `gh` は `y` の後に `gh issue close` または `gh pr close` を 1 回呼ぶ。読み取りを呼ぶかどうかは下記 Q1 が未確定
 - close された issue / PR は次の取得（`R` / 自動更新）で `gh search --state open` の結果から消え、キューの行としては落ちる
 - 書き込み後の対象 1 件再取得（D-002）は s18 の担当で、この change では行わない
 
@@ -73,6 +75,10 @@ Q2 が選択肢 B に決まったときは、`queue-screen` と `card-detail` �
   確認画面と、`Esc` で戻った先に残る
 - **`internal/ui/rows.go` の `row` は変えない**。`row` は close の対象に必要な値をすべて持っている（リポジトリ・番号・
   issue か PR か・タイトル・ラベル）。`row` にフィールドを足すと s08 `queue-screen` の spec に波及する
+- **フッタのヒントに `c close` を足す**（キュー 89 列 / カード詳細 126 列・`PRs` 空で 78 列 / PR 詳細 91 列）。
+  人の回答（PR #10 のコメント）で決まった。位置は `m merge` の次で、`PRs` が空のカード詳細では `t todo` の次に置く。
+  幅 90〜97 の端末では取得中や書き込み中にヒントが丸ごと消えるようになる（s14 がフッタを 80 列に伸ばしたときの
+  「キーを隠すよりキーを出すことを採った」と同じ引き換え）
 - **mvp.md のキーバインド表に `c` の行を足す**。`u` を足した s22（`openspec/changes/archive/2026-09-06-s22-url-picker/tasks.md` 5.5）と
   `↑ update` を足した s23 の前例に従う。`help-screen` の行順は「前半は mvp.md キーバインド表の順」なので、表に足さないと
   ヘルプの行を置く位置が決まらない。mvp.md「前提と未決事項」の「取り下げる・止める（段階ラベルを外す）」は `c` では
@@ -104,22 +110,4 @@ search の結果からしか Card を作らず、`model.PRFromSearch` は `State
   実機で確かめる）。取り直した `labels` と `state` で確認画面を作り、open でなければ `close できません: <State> です` を出して
   `y` を出さない。`wip` も最新が出る。代わりに `gh-client` spec と fixture（`internal/gh/testdata`）と型が変わり、
   `c` に 1 往復ぶんの待ちと失敗経路（取り直し中の画面移動）が増える
-- 依存: なし
-
-### Q2. 3 画面のフッタのヒントに `c close` を足すか
-
-issue #4 はヘルプ（`internal/ui/help.go`）だけを挙げている。フッタは画面ごとに動くキーを並べる場所で、書き込みのキー
-`a` / `t` / `m` はすべて出ている。ただしキュー画面のヒントは既に表示幅 80 列で、`Model` の既定幅 80 の端末では取得中や
-書き込み中にヒント全体が消える（フッタは両方入らないときステータスを優先する）。`c close` を足すと、ヒントの表示幅は
-キュー画面が 80 列から 89 列へ、カード詳細（PR あり）が 117 列から 126 列へ、カード詳細（PR なし）が 69 列から 78 列へ、
-PR 詳細が 82 列から 91 列へ伸びる。
-
-- 選択肢 A（推奨）: **フッタは変えず、ヘルプにだけ出す。** 幅 90〜97 の端末で「取得中でもヒントとスピナーが両方出る」
-  という今の振る舞いを保てる（`queue-screen` の Scenario「幅 90 では取得中でもヒントとスピナーが両方出る」がそれを固定している）。
-  spec の変更は `help-screen` の 1 本で済む
-- 選択肢 B: **3 画面とも `m merge` の次（PR なしのカード詳細は `t todo` の次）に `c close` を足す。** s14 がフッタを 80 列に
-  伸ばすときの「キーを隠すよりキーを出すことを採った」（queue-screen spec 132 行目、card-detail spec 194 行目）に忠実で、
-  `c` の入口が画面上に見える。代わりに幅 90〜97 の端末では取得中にヒントが丸ごと消えるようになり、上記の Scenario が
-  成り立たなくなる。openspec 1.13 の MODIFIED は既存 Scenario を落とせないので、`queue-screen` のフッタの Requirement を
-  REMOVED + ADDED で作り直す作業が加わる
 - 依存: なし
