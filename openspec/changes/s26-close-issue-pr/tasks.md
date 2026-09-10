@@ -1,7 +1,9 @@
 ## 1. close の呼び出し（internal/gh）
 
-- [ ] 1.0 `origin/main` の `openspec/changes/` を見て、先行 change `s26-issue-label-driven` が archive 済みかを確かめる
-      （`help-screen` の delta はその change の版を土台にしている。未 archive なら archive の順序を守る）
+- [ ] 1.0 `origin/main` の `openspec/specs/` と `openspec/changes/`（未 archive の change の delta）を読み、proposal の
+      Impact に挙げた 6 つの Requirement（`help-screen` 1 本 / `queue-screen` 2 本 / `card-detail` 2 本 / `todo-toggle` 1 本）の
+      delta を、そのときの最新の版から写し直す。`s15-new-issue` の `n` の行と `2026-09-10-s27-wrap-titles` の折り返しの
+      追記を消さないことを、`openspec validate --strict` の後に diff で確かめる
 
 - [ ] 1.1 `internal/gh/gh.go` の `GHClient` に `CloseIssue(ctx, repo, number)` と `ClosePR(ctx, repo, number)` を足す
 - [ ] 1.2 `internal/gh/client.go` に `Client.CloseIssue` / `Client.ClosePR` を実装する（引数は `issue close <n> -R <repo>` と
