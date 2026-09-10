@@ -1,0 +1,10 @@
+{
+  "body": "ラベル一覧の fixture 150。",
+  "comments": [],
+  "labels": [
+    {"name": "wip"}
+  ],
+  "number": 150,
+  "title": "fixture 150",
+  "url": "https://github.com/org/app/issues/150"
+}

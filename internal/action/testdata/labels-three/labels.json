@@ -1,0 +1,5 @@
+[
+  {"name": "apply", "description": "実装の PR", "color": "1d76db"},
+  {"name": "docs", "description": ".claude/ と docs/ だけの PR", "color": "0075ca"},
+  {"name": "wip", "description": "worker が作業中の印", "color": "fbca04"}
+]

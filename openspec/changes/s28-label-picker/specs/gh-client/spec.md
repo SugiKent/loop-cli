@@ -73,7 +73,7 @@ PR に対して `EditIssueLabels`（`gh issue edit`）を使ってはならな�
 3. `SearchPRs` と同じ引数で `gh search prs` を実行し、`search-prs.json` に入れる。PR 番号の一覧を得る
 4. 各 PR 番号 `n` について順に、`gh pr view <n> -R <repo> --json number,title,body,url,labels,isDraft,comments,mergeable,mergeStateStatus,statusCheckRollup,reviewDecision`（`ViewPR` と `ViewPRMergeState` のフィールドを合わせた 11 フィールド。s03 `gh-fake` の `pr-<n>.json` の定義どおり）と、`ReviewThreads` と同じ引数で実行し、`pr-<n>.json` / `pr-<n>-review-threads.json` に入れる
 
-5. `ListLabels` と同じ引数で `gh label list` を実行し、`labels.json` に入れる（s27 `label-picker` が `Fake` にラベルの一覧を読ませるため。リポジトリ単位の 1 ファイルなので、issue / PR の繰り返しの後に 1 回だけ実行する）
+5. `ListLabels` と同じ引数で `gh label list` を実行し、`labels.json` に入れる（s28 `label-picker` が `Fake` にラベルの一覧を読ませるため。リポジトリ単位の 1 ファイルなので、issue / PR の繰り返しの後に 1 回だけ実行する）
 
 `pr view` 以外の引数は対応する読み取りメソッドと同一でなければならない（引数の組み立てを共有する）。`pr view` は上記 11 フィールドの 1 回の出力で、`ViewPRMergeState` と同じ「`mergeable` が `UNKNOWN` なら `RetryWait`（既定 2 秒）後に 1 回だけ再取得」を通った後の標準出力を入れる（再取得の処理を `ViewPRMergeState` と共有する。fixture が `UNKNOWN` だらけになると局面 C を fixture でテストできないため）。map のキーは `Fake` がファイルを探す名前と同じ関数から組み立てる。
 `progress` は各ファイルの取得直前に 1 回、これから入れるファイル名を引数に呼ぶ（呼び出し側が進捗を表示するため。`pr view` の UNKNOWN 再取得で `gh` が 2 回走っても呼び出しは 1 回）。いずれかの実行が失敗したら、その時点のエラー（s03 の `*Error` またはデコードエラー）を返し、それ以降は実行しない。
@@ -92,7 +92,7 @@ PR に対して `EditIssueLabels`（`gh issue edit`）を使ってはならな�
 
 #### Scenario: open issue も open PR も無い
 - **WHEN** 実行関数が `search issues` と `search prs` に空配列 `[]` を返す状態で `Capture` を呼ぶ
-- **THEN** map のキーは `search-issues.json` と `search-prs.json` の 2 つだけで、実行関数は 2 回しか呼ばれない
+- **THEN** map のキーは `search-issues.json` と `search-prs.json` と `labels.json` の 3 つで、実行関数は 3 回しか呼ばれない（`labels.json` はリポジトリ単位なので issue / PR が 0 件でも採る）
 
 #### Scenario: 途中の gh 失敗で止まる
 - **WHEN** 実行関数が `issue view 108` に終了コード 1 と stderr を返す状態で `Capture` を呼ぶ

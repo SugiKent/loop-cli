@@ -71,6 +71,11 @@ type Model struct {
 	helpFrom screen // ヘルプ画面を開いた画面。? / Esc で戻る先
 	urls     urlListState
 
+	labelPicker labelPickerState
+	// repoLabels はリポジトリ名 -> そのリポジトリのラベル。R でも自動更新でも捨てない
+	// （ラベルの集合はセッション中にまず変わらないので、L を押すたびに gh を呼ばない）。
+	repoLabels map[string][]gh.RepoLabel
+
 	answer         answerState
 	merge          mergeState
 	newIssue       newIssueState
@@ -220,6 +225,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case openedURLMsg:
 		return m.updateOpenedURL(msg), nil
 
+	case labelsFetchedMsg:
+		return m.updateLabelsFetched(msg), nil
+
+	case labelsEditedMsg:
+		return m.updateLabelsEdited(msg), nil
+
 	case refreshTickMsg:
 		return m.updateTick()
 
@@ -249,8 +260,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.screen == screenURL {
 			return m.updateURLKey(key)
 		}
+		// ラベル一覧画面は u より先に振り分ける（後ろだと一覧の上の u で変更予定が失われる）。
+		if m.screen == screenLabels {
+			return m.updateLabelKey(key)
+		}
 		if key == "u" {
 			return m.urlKey()
+		}
+		// L は一覧画面の分岐の後・a / t / m / o / ? の前に置く
+		// （前だと戻り先が一覧自身に上書きされ、後ろだと一覧の裏の対象へ書き込みが起きる）。
+		if key == "L" {
+			return m.labelKey()
 		}
 		// a は 3 画面すべてで効き、対象は画面が見せているものに決まる。
 		if key == "a" {

@@ -15,21 +15,24 @@ var (
 
 // Call は Fake が記録した呼び出し。使わないフィールドはゼロ値のまま。
 type Call struct {
-	Method      string
-	Repo        string
-	Number      int
-	Body        string
-	Label       string
-	MergeMethod string
-	Title       string
-	CommentID   int64
-	URL         string
+	Method       string
+	Repo         string
+	Number       int
+	Body         string
+	Label        string
+	AddLabels    []string
+	RemoveLabels []string
+	MergeMethod  string
+	Title        string
+	CommentID    int64
+	URL          string
 }
 
 // fixture ファイル名。Fake の読み取りと Client.Capture の map キーが同じ名前を使う。
 const (
 	fixtureSearchIssues = "search-issues.json"
 	fixtureSearchPRs    = "search-prs.json"
+	fixtureLabels       = "labels.json"
 )
 
 func fixtureIssue(number int) string { return fmt.Sprintf("issue-%d.json", number) }
@@ -140,6 +143,17 @@ func (f *Fake) LabelTimeline(_ context.Context, _ string, number int) ([]LabelEv
 	return decodeLabelEvents(b)
 }
 
+// ListLabels は読み取りだが Calls に記録する。Fake は repo 引数でファイルを探さないので、
+// リポジトリ単位のキャッシュが 2 回目に gh を呼ばないことはこの記録の件数でしか検証できない。
+func (f *Fake) ListLabels(_ context.Context, repo string) ([]RepoLabel, error) {
+	f.record(Call{Method: "ListLabels", Repo: repo})
+	b, err := f.read(fixtureLabels)
+	if err != nil {
+		return nil, err
+	}
+	return decodeRepoLabels(b)
+}
+
 func (f *Fake) CommentIssue(_ context.Context, repo string, number int, body string) error {
 	f.record(Call{Method: "CommentIssue", Repo: repo, Number: number, Body: body})
 	return nil
@@ -157,6 +171,18 @@ func (f *Fake) AddLabel(_ context.Context, repo string, number int, label string
 
 func (f *Fake) RemoveLabel(_ context.Context, repo string, number int, label string) error {
 	f.record(Call{Method: "RemoveLabel", Repo: repo, Number: number, Label: label})
+	return nil
+}
+
+// EditIssueLabels / EditPRLabels は Method を分けて記録する。issue へ書いたのか PR へ書いたのかを
+// テストが区別できるようにするため（不変条件 4）。add と remove が空でも 1 件記録する。
+func (f *Fake) EditIssueLabels(_ context.Context, repo string, number int, add, remove []string) error {
+	f.record(Call{Method: "EditIssueLabels", Repo: repo, Number: number, AddLabels: add, RemoveLabels: remove})
+	return nil
+}
+
+func (f *Fake) EditPRLabels(_ context.Context, repo string, number int, add, remove []string) error {
+	f.record(Call{Method: "EditPRLabels", Repo: repo, Number: number, AddLabels: add, RemoveLabels: remove})
 	return nil
 }
 

@@ -14,7 +14,8 @@ loop-cli の分類器（`internal/classify`）と action 層はこの文書を�
 
 上流が定める人の役割は 3 つだけ。**`stage:todo` を付ける / `question` が付いた PR・issue にコメントで答える / PR を merge する。**
 `blocked` / `question` / 段階ラベルの付け外しと worker の再起動は routine（dispatcher / sweep）が行い、人はラベルを触らない。
-`ai-assess:requested` を付け直すと PR の AI 評価をもう一度走らせられるが、この TUI からは行わない（人の出番を並べるのが役目）。
+`ai-assess:requested` を付け直すと PR の AI 評価をもう一度走らせられる。これは `L`（ラベル一覧）から付け直せる
+（`L` はリポジトリのラベルを制限なく扱う。#3 の回答で決まった）。
 
 | # | 人の役割 | 検知シグナル（すべて GitHub の状態だけで決まる） | TUI のアクション | 優先度 |
 | --- | --- | --- | --- | --- |
@@ -106,11 +107,15 @@ issue-driven-sdd を運用しているリポジトリを 1 つ読んで確認し
 
 すべて `gh` 経由。プラグインの規約に従う制約を action 層の不変条件にする。
 
-1. **ラベルは 1 つずつ付け外しする。** `--add-label` / `--remove-label` を 1 ラベルずつ別プロセスで呼び、ラベル集合の置換は行わない。
+1. **ラベル集合の置換は行わない。** `--add-label` / `--remove-label` だけを使い、渡さなかったラベルには触らない
+   （他の書き手が付けたラベルを消さない）。`t` は 1 ラベルずつ別プロセスで呼び、`L` の送信は 1 回の `gh` 実行で複数ラベルを変える。
    Routine のフィルターは書き込み後のラベル集合で判定され、増えたラベルの数だけイベントが出る（上流 `2b1b791` の実測）。
-   1 回に増やすラベルを 1 つに保てば、意図しない Routine を起こさずに済む。
-2. **TUI が書くラベルは `stage:todo` と、`s` の強制操作で付ける `stage:propose` の 2 つに限る。** `blocked` / `question` / `wip` /
-   `stage:apply` / `stage:archive` は書かない。人がラベルを触らない前提で dispatcher が状態機械を回しているため。
+   まとめて送るほうが意図しない Routine は起きにくいが、`gh` は「付ける」と「外す」を別の mutation として送るので**原子的ではなく**、
+   片方だけ通ることがある。また付けるほうが先に走るため、`stage:apply` を足して `wip` を外す送信は書き込み後の集合に `wip` が残った
+   状態で評価され、worker の Routine の `NOT_IN [wip]` に当たって**意図した起動も起きない**ことがある。
+2. **`t` の `stage:todo`、`s` の `stage:propose` に加えて、`L` で人が明示的に選んだラベルは書く。** `L` はリポジトリのラベルを
+   制限なく扱うので、`blocked` / `question` / `wip` / `stage:apply` / `stage:archive` も人の操作で書ける（#3 の回答）。
+   誤って段階ラベルを 2 つ付けた issue では、以後 `t` が `ErrMultipleStages` で拒否され続けるので、戻すのも `L` から行う。
 3. **`s` の「外して付け直す」は 2 呼び出しで行う。** `stage:todo` を外し、`gh issue view --json labels` で読み直してから `stage:propose` を付ける。
 4. **回答の書き先は 3 種類を混同しない。** grill の問い（PR 会話コメント）→ `gh pr comment`。issue の `question` → `gh issue comment`。
    review thread → REST replies。
@@ -128,6 +133,7 @@ issue-driven-sdd を運用しているリポジトリを 1 つ読んで確認し
 
 | 日時 | 変更内容 | 理由 |
 | --- | --- | --- |
+| 2026-09-10-0900 | 冒頭の `ai-assess:requested` の一文と不変条件 1・2 を `L`（ラベル一覧）に合わせて改訂。不変条件 1 を「ラベル集合の置換は行わない」に狭め、まとめ送信が原子的でないことと Routine の起動順の帰結を追記 | `L` が任意のラベルを 1 回の書き込みでまとめて変えるようになり、「1 ラベルずつ」「書くラベルは 2 つに限る」が事実と合わなくなったため（#3・s28-label-picker） |
 | 2026-09-10-0700 | issue-label-driven（`mode: label`）のシグナル対応表と、その方式でキューに入れないものを追加した | `To Do` / `In Progress` / `Done` の 3 ラベルで進むリポジトリを同じキューに載せるため（#5） |
 | 2026-09-07-1500 | 上流 `2b1b791` に同期。同期点を更新し、C の条件に `ai-assess:requested` なしを足し、キューに入れないものへ「2 回書きの途中の issue」と「AI 評価待ちの PR」を足し、不変条件 1 の理由をラベル集合による起動判定に書き直し、不変条件 5 に `ai-assess:requested` を足した | 上流が Routine の起動条件をラベル集合の判定に合わせて作り直し、ブロック解除と再起動を 2 回書きにし、PR の AI 評価を `ai-assess:requested` ラベルで起動する経路に変えたため |
 | 2026-09-05-1805 | 上流 `d8db3842` に同期。B を「`question` 付き issue にコメントするだけ」に変更、F を段階ラベル重複のみに縮小、G から `retro` を除外、進行中に「回答済み issue（sweep 待ち）」を追加、不変条件 2〜4 を人がラベルを触らない規約に合わせて書き直し | 上流が人の操作を `stage:todo` とコメントに限定し、issue の人待ちを `question` で可視化するようになったため |

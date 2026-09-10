@@ -608,11 +608,11 @@ func TestScrollResetsWhenMovingBetweenScreens(t *testing.T) {
 }
 
 func TestDetailFooters(t *testing.T) {
-	m, _ := send(detailModel(130, 40, []model.Card{longBodyCard()}), enterKey)
+	m, _ := send(detailModel(140, 40, []model.Card{longBodyCard()}), enterKey)
 
 	lines := linesOf(m)
 	footer := lines[len(lines)-1]
-	for _, want := range []string{"Esc 戻る", "Tab PR 選択", "x 展開", "a 回答", "t todo", "m merge", "n 新規", "o ブラウザ", "? ヘルプ", "u URL", "q 終了"} {
+	for _, want := range []string{"Esc 戻る", "Tab PR 選択", "x 展開", "a 回答", "t todo", "L ラベル", "m merge", "n 新規", "o ブラウザ", "? ヘルプ", "u URL", "q 終了"} {
 		if !strings.Contains(footer, want) {
 			t.Errorf("カード詳細のフッタに %q が無い: %q", want, footer)
 		}
@@ -626,7 +626,7 @@ func TestDetailFooters(t *testing.T) {
 	m, _ = send(m, enterKey)
 	lines = linesOf(m)
 	footer = lines[len(lines)-1]
-	for _, want := range []string{"Esc 戻る", "g issue へ", "a 回答", "m merge", "n 新規", "o ブラウザ", "? ヘルプ", "u URL", "q 終了"} {
+	for _, want := range []string{"Esc 戻る", "g issue へ", "a 回答", "L ラベル", "m merge", "n 新規", "o ブラウザ", "? ヘルプ", "u URL", "q 終了"} {
 		if !strings.Contains(footer, want) {
 			t.Errorf("PR 詳細のフッタに %q が無い: %q", want, footer)
 		}
@@ -695,7 +695,7 @@ func TestShortTerminalDropsPRList(t *testing.T) {
 		prOf(702, "OPEN", []string{model.LabelApply}),
 		prOf(703, "OPEN", []string{model.LabelArchive}),
 	}
-	m, _ := send(detailModel(130, 7, []model.Card{issueCard(issue, prs, "読む")}), enterKey)
+	m, _ := send(detailModel(140, 7, []model.Card{issueCard(issue, prs, "読む")}), enterKey)
 
 	lines := linesOf(m)
 	text := strings.Join(lines, "\n")

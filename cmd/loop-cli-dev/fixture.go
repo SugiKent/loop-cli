@@ -111,6 +111,9 @@ func verifyFixtures(ctx context.Context, dir string) (issues, prs int, err error
 	if err != nil {
 		return 0, 0, fmt.Errorf("自己検査に失敗しました: %w", err)
 	}
+	if _, err := f.ListLabels(ctx, ""); err != nil {
+		return 0, 0, fmt.Errorf("自己検査に失敗しました: %w", err)
+	}
 	for _, i := range is {
 		if _, err := f.ViewIssue(ctx, "", i.Number); err != nil {
 			return 0, 0, fmt.Errorf("自己検査に失敗しました: %w", err)

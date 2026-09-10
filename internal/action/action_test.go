@@ -41,7 +41,7 @@ func TestCommentWritesToTheKindOfTarget(t *testing.T) {
 			if len(client.Calls) != 1 {
 				t.Fatalf("呼び出し = %d 件, want 1: %+v", len(client.Calls), client.Calls)
 			}
-			if client.Calls[0] != tc.want {
+			if !reflect.DeepEqual(client.Calls[0], tc.want) {
 				t.Errorf("呼び出し = %+v, want %+v", client.Calls[0], tc.want)
 			}
 		})
@@ -101,7 +101,7 @@ func TestCommentAcceptsBlockedByLines(t *testing.T) {
 		t.Fatalf("Comment: %v", err)
 	}
 	want := gh.Call{Method: "CommentIssue", Repo: "org/app", Number: 108, Body: body}
-	if len(client.Calls) != 1 || client.Calls[0] != want {
+	if len(client.Calls) != 1 || !reflect.DeepEqual(client.Calls[0], want) {
 		t.Errorf("呼び出し = %+v, want 1 件の %+v", client.Calls, want)
 	}
 }

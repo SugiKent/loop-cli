@@ -17,6 +17,11 @@ func decodeSearchPRs(b []byte) ([]SearchPR, error) {
 	return v, json.Unmarshal(b, &v)
 }
 
+func decodeRepoLabels(b []byte) ([]RepoLabel, error) {
+	var v []RepoLabel
+	return v, json.Unmarshal(b, &v)
+}
+
 func decodeIssueDetail(b []byte) (*IssueDetail, error) {
 	var v IssueDetail
 	if err := json.Unmarshal(b, &v); err != nil {

@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -21,7 +22,7 @@ func browseModel(t *testing.T) (Model, *gh.Fake) {
 func wantBrowse(t *testing.T, fake *gh.Fake, number int) {
 	t.Helper()
 	want := gh.Call{Method: "Browse", Repo: "org/app", Number: number}
-	if len(fake.Calls) != 1 || fake.Calls[0] != want {
+	if len(fake.Calls) != 1 || !reflect.DeepEqual(fake.Calls[0], want) {
 		t.Fatalf("呼び出し = %+v, want [%+v]", fake.Calls, want)
 	}
 }
