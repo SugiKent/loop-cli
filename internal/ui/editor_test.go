@@ -3,6 +3,7 @@ package ui
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -38,6 +39,10 @@ func TestWriteTemp(t *testing.T) {
 
 	if !strings.HasSuffix(path, ".md") {
 		t.Errorf("一時ファイル名が .md で終わらない: %q", path)
+	}
+	// 名前は `a` と `n` のどちらの下書きでも読める draft にする（エディタが人に見せる）。
+	if !strings.HasPrefix(filepath.Base(path), "loop-cli-draft-") {
+		t.Errorf("一時ファイル名が loop-cli-draft- で始まらない: %q", path)
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {

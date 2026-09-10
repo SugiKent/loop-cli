@@ -243,10 +243,11 @@ func TestTodoStatusIsReplacedByNextToggle(t *testing.T) {
 	}
 }
 
-// TestWritingBlocksTodoAndAnswer は書き込み中の t / a がどちらも効かないことを検証する
-// （s10 answer-question「投稿中は a を無視」をラベル切り替え中と s14 の merge 中にも広げたもの）。
+// TestWritingBlocksTodoAndAnswer は書き込み中の t / a / m / n がどれも効かないことを検証する
+// （s10 answer-question「投稿中は a を無視」をラベル切り替え中・s14 の merge 中・
+// s15 の issue 作成中にも広げたもの）。
 func TestWritingBlocksTodoAndAnswer(t *testing.T) {
-	t.Run("切り替え中の t と a", func(t *testing.T) {
+	t.Run("切り替え中の t と a と n", func(t *testing.T) {
 		fake := gh.NewFake(fixtureDir)
 		ed := &stubEditor{msg: editedMsg{text: "Q1: A"}}
 		m := todoModel(fake, exampleResult(t).Cards, ed)
@@ -261,6 +262,9 @@ func TestWritingBlocksTodoAndAnswer(t *testing.T) {
 		}
 		if _, answered := send(m, aKey); answered != nil {
 			t.Error("切り替え中の a が無視されていない")
+		}
+		if _, created := send(m, nKey); created != nil {
+			t.Errorf("切り替え中の n が無視されていない: %T", created())
 		}
 		if ed.calls != 0 {
 			t.Errorf("エディタが起動している: %d 回", ed.calls)
@@ -283,6 +287,24 @@ func TestWritingBlocksTodoAndAnswer(t *testing.T) {
 		}
 		if _, answered := send(m, aKey); answered != nil {
 			t.Errorf("merge 中の a が無視されていない: %T", answered())
+		}
+		if len(fake.Calls) != 0 {
+			t.Errorf("呼び出し = %+v, want 空（コマンドをまだ実行していない）", fake.Calls)
+		}
+	})
+
+	t.Run("issue 作成中の t と a と m", func(t *testing.T) {
+		m, fake := answerModel(exampleResult(t).Cards, &stubEditor{msg: editedMsg{text: "タイトル\n\n本文"}})
+		m = newIssueConfirm(t, m)
+
+		m, cmd := send(m, runeKey('y'))
+		if cmd == nil {
+			t.Fatal("y で作成のコマンドが返っていない")
+		}
+		for _, k := range []rune{'t', 'a', 'm'} {
+			if _, ignored := send(m, runeKey(k)); ignored != nil {
+				t.Errorf("作成中の %c が無視されていない: %T", k, ignored())
+			}
 		}
 		if len(fake.Calls) != 0 {
 			t.Errorf("呼び出し = %+v, want 空（コマンドをまだ実行していない）", fake.Calls)

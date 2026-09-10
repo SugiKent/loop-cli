@@ -53,6 +53,8 @@ func (m Model) render() string {
 		return m.renderConfirm()
 	case screenMergeConfirm:
 		return m.renderMergeConfirm()
+	case screenNewConfirm:
+		return m.renderNewConfirm()
 	case screenCard, screenPR:
 		return m.renderDetail()
 	case screenHelp:

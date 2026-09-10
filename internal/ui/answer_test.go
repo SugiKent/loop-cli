@@ -331,6 +331,54 @@ func TestConfirmKeys(t *testing.T) {
 	})
 }
 
+// TestEditRouteSeparatesAnswerFromNewIssue は編集完了が始めたキーの経路で扱われることを検証する。
+// 経路を取り違えると、issue の下書きが直前の回答対象へコメントとして投稿される。
+func TestEditRouteSeparatesAnswerFromNewIssue(t *testing.T) {
+	t.Run("n で始めた編集は回答として扱わない", func(t *testing.T) {
+		ed := &stubEditor{msg: editedMsg{text: "タイトル\n\n本文"}}
+		m, fake := answerModel([]model.Card{prCard(nil)}, ed)
+
+		m, cmd := send(m, nKey)
+		m, _ = runCmd(t, m, cmd)
+
+		if m.screen != screenNewConfirm {
+			t.Errorf("画面 = %d, want 作成の確認", m.screen)
+		}
+		if len(fake.Calls) != 0 {
+			t.Errorf("回答として投稿している: %+v", fake.Calls)
+		}
+		if text := plainText(m); strings.Contains(text, "回答の確認:") {
+			t.Errorf("回答の確認画面になっている:\n%s", text)
+		}
+	})
+
+	t.Run("回答の確認画面の e から戻った編集完了は回答として投稿される", func(t *testing.T) {
+		const draft = "Q1: A\n  blocked-by: human"
+		ed := &stubEditor{msg: editedMsg{text: draft}}
+		m, fake := answerModel([]model.Card{prCard(nil)}, ed)
+		m, _ = answer(t, m)
+		if m.screen != screenConfirm {
+			t.Fatalf("確認画面に移っていない: screen = %d", m.screen)
+		}
+
+		ed.msg = editedMsg{text: "Q1: A"}
+		m, cmd := send(m, runeKey('e'))
+		m, cmd = runCmd(t, m, cmd)
+		if ed.initial != draft {
+			t.Errorf("エディタに渡した下書き = %q, want %q", ed.initial, draft)
+		}
+		m, _ = runCmd(t, m, cmd)
+
+		want := gh.Call{Method: "CommentPR", Repo: "org/app", Number: 131, Body: "Q1: A"}
+		if len(fake.Calls) != 1 || fake.Calls[0] != want {
+			t.Fatalf("呼び出し = %+v, want 1 件の %+v", fake.Calls, want)
+		}
+		if m.screen != screenQueue {
+			t.Errorf("画面 = %d, want キュー", m.screen)
+		}
+	})
+}
+
 // failingClient は投稿だけが失敗する client。
 type failingClient struct {
 	*gh.Fake
