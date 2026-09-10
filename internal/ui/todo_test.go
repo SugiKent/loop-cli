@@ -295,7 +295,7 @@ func TestWritingBlocksTodoAndAnswer(t *testing.T) {
 	})
 
 	t.Run("issue 作成中の t と a と m", func(t *testing.T) {
-		m, fake := answerModel(exampleResult(t).Cards, &stubEditor{msg: editedMsg{text: "タイトル\n\n本文"}})
+		m, fake := answerModel(exampleResult(t).Cards, &stubEditor{msg: editedMsg{text: newDraft}})
 		m = newIssueConfirm(t, m)
 
 		m, cmd := send(m, runeKey('y'))

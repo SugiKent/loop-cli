@@ -43,8 +43,9 @@ func (m Model) newKey() (tea.Model, tea.Cmd) {
 	}
 	m.newIssue = newIssueState{repo: repo, from: m.screen}
 	m.writeStatus, m.writeStatusErr = "", false
-	// 書式の案内を初期テキストに入れると、それがそのままタイトルになる（書式は確認画面が見せる）。
-	cmd := m.openEditor(routeNewIssue, "")
+	// 案内の 2 行そのものが分割の区切りなので、初期テキストに入れてもタイトルや本文には入らない。
+	// 文言は action が持つ（`a` が action.AnswerTemplate の結果を渡すのと同じ形）。
+	cmd := m.openEditor(routeNewIssue, action.NewIssueDraft)
 	return m, cmd
 }
 
@@ -70,8 +71,11 @@ func (m Model) updateNewEdited(msg editedMsg) (tea.Model, tea.Cmd) {
 		m.writeStatus, m.writeStatusErr = "エディタ: "+msg.err.Error(), true
 		return m, nil
 	}
-	title, body := action.SplitNewIssue(msg.text)
+	title, body, ok := action.SplitNewIssue(msg.text)
 	switch {
+	case !ok:
+		// 区切りが壊れた下書きからはタイトルも本文も導けないので、空の検査より先に見る。
+		m.writeStatus, m.writeStatusErr = "作成を中止しました（プレースホルダー行が見つかりません）", false
 	case title == "":
 		m.writeStatus, m.writeStatusErr = "作成を中止しました（タイトルが空）", false
 	case body == "":
