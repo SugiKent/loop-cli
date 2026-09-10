@@ -199,6 +199,26 @@ func TestFakeRecordsCommentPRBody(t *testing.T) {
 	}
 }
 
+// s26 の UI テストは「issue と PR で書き先を混同していないか」を Calls で見るので、
+// Method が種別ごとに分かれ、Repo と Number 以外がゼロ値であることを固定する。
+func TestFakeRecordsCloseIssueAndClosePR(t *testing.T) {
+	f := NewFake(exampleDir)
+	ctx := t.Context()
+	if err := f.CloseIssue(ctx, "org/app", 108); err != nil {
+		t.Fatalf("CloseIssue: %v", err)
+	}
+	if err := f.ClosePR(ctx, "org/app", 131); err != nil {
+		t.Fatalf("ClosePR: %v", err)
+	}
+	want := []Call{
+		{Method: "CloseIssue", Repo: "org/app", Number: 108},
+		{Method: "ClosePR", Repo: "org/app", Number: 131},
+	}
+	if !reflect.DeepEqual(f.Calls, want) {
+		t.Errorf("Calls = %+v, want %+v", f.Calls, want)
+	}
+}
+
 func TestFakeCreateIssueReturnsPlaceholderURL(t *testing.T) {
 	f := NewFake(exampleDir)
 	url, err := f.CreateIssue(t.Context(), "org/app", "タイトル", "本文")

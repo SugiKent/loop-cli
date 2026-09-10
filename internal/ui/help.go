@@ -16,6 +16,7 @@ var helpKeys = [][2]string{
 	{"t", "stage:todo / To Do を付ける / 外す"},
 	{"L", "ラベルを一覧から付け外し"},
 	{"m", "PR を merge する（確認あり）"},
+	{"c", "issue / PR を close する（確認あり）"},
 	{"n", "選択中の repo に issue を作る（確認あり）"},
 	{"o", "ブラウザで開く"},
 	{"u", "URL 一覧を開く"},

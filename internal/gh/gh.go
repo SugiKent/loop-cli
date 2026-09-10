@@ -27,6 +27,8 @@ type GHClient interface {
 	EditIssueLabels(ctx context.Context, repo string, number int, add, remove []string) error
 	EditPRLabels(ctx context.Context, repo string, number int, add, remove []string) error
 	MergePR(ctx context.Context, repo string, number int, method string) error
+	CloseIssue(ctx context.Context, repo string, number int) error
+	ClosePR(ctx context.Context, repo string, number int) error
 	CreateIssue(ctx context.Context, repo string, title string, body string) (string, error)
 	ReplyReviewThread(ctx context.Context, repo string, number int, commentID int64, body string) error
 	Browse(ctx context.Context, repo string, number int) error

@@ -1,11 +1,23 @@
 ## MODIFIED Requirements
 
 ### Requirement: Fake は書き込み呼び出しと ViewIssue を記録する
-`Fake` の書き込みメソッド（`CommentIssue` / `CommentPR` / `AddLabel` / `RemoveLabel` / `MergePR` / `CreateIssue` / `ReplyReviewThread` / `Browse` / `OpenURL` / `CloseIssue` / `ClosePR`）は `gh` を呼ばず、呼び出しをフィールド `Calls []Call` に呼び出し順で MUST 追記して nil を返す。`OpenURL` は `Method` が `OpenURL`、`URL` に受け取った URL を記録し、ブラウザ起動コマンドを実行しない。`CloseIssue` と `ClosePR` は `Method` にそれぞれ `CloseIssue` / `ClosePR` と、`Repo` と `Number` を記録する（s26 `close-issue-pr` のテストが「issue と PR で書き先を混同していないか」を `Calls` で検証するため）。読み取りのうち `ViewIssue` だけは `Calls` に `Method` が `ViewIssue`、`Repo`、`Number` を MUST 記録する（不変条件 3「`stage:todo` を外し、`gh issue view --json labels` で読み直してから `stage:propose` を付ける」の順序を s15 のテストで検証するため）。他の読み取りは記録しない。`Call` は `Method string`（メソッド名）/ `Repo string` / `Number int` / `Body string` / `Label string` / `MergeMethod string` / `Title string` / `CommentID int64` / `URL string` を持ち、使わないフィールドはゼロ値のままにする。`CreateIssue` は `https://github.com/<repo>/issues/0` を返す。テストは `Calls` を見て「どの引数で何回呼ばれたか」を検証する（不変条件 1「1 操作 1 ラベル」と不変条件 3 の検証手段）。
+`Fake` の書き込みメソッド（`CommentIssue` / `CommentPR` / `AddLabel` / `RemoveLabel` / `EditIssueLabels` / `EditPRLabels` / `MergePR` / `CreateIssue` / `ReplyReviewThread` / `Browse` / `OpenURL` / `CloseIssue` / `ClosePR`）は `gh` を呼ばず、呼び出しをフィールド `Calls []Call` に呼び出し順で MUST 追記して nil を返す。`OpenURL` は `Method` が `OpenURL`、`URL` に受け取った URL を記録し、ブラウザ起動コマンドを実行しない。`CloseIssue` と `ClosePR` は `Method` にそれぞれ `CloseIssue` / `ClosePR` と、`Repo` と `Number` を記録する（s26 `close-issue-pr` のテストが「issue と PR で書き先を混同していないか」を `Calls` で検証するため）。`EditIssueLabels` / `EditPRLabels` は `Repo` / `Number` に加えて `AddLabels` / `RemoveLabels` を受け取った並びのまま記録し、`Method` を分ける（不変条件 4「書き先を混同しない」を、issue へ書いたのか PR へ書いたのかとして検証できるようにするため）。`add` と `remove` がどちらも空のときも 1 件記録する（`Client` は `gh` を実行しないが、`Fake` は「呼ばれたかどうか」を検証の手がかりにするため）。読み取りのうち `ViewIssue` と `ListLabels` は `Calls` に MUST 記録する。`ViewIssue` は `Method` が `ViewIssue`、`Repo`、`Number`（不変条件 3「`stage:todo` を外し、`gh issue view --json labels` で読み直してから `stage:propose` を付ける」の順序を s15 のテストで検証するため）。`ListLabels` は `Method` が `ListLabels` と `Repo`（`Fake` は `repo` 引数でファイルを探さないので、`L` の一覧をリポジトリ単位でキャッシュして 2 回目に `gh` を呼ばないことは、この記録の件数でしか検証できないため）。他の読み取りは記録しない。`Call` は `Method string`（メソッド名）/ `Repo string` / `Number int` / `Body string` / `Label string` / `AddLabels []string` / `RemoveLabels []string` / `MergeMethod string` / `Title string` / `CommentID int64` / `URL string` を持ち、使わないフィールドはゼロ値のままにする。`CreateIssue` は `https://github.com/<repo>/issues/0` を返す。テストは `Calls` を見て「どの引数で何回呼ばれたか」を検証する（`t` の 1 操作 1 ラベルと、`L` の 1 送信 1 書き込みの検証手段）。
 
 #### Scenario: AddLabel の呼び出しが記録される
 - **WHEN** `AddLabel(ctx, "org/app", 108, "stage:todo")` を呼ぶ
 - **THEN** `Calls` は 1 件で、`Method` が `AddLabel`、`Repo` が `org/app`、`Number` が 108、`Label` が `stage:todo` である
+
+#### Scenario: ラベルの一括編集は付ける並びと外す並びごと記録される
+- **WHEN** `EditIssueLabels(ctx, "org/app", 108, []string{"docs", "wip"}, []string{"blocked"})` を呼ぶ
+- **THEN** `Calls` は 1 件で、`Method` が `EditIssueLabels`、`Repo` が `org/app`、`Number` が 108、`AddLabels` が `["docs", "wip"]`、`RemoveLabels` が `["blocked"]`、`Label` はゼロ値である
+
+#### Scenario: PR へのラベル書き込みは issue と別の Method で記録される
+- **WHEN** `EditPRLabels(ctx, "org/app", 131, []string{"docs"}, nil)` を呼ぶ
+- **THEN** `Calls` は 1 件で、`Method` が `EditPRLabels`、`Number` が 131、`AddLabels` が `["docs"]`、`RemoveLabels` が空である
+
+#### Scenario: ListLabels の呼び出しが記録される
+- **WHEN** `ListLabels(ctx, "org/app")` を 2 回呼ぶ
+- **THEN** `Calls` は 2 件で、どちらも `Method` が `ListLabels`、`Repo` が `org/app` であり、`Number` と `Label` はゼロ値である
 
 #### Scenario: 複数の書き込みが順に記録される
 - **WHEN** `RemoveLabel(ctx, "org/app", 108, "stage:todo")` の後に `AddLabel(ctx, "org/app", 108, "stage:propose")` を呼ぶ
@@ -30,15 +42,3 @@
 #### Scenario: CloseIssue と ClosePR の呼び出しが記録される
 - **WHEN** `CloseIssue(ctx, "org/app", 108)` の後に `ClosePR(ctx, "org/app", 131)` を呼ぶ
 - **THEN** `Calls` は 2 件で、`Method` は順に `CloseIssue` / `ClosePR`、`Repo` はどちらも `org/app`、`Number` は順に 108 と 131 であり、`Body` と `Label` はゼロ値である
-
-#### Scenario: ラベルの一括編集は付ける並びと外す並びごと記録される
-- **WHEN** `EditIssueLabels(ctx, "org/app", 108, []string{"docs", "wip"}, []string{"blocked"})` を呼ぶ
-- **THEN** `Calls` は 1 件で、`Method` が `EditIssueLabels`、`Repo` が `org/app`、`Number` が 108、`AddLabels` が `["docs", "wip"]`、`RemoveLabels` が `["blocked"]`、`Label` はゼロ値である
-
-#### Scenario: PR へのラベル書き込みは issue と別の Method で記録される
-- **WHEN** `EditPRLabels(ctx, "org/app", 131, []string{"docs"}, nil)` を呼ぶ
-- **THEN** `Calls` は 1 件で、`Method` が `EditPRLabels`、`Number` が 131、`AddLabels` が `["docs"]`、`RemoveLabels` が空である
-
-#### Scenario: ListLabels の呼び出しが記録される
-- **WHEN** `ListLabels(ctx, "org/app")` を 2 回呼ぶ
-- **THEN** `Calls` は 2 件で、どちらも `Method` が `ListLabels`、`Repo` が `org/app` であり、`Number` と `Label` はゼロ値である

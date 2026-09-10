@@ -344,6 +344,18 @@ func (c *Client) MergePR(ctx context.Context, repo string, number int, method st
 	return err
 }
 
+// CloseIssue と ClosePR は理由（--reason）もコメント（--comment）も渡さず、
+// ブランチの削除（--delete-branch）も行わない（s26 design.md）。
+func (c *Client) CloseIssue(ctx context.Context, repo string, number int) error {
+	_, err := c.run(ctx, "", "issue", "close", strconv.Itoa(number), "-R", repo)
+	return err
+}
+
+func (c *Client) ClosePR(ctx context.Context, repo string, number int) error {
+	_, err := c.run(ctx, "", "pr", "close", strconv.Itoa(number), "-R", repo)
+	return err
+}
+
 // CreateIssue は作成した issue の URL（標準出力の末尾行）を返す。
 func (c *Client) CreateIssue(ctx context.Context, repo string, title string, body string) (string, error) {
 	args := []string{"issue", "create", "-R", repo, "--title", title, "--body-file", "-"}
