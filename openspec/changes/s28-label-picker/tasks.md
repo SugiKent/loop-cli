@@ -14,7 +14,7 @@
 
 - [x] 2.1 fixture を手書きで作る。`internal/gh/testdata/fixtures/example/labels.json`（`stage:*` / `wip` / `blocked` / `question` / `propose` / `apply` / `archive` / `docs` / `ai-assess:requested` と、プロジェクト固有のラベル 1〜2 件。名前の昇順）と、`L` のテスト用の `internal/action/testdata/labels/`（`Labels` が `wip` の issue 150、`docs` の付いた issue 151、`labels.json` は `docs` と `wip` の 2 件）。ラベルの件数を変える 3 つ（`labels-empty/` = 0 件、`labels-three/` = 3 件、`labels-many/` = 30 件 `label-00`〜`label-29`）も同じ場所に置く。`../action/testdata/todo` と `testdata/merge` が同じやり方をしている
 - [x] 2.2 `internal/gh/capture.go` の `Capture` で `labels.json` を採り（issue / PR の繰り返しの後に 1 回）、`cmd/loop-cli-dev` の fixture capture の自己検査に `ListLabels` を足して要約のファイル数を直す
-- [x] 2.3 `internal/gh/capture_test.go`（map のキー 7 → 8、`progress` の順序）と `cmd/loop-cli-dev` の fixture のテスト（ファイル数 10 → 11）の期待値を直す
+- [x] 2.3 `internal/gh/capture_test.go` の期待値を直した（map のキー 7 → 8、`progress` の順序、issue / PR が 0 件のときの 2 → 3）。`cmd/loop-cli-dev` 側にファイル数を見ているテストは無く（要約は `len(redacted)` の動的値）、直す対象が無かった
 
 ## 3. 送信の action（internal/action）
 

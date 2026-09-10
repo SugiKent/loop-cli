@@ -129,6 +129,15 @@ func callsOf(fake *gh.Fake, method string) []gh.Call {
 	return out
 }
 
+// methodsOf は呼ばれた Method を呼び出し順に返す（失敗時に何が余分に呼ばれたか分かるように）。
+func methodsOf(fake *gh.Fake) []string {
+	out := make([]string, 0, len(fake.Calls))
+	for _, c := range fake.Calls {
+		out = append(out, c.Method)
+	}
+	return out
+}
+
 // TestLabelKeyTargetPerScreen は L の対象が画面の見せているものに決まることを検証する。
 func TestLabelKeyTargetPerScreen(t *testing.T) {
 	t.Run("キュー画面はラベルを取りに行く", func(t *testing.T) {
@@ -372,6 +381,25 @@ func TestLabelKeyDoesNothingOnOtherScreens(t *testing.T) {
 		}
 	})
 
+	t.Run("merge の確認画面", func(t *testing.T) {
+		base, fake := mergeModel(t, "testdata/merge", Options{})
+		m := confirmed(t, base)
+
+		m, cmd := send(m, lKey)
+
+		if cmd != nil {
+			t.Error("コマンドが返っている")
+		}
+		if m.screen != screenMergeConfirm {
+			t.Errorf("画面 = %d, want merge の確認", m.screen)
+		}
+		for _, c := range fake.Calls {
+			if c.Method == "ListLabels" {
+				t.Errorf("ラベルを取りに行っている: %v", methodsOf(fake))
+			}
+		}
+	})
+
 	t.Run("回答の確認画面", func(t *testing.T) {
 		m, fake := confirmModel(t)
 
@@ -445,8 +473,8 @@ func TestSpaceOnlyTogglesMark(t *testing.T) {
 	if !m.labelPicker.want["docs"] {
 		t.Errorf("変更予定 = %v, want docs を含む", m.labelPicker.want)
 	}
-	if got := callsOf(fake, "ListLabels"); len(fake.Calls) != len(got) {
-		t.Errorf("Calls = %+v, want ListLabels だけ", fake.Calls)
+	if got := methodsOf(fake); !reflect.DeepEqual(got, []string{"ListLabels"}) {
+		t.Errorf("呼ばれた Method = %v, want [ListLabels]", got)
 	}
 }
 
@@ -508,8 +536,8 @@ func TestLabelListIgnoresOtherKeys(t *testing.T) {
 			t.Errorf("%v で変更予定が動いた: %v", k, next.labelPicker.want)
 		}
 	}
-	if got := callsOf(fake, "ListLabels"); len(fake.Calls) != len(got) {
-		t.Errorf("Calls = %+v, want ListLabels だけ", fake.Calls)
+	if got := methodsOf(fake); !reflect.DeepEqual(got, []string{"ListLabels"}) {
+		t.Errorf("呼ばれた Method = %v, want [ListLabels]", got)
 	}
 	if ed.calls != 0 {
 		t.Errorf("エディタが %d 回開かれた", ed.calls)
@@ -692,6 +720,37 @@ func TestSubmitLabelsWritesOnce(t *testing.T) {
 	m, _ = send(m, lKey)
 	if m.labelPicker.want["docs"] || !m.labelPicker.want["wip"] {
 		t.Errorf("開き直した印 = %v, want wip だけ", m.labelPicker.want)
+	}
+}
+
+// TestSubmitLabelsWritesStageLabel は段階ラベルが L の経路から書けることを検証する。
+// この change で最もリスクを引き受けた振る舞い（#3 の回答 Q1: C）なので UI 経路でも押さえる。
+func TestSubmitLabelsWritesStageLabel(t *testing.T) {
+	// example の issue 108 は stage:propose と question。カード詳細から stage:apply を足す。
+	m, fake := exampleLabelModel(t, 120, 24)
+	m, _ = send(m, enterKey)
+	if m.screen != screenCard {
+		t.Fatalf("カード詳細に移っていない: screen = %d", m.screen)
+	}
+	m = openLabels(t, m)
+	m = selectLabel(t, m, "stage:apply")
+	m, _ = send(m, spaceKey)
+
+	m, cmd := send(m, enterKey)
+	if cmd == nil {
+		t.Fatal("Enter でコマンドが返らない")
+	}
+	m, _ = send(m, cmd())
+
+	want := []gh.Call{{
+		Method: "EditIssueLabels", Repo: "org/app", Number: 108,
+		AddLabels: []string{"stage:apply"},
+	}}
+	if got := callsOf(fake, "EditIssueLabels"); !reflect.DeepEqual(got, want) {
+		t.Errorf("書き込み = %+v, want %+v（段階ラベルは拒否しない）", got, want)
+	}
+	if footer := footerOf(plainText(m)); !strings.Contains(footer, "のラベルを更新しました（+stage:apply）") {
+		t.Errorf("フッタ = %q", footer)
 	}
 }
 

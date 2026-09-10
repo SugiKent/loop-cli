@@ -270,25 +270,29 @@ func TestFakeRecordsOpenURL(t *testing.T) {
 	}
 }
 
+// Fake は labels.json の並びをそのまま返す（gh の --sort に相当する並べ替えは行わない）。
 func TestFakeListLabels(t *testing.T) {
 	got, err := NewFake(exampleDir).ListLabels(t.Context(), "org/app")
 	if err != nil {
 		t.Fatalf("ListLabels: %v", err)
 	}
-	if len(got) == 0 {
-		t.Fatal("ラベルが 0 件")
-	}
-	// labels.json の並びをそのまま返す（gh の --sort に相当する並べ替えは行わない）。
-	if got[0].Name != "ai-assess:requested" {
-		t.Errorf("1 件目 = %+v, want ai-assess:requested", got[0])
-	}
+
+	var names []string
 	for _, l := range got {
-		if l.Name == "" || l.Color == "" {
-			t.Errorf("Name / Color が空のラベルがある: %+v", l)
-		}
+		names = append(names, l.Name)
 	}
-	if got[len(got)-1].Name != "wip" {
-		t.Errorf("最後 = %+v, want wip", got[len(got)-1])
+	want := []string{
+		"ai-assess:requested", "apply", "archive", "blocked", "docs", "p1", "propose",
+		"question", "stage:apply", "stage:archive", "stage:propose", "stage:todo", "tui", "wip",
+	}
+	if !reflect.DeepEqual(names, want) {
+		t.Errorf("名前の並び = %v, want %v", names, want)
+	}
+	first := RepoLabel{
+		Name: "ai-assess:requested", Description: "AI によるリスク評価を要求する PR", Color: "c5def5",
+	}
+	if len(got) > 0 && got[0] != first {
+		t.Errorf("1 件目 = %+v, want %+v", got[0], first)
 	}
 }
 

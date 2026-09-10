@@ -86,8 +86,9 @@ func (m Model) labelTarget() (action.Target, []string, bool) {
 }
 
 // openLabelPicker は「一覧を開く判定」。キャッシュに有った経路と取得した経路が合流する 1 か所で、
-// どちらを通っても結果は同じになる。
+// どちらを通っても結果は同じになる（古いステータスを消すのもここ 1 か所で行う）。
 func (m Model) openLabelPicker(labels []gh.RepoLabel) Model {
+	m.writeStatus, m.writeStatusErr = "", false
 	if len(labels) == 0 {
 		m.writeStatus, m.writeStatusErr = "ラベルがありません", false
 		return m
@@ -125,7 +126,6 @@ func (m Model) updateLabelsFetched(msg labelsFetchedMsg) Model {
 		m.repoLabels = map[string][]gh.RepoLabel{}
 	}
 	m.repoLabels[msg.repo] = msg.labels
-	m.writeStatus, m.writeStatusErr = "", false
 	return m.openLabelPicker(msg.labels)
 }
 
