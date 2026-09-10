@@ -265,7 +265,83 @@ func TestFakeRecordsOpenURL(t *testing.T) {
 	}
 
 	want := Call{Method: "OpenURL", URL: "https://example.com/design"}
-	if len(f.Calls) != 1 || f.Calls[0] != want {
+	if len(f.Calls) != 1 || !reflect.DeepEqual(f.Calls[0], want) {
 		t.Fatalf("呼び出し = %+v, want [%+v]", f.Calls, want)
+	}
+}
+
+func TestFakeListLabels(t *testing.T) {
+	got, err := NewFake(exampleDir).ListLabels(t.Context(), "org/app")
+	if err != nil {
+		t.Fatalf("ListLabels: %v", err)
+	}
+	if len(got) == 0 {
+		t.Fatal("ラベルが 0 件")
+	}
+	// labels.json の並びをそのまま返す（gh の --sort に相当する並べ替えは行わない）。
+	if got[0].Name != "ai-assess:requested" {
+		t.Errorf("1 件目 = %+v, want ai-assess:requested", got[0])
+	}
+	for _, l := range got {
+		if l.Name == "" || l.Color == "" {
+			t.Errorf("Name / Color が空のラベルがある: %+v", l)
+		}
+	}
+	if got[len(got)-1].Name != "wip" {
+		t.Errorf("最後 = %+v, want wip", got[len(got)-1])
+	}
+}
+
+func TestFakeMissingLabelsFixture(t *testing.T) {
+	_, err := NewFake(filepath.Join("testdata", "fixtures")).ListLabels(t.Context(), "org/app")
+	if err == nil {
+		t.Fatal("エラーが返らない")
+	}
+	if !strings.Contains(err.Error(), "labels.json") {
+		t.Errorf("エラー文字列にパスが無い: %v", err)
+	}
+}
+
+func TestFakeRecordsListLabels(t *testing.T) {
+	f := NewFake(exampleDir)
+	ctx := t.Context()
+	for range 2 {
+		if _, err := f.ListLabels(ctx, "org/app"); err != nil {
+			t.Fatalf("ListLabels: %v", err)
+		}
+	}
+	want := []Call{
+		{Method: "ListLabels", Repo: "org/app"},
+		{Method: "ListLabels", Repo: "org/app"},
+	}
+	if !reflect.DeepEqual(f.Calls, want) {
+		t.Errorf("Calls = %+v, want %+v", f.Calls, want)
+	}
+}
+
+func TestFakeRecordsEditIssueLabels(t *testing.T) {
+	f := NewFake(exampleDir)
+	err := f.EditIssueLabels(t.Context(), "org/app", 108, []string{"docs", "wip"}, []string{"blocked"})
+	if err != nil {
+		t.Fatalf("EditIssueLabels: %v", err)
+	}
+	want := []Call{{
+		Method: "EditIssueLabels", Repo: "org/app", Number: 108,
+		AddLabels: []string{"docs", "wip"}, RemoveLabels: []string{"blocked"},
+	}}
+	if !reflect.DeepEqual(f.Calls, want) {
+		t.Errorf("Calls = %+v, want %+v", f.Calls, want)
+	}
+}
+
+// PR へのラベル書き込みは issue と別の Method で記録される（不変条件 4）。
+func TestFakeRecordsEditPRLabels(t *testing.T) {
+	f := NewFake(exampleDir)
+	if err := f.EditPRLabels(t.Context(), "org/app", 131, []string{"docs"}, nil); err != nil {
+		t.Fatalf("EditPRLabels: %v", err)
+	}
+	want := []Call{{Method: "EditPRLabels", Repo: "org/app", Number: 131, AddLabels: []string{"docs"}}}
+	if !reflect.DeepEqual(f.Calls, want) {
+		t.Errorf("Calls = %+v, want %+v", f.Calls, want)
 	}
 }

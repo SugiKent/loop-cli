@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -310,7 +311,7 @@ func TestMergeSucceeds(t *testing.T) {
 	m, _ = runCmd(t, m, cmd)
 
 	want := gh.Call{Method: "MergePR", Repo: "org/app", Number: 131, MergeMethod: "squash"}
-	if len(fake.Calls) != 1 || fake.Calls[0] != want {
+	if len(fake.Calls) != 1 || !reflect.DeepEqual(fake.Calls[0], want) {
 		t.Fatalf("呼び出し = %+v, want 1 件の %+v", fake.Calls, want)
 	}
 	if text := plainText(m); !strings.Contains(text, "org/app PR#131 を merge しました") {

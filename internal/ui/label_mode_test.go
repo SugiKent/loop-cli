@@ -3,6 +3,7 @@ package ui
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -60,7 +61,7 @@ func TestTodoLabelModeWritesToDo(t *testing.T) {
 		t.Fatalf("呼び出し = %+v, want %+v", fake.Calls, want)
 	}
 	for i, w := range want {
-		if fake.Calls[i] != w {
+		if !reflect.DeepEqual(fake.Calls[i], w) {
 			t.Errorf("%d 件目 = %+v, want %+v", i+1, fake.Calls[i], w)
 		}
 	}

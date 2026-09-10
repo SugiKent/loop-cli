@@ -77,6 +77,7 @@ func TestCaptureFilesAndProgressOrder(t *testing.T) {
 		"issue-108.json", "issue-108-cross-refs.json", "issue-108-timeline.json",
 		"search-prs.json",
 		"pr-131.json", "pr-131-review-threads.json",
+		"labels.json",
 	}
 	if strings.Join(seen, ",") != strings.Join(want, ",") {
 		t.Errorf("progress の順序 = %v, want %v", seen, want)
@@ -115,6 +116,7 @@ func TestCaptureArgsMatchReadMethods(t *testing.T) {
 		"pr view 131 -R org/app --json number,title,body,url,labels,isDraft,comments," +
 			"mergeable,mergeStateStatus,statusCheckRollup,reviewDecision",
 		strings.Join(argsReviewThreads("org/app", 131), " "),
+		strings.Join(argsListLabels("org/app"), " "),
 	}
 	got := rec.joined()
 	if len(got) != len(want) {
@@ -185,11 +187,13 @@ func TestCaptureEmptyRepo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Capture: %v", err)
 	}
-	if len(files) != 2 || files["search-issues.json"] == nil || files["search-prs.json"] == nil {
-		t.Errorf("files = %v, want search 2 件だけ", files)
+	// labels.json はリポジトリ単位なので issue / PR が 0 件でも採る。
+	if len(files) != 3 || files["search-issues.json"] == nil || files["search-prs.json"] == nil ||
+		files["labels.json"] == nil {
+		t.Errorf("files = %v, want search 2 件と labels.json", files)
 	}
-	if len(rec.args) != 2 {
-		t.Errorf("実行回数 = %d, want 2", len(rec.args))
+	if len(rec.args) != 3 {
+		t.Errorf("実行回数 = %d, want 3", len(rec.args))
 	}
 }
 

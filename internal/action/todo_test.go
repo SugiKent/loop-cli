@@ -3,6 +3,7 @@ package action
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -110,7 +111,7 @@ func TestToggleTodo(t *testing.T) {
 				t.Fatalf("呼び出し = %+v, want %+v", client.Calls, tc.wantCalls)
 			}
 			for i, want := range tc.wantCalls {
-				if client.Calls[i] != want {
+				if !reflect.DeepEqual(client.Calls[i], want) {
 					t.Errorf("%d 件目 = %+v, want %+v", i+1, client.Calls[i], want)
 				}
 			}
@@ -175,7 +176,7 @@ func TestToggleTodoLabelMode(t *testing.T) {
 				t.Fatalf("呼び出し = %+v, want %+v", client.Calls, tc.wantCalls)
 			}
 			for i, want := range tc.wantCalls {
-				if client.Calls[i] != want {
+				if !reflect.DeepEqual(client.Calls[i], want) {
 					t.Errorf("%d 件目 = %+v, want %+v", i+1, client.Calls[i], want)
 				}
 			}

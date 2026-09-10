@@ -474,3 +474,85 @@ func TestRunBrowserMissingCommand(t *testing.T) {
 		}
 	}
 }
+
+func TestListLabelsArgsAndDecode(t *testing.T) {
+	rec := &recorder{outs: []string{
+		`[{"name":"docs","description":".claude/ と docs/ だけの PR","color":"0075ca"},` +
+			`{"name":"wip","description":"","color":"ededed"}]`,
+	}}
+	got, err := newTestClient(rec).ListLabels(t.Context(), "org/app")
+	if err != nil {
+		t.Fatalf("ListLabels: %v", err)
+	}
+	wantArgs(t, rec, "label list -R org/app --json name,description,color --sort name --order asc --limit 100")
+
+	want := []RepoLabel{
+		{Name: "docs", Description: ".claude/ と docs/ だけの PR", Color: "0075ca"},
+		{Name: "wip", Description: "", Color: "ededed"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ラベル = %+v, want %+v", got, want)
+	}
+}
+
+func TestListLabelsDecodeErrorNamesCommand(t *testing.T) {
+	rec := &recorder{outs: []string{"{"}}
+	_, err := newTestClient(rec).ListLabels(t.Context(), "org/app")
+	if err == nil {
+		t.Fatal("エラーが返らない")
+	}
+	for _, want := range []string{"label list", "decode"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("エラー文字列に %q が無い: %v", want, err)
+		}
+	}
+}
+
+func TestEditIssueLabelsRepeatsFlagsInOneRun(t *testing.T) {
+	rec := &recorder{}
+	err := newTestClient(rec).EditIssueLabels(t.Context(), "org/app", 108,
+		[]string{"docs", "wip"}, []string{"blocked"})
+	if err != nil {
+		t.Fatalf("EditIssueLabels: %v", err)
+	}
+	wantArgs(t, rec, "issue edit 108 -R org/app --add-label docs --add-label wip --remove-label blocked")
+}
+
+func TestEditPRLabelsUsesPREdit(t *testing.T) {
+	rec := &recorder{}
+	if err := newTestClient(rec).EditPRLabels(t.Context(), "org/app", 131, []string{"docs"}, nil); err != nil {
+		t.Fatalf("EditPRLabels: %v", err)
+	}
+	wantArgs(t, rec, "pr edit 131 -R org/app --add-label docs")
+}
+
+func TestEditIssueLabelsRemoveOnly(t *testing.T) {
+	rec := &recorder{}
+	if err := newTestClient(rec).EditIssueLabels(t.Context(), "org/app", 108, nil, []string{"question"}); err != nil {
+		t.Fatalf("EditIssueLabels: %v", err)
+	}
+	wantArgs(t, rec, "issue edit 108 -R org/app --remove-label question")
+}
+
+func TestEditIssueLabelsWithoutChangesDoesNotRunGh(t *testing.T) {
+	rec := &recorder{}
+	if err := newTestClient(rec).EditIssueLabels(t.Context(), "org/app", 108, nil, nil); err != nil {
+		t.Fatalf("EditIssueLabels: %v", err)
+	}
+	if rec.calls() != 0 {
+		t.Errorf("実行回数 = %d, want 0: %v", rec.calls(), rec.args)
+	}
+}
+
+func TestEditPRLabelsReturnsGhFailure(t *testing.T) {
+	rec := &recorder{err: &Error{Args: []string{"pr", "edit", "131"}, ExitCode: 1, Stderr: "HTTP 403"}}
+	err := newTestClient(rec).EditPRLabels(t.Context(), "org/app", 131, []string{"docs"}, nil)
+	if err == nil {
+		t.Fatal("エラーが返らない")
+	}
+	for _, want := range []string{"pr edit", "exit 1", "HTTP 403"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("エラー文字列に %q が無い: %v", want, err)
+		}
+	}
+}
