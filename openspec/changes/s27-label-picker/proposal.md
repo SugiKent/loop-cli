@@ -45,7 +45,9 @@ Refs #3
 - `docs/mvp/mvp.md`: キーバインド表に `L` の行と、変更履歴に 1 行
 - `docs/domain/issue-driven-sdd/human-turn-signals.md`: 不変条件 1 と 2、および冒頭の「`ai-assess:requested` は この TUI からは行わない」の 3 か所の改訂（後述）
 - `l` はカンバンの列移動（s17、未着手）の予約のまま残るので、`docs/mvp/mvp.md` の既存行は変えない
-- 並行して走っている propose との関係: `openspec/changes/` 直下に進行中の change は無いが、issue #2 / #4 / #5 / #6 が同時に propose 段階にある（それぞれ別セッション）。#4（`c` で close）と #6（`n` で issue 作成）は同じく画面とキーを足すので `queue-screen` / `card-detail` / `help-screen` / `gh-client` / `gh-fake` の同じ Requirement を MODIFIED する。#2（タイトルの折り返し）は `card-detail` のヘッダを MODIFIED する。s22 が s21 に対して行ったのと同じく、**先に merge された change の delta を土台に写して MODIFIED を書き、実装と archive は merge 順に行う**
+- 先行する change: issue #5 の `s26-issue-label-driven` が `origin/main` に merge され、`openspec/changes/` 直下に未実装のまま置かれている。これは `card-detail` / `help-screen` / `queue-screen` を含む 10 の capability を MODIFIED する。この change の UI 側 delta は **s26 の delta を土台に写して書き、実装と archive は s26 → s27 の順に行う**（s22 が s21 に対して行ったのと同じ）。番号を `s26` から `s27` に繰り上げたのは、`s26` を先に merge された change が使っているためである
+- `s26-issue-label-driven` が入ると、リポジトリは `sdd` と `label` の 2 方式を持ち、`t` が付けるラベルが方式で変わる（`stage:todo` / `To Do`）。`L` のラベル一覧はリポジトリが実際に持つラベルをそのまま並べるので、方式の分岐を持たずに両方で動く
+- 並行して走っている propose との関係: issue #2 / #4 / #6 が同時に propose 段階にある（それぞれ別セッション）。#4（`c` で close）と #6（`n` で issue 作成）は同じく画面とキーを足すので `queue-screen` / `card-detail` / `help-screen` / `gh-client` / `gh-fake` の同じ Requirement を MODIFIED する。#2（タイトルの折り返し）は `card-detail` のヘッダを MODIFIED する。UI 側 delta を書く時点の `origin/main` を見て、merge 済みのものを土台にする
 
 ## 確定した判断
 
