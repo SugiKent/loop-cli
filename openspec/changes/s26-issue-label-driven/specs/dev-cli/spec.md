@@ -2,7 +2,7 @@
 
 ### Requirement: classify は fixture を分類してキューを 4 タブ別にプレーンテキストで出す
 `loop-cli-dev classify --fixture <alias> [--mode sdd|label]` は、カレントディレクトリからの相対パス `internal/gh/testdata/fixtures/<alias>` を s03 の `gh.NewFake` で読み、全 open issue / open PR を s05 の `classify.Issue` / `classify.PR` で分類し、結果を標準出力に MUST 書く。live の `gh` は実行しない。
-- `--mode` は分類に使う運用方式で、既定は `sdd`。`sdd` / `label` 以外の値は、その値を含むエラーを返し、出力を書かない。読み込んだ全 issue / 全 PR の `Mode` にこの値を入れる（fixture は 1 リポジトリ 1 方式で採る）
+- `--mode` は分類に使う運用方式で、既定は `sdd`。`sdd` / `label` 以外の値は、その値を含むエラーを返し、出力を書かない。`classify.Issue` / `classify.PR` の呼び出しにこの値を渡す（fixture は 1 リポジトリ 1 方式で採る）
 - `internal/gh/testdata/fixtures` が存在しなければ、s04 `fixture capture` と同じくリポジトリのルートで実行するよう促すエラーを返す。`<alias>` ディレクトリが無ければ、そのパスを含むエラーを返す（どちらも `Fake` を呼ぶ前に確認する）
 - 入力の組み立ては s05 `human-turn-classify`「fixture と期待値表で分類器をテストする」と同じ: 各 issue は `model.IssueFromSearch` に `ViewIssue` の `Comments` を `model.CommentFrom` で入れ、各 PR は `model.PRFromSearch` に `ViewPR` の `Comments`、`ViewPRMergeState`、`ReviewThreads` を入れる。D-001 の遅延取得による絞り込みはしない（fixture は全詳細を持つ）。`Fake` の読み取りが 1 つでも失敗したら、そのエラーを返し、出力を書かない
 - Issue と PR の紐づけ（`classify.Card`）は行わない。行は issue 1 件または PR 1 件である

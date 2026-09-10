@@ -1,3 +1,34 @@
+## ADDED Requirements
+
+### Requirement: リポジトリごとの運用方式を設定から受け取る
+`internal/ui` の `Options` は `Modes map[string]model.Mode`（リポジトリ名 → 運用方式）を MUST 持ち、`Model` は方式が要るときに必ずこの表を引く。表に無いリポジトリは `model.Mode` のゼロ値（`sdd`）として扱う。`cmd/loop-cli` が `Config.Repos` から表を作って渡す（`MergeMethods` と同じ経路で、`internal/ui` は `internal/config` を import しない）。
+表示（カード詳細の段階行・バッジ・PR 一覧）と書き込み（`t` のラベル切り替え）は、どちらもこの表の方式を使う。`Cards` の中の値や前回のスナップショットから方式を決めない。スナップショットは前回の実行時の派生データであり、設定を変える前に保存された値が残るため、そこから方式を決めると設定と食い違ったラベルを書き込む経路ができる。
+
+#### Scenario: 表に無いリポジトリは sdd として扱う
+- **WHEN** `Options.Modes` が `org/board` だけを `label` にした `Model` で、`org/app` の issue の Card の詳細を開き、`View` を読む
+- **THEN** `org/app` の issue は sdd の語彙で表示される（`Labels` が `stage:propose` なら `段階: stage:propose`）
+
+#### Scenario: スナップショットの Card でも設定の方式で表示する
+- **WHEN** `Options.Snapshot` に前回の `Cards` を持たせ、`Options.Modes` が `org/board` を `label` にした `Model` を初回取得の前に描き、`org/board` の `In Progress` の issue の Card の詳細を開いて `View` を読む
+- **THEN** `段階: In Progress` が含まれる
+
+### Requirement: 方式の取り違えらしき状態をフッタで知らせる
+キュー画面は、取得が成功したとき、`sdd` として扱っているリポジトリに `To Do` または `In Progress` のラベルが付いた open issue が 1 件以上あれば、フッタのステータスに `<Repo> に To Do / In Progress の issue があります。mode: label の設定漏れかもしれません` を MUST 出す（複数のリポジトリが当たるときは、リポジトリ名の昇順で最初の 1 件だけ出す）。追加の `gh` 呼び出しはせず、取得済みの `Cards` のラベルだけで判定する。
+この知らせは、取得中・取得失敗・書き込みステータス・部分失敗のいずれかを出しているときは出さない（フッタのステータスは 1 つで、既存の表示を隠さない）。`label` として扱っているリポジトリについては何も出さない。
+方式を書き忘れた ILD リポジトリは、issue が段階ラベル無しに見えて局面 E（着手を承認する）に並び、`t` が `stage:todo` を書いてしまう。0 件のヒント（Requirement「取得が成功して Card が 0 件のときは表の領域にヒントを出す」）はカードが 1 件でもあれば出ないので、この状態を人に伝える経路が他に無い。
+
+#### Scenario: sdd 扱いのリポジトリに To Do があれば知らせる
+- **WHEN** `Options.Modes` が空の `Model` に、`org/board` の `Labels` が `To Do` の issue を持つ `Result` を取得完了として渡し、`View` から ANSI エスケープを除いて読む
+- **THEN** フッタに `org/board に To Do / In Progress の issue があります。mode: label の設定漏れかもしれません` が含まれる
+
+#### Scenario: label 扱いのリポジトリでは知らせない
+- **WHEN** `Options.Modes` が `org/board` を `label` にした `Model` に同じ `Result` を渡し、`View` を読む
+- **THEN** フッタに `設定漏れ` は含まれない
+
+#### Scenario: 部分失敗があればそちらを優先する
+- **WHEN** 同じ `Result` に `Errors` を 1 件持たせて取得完了として渡し、`View` を読む
+- **THEN** フッタに `詳細取得の失敗 1 件` が含まれ、`設定漏れ` は含まれない
+
 ## MODIFIED Requirements
 
 ### Requirement: 取得が成功して Card が 0 件のときは表の領域にヒントを出す
