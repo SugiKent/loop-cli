@@ -1,0 +1,24 @@
+[
+  {
+    "body": "取り込みをチャンクに分けた。\n\nCloses #61",
+    "isDraft": false,
+    "labels": [],
+    "number": 71,
+    "repository": {"name": "board", "nameWithOwner": "org/board"},
+    "title": "取り込みバッチを分割する",
+    "updatedAt": "2026-09-05T06:00:00Z",
+    "url": "https://github.com/org/board/pull/71"
+  },
+  {
+    "body": "既定権限を viewer にした。\n\nCloses #64",
+    "isDraft": false,
+    "labels": [
+      {"id": "LB_kwDOE", "name": "question", "color": "d876e3", "description": "確認事項あり"}
+    ],
+    "number": 72,
+    "repository": {"name": "board", "nameWithOwner": "org/board"},
+    "title": "招待ユーザーの既定権限を viewer にする",
+    "updatedAt": "2026-09-05T07:00:00Z",
+    "url": "https://github.com/org/board/pull/72"
+  }
+]

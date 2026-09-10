@@ -33,11 +33,15 @@ func classifyFixture(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("classify", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	alias := fs.String("fixture", "", "分類する fixture のディレクトリ名")
+	mode := fs.String("mode", string(model.ModeSDD), "分類に使う運用方式（sdd / label）")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if *alias == "" {
 		return fmt.Errorf("--fixture を指定してください")
+	}
+	if *mode != string(model.ModeSDD) && *mode != string(model.ModeLabel) {
+		return fmt.Errorf("--mode %q: sdd / label のいずれかを指定してください", *mode)
 	}
 	if fs.NArg() > 0 {
 		return fmt.Errorf("余分な引数があります: %q", fs.Arg(0))
@@ -50,7 +54,7 @@ func classifyFixture(args []string, stdout, stderr io.Writer) error {
 		return fmt.Errorf("fixture がありません: %w", err)
 	}
 
-	rows, err := classifyRows(context.Background(), dir)
+	rows, err := classifyRows(context.Background(), dir, model.Mode(*mode))
 	if err != nil {
 		return err
 	}
@@ -58,7 +62,7 @@ func classifyFixture(args []string, stdout, stderr io.Writer) error {
 }
 
 // classifyRows は fixture の全 open issue / PR を分類して行にする。Card 化はしない（s07 の担当）。
-func classifyRows(ctx context.Context, dir string) ([]row, error) {
+func classifyRows(ctx context.Context, dir string, mode model.Mode) ([]row, error) {
 	f := gh.NewFake(dir)
 	var rows []row
 
@@ -73,7 +77,7 @@ func classifyRows(ctx context.Context, dir string) ([]row, error) {
 			return nil, err
 		}
 		is.Comments = comments(detail.Comments)
-		rows = append(rows, newRow(classify.Issue(is), is.Repo, false, is.Number, is.Title, is.UpdatedAt))
+		rows = append(rows, newRow(classify.Issue(is, mode), is.Repo, false, is.Number, is.Title, is.UpdatedAt))
 	}
 
 	prs, err := f.SearchPRs(ctx, nil)
@@ -93,7 +97,7 @@ func classifyRows(ctx context.Context, dir string) ([]row, error) {
 		if pr.ReviewThreads, err = f.ReviewThreads(ctx, pr.Repo, pr.Number); err != nil {
 			return nil, err
 		}
-		rows = append(rows, newRow(classify.PR(pr), pr.Repo, true, pr.Number, pr.Title, pr.UpdatedAt))
+		rows = append(rows, newRow(classify.PR(pr, mode), pr.Repo, true, pr.Number, pr.Title, pr.UpdatedAt))
 	}
 	return rows, nil
 }

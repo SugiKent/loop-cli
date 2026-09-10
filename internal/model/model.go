@@ -24,6 +24,22 @@ const (
 	LabelWip          = "wip"
 )
 
+// issue-label-driven の段階ラベル。PR には段階ラベルが付かない。
+const (
+	LabelToDo       = "To Do"
+	LabelInProgress = "In Progress"
+	LabelDone       = "Done"
+)
+
+// Mode はリポジトリの運用方式。ゼロ値 "" は ModeSDD として扱う。
+// 設定（internal/config）が正本で、Issue / PR には持たせず引数で配る。
+type Mode string
+
+const (
+	ModeSDD   Mode = "sdd"
+	ModeLabel Mode = "label"
+)
+
 // Situation は human-turn-signals.md の判定表の行。ゼロ値 "" は未分類。
 type Situation string
 
@@ -178,8 +194,9 @@ func HasLabel(labels []string, name string) bool {
 }
 
 var (
-	issueStageOrder = []string{LabelStageTodo, LabelStagePropose, LabelStageApply, LabelStageArchive}
-	prStageOrder    = []string{LabelPropose, LabelApply, LabelArchive}
+	issueStageOrder      = []string{LabelStageTodo, LabelStagePropose, LabelStageApply, LabelStageArchive}
+	prStageOrder         = []string{LabelPropose, LabelApply, LabelArchive}
+	issueStageOrderLabel = []string{LabelToDo, LabelInProgress, LabelDone}
 )
 
 func stages(labels []string, order []string) []string {
@@ -192,11 +209,29 @@ func stages(labels []string, order []string) []string {
 	return out
 }
 
-// IssueStages は issue の段階ラベルを段階順で返す。
-func IssueStages(labels []string) []string { return stages(labels, issueStageOrder) }
+// IssueStages は方式ごとの issue の段階ラベルを段階順で返す。
+func IssueStages(mode Mode, labels []string) []string {
+	if mode == ModeLabel {
+		return stages(labels, issueStageOrderLabel)
+	}
+	return stages(labels, issueStageOrder)
+}
 
-// PRStages は PR の段階ラベルを段階順で返す。
-func PRStages(labels []string) []string { return stages(labels, prStageOrder) }
+// PRStages は PR の段階ラベルを段階順で返す。label 方式の PR に段階ラベルは付かない。
+func PRStages(mode Mode, labels []string) []string {
+	if mode == ModeLabel {
+		return nil
+	}
+	return stages(labels, prStageOrder)
+}
+
+// TodoLabel は人が着手を承認するときに付けるラベルを返す。
+func TodoLabel(mode Mode) string {
+	if mode == ModeLabel {
+		return LabelToDo
+	}
+	return LabelStageTodo
+}
 
 func labelNames(labels []gh.Label) []string {
 	var out []string

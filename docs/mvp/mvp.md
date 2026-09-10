@@ -1,8 +1,9 @@
 # loop-cli MVP
 
-最終更新: 2026-09-05-1805
+最終更新: 2026-09-10-0700
 
-issue-driven-sdd（Claude Code Routines が GitHub Issue のラベルで propose → apply → archive を回す構成）で、
+issue-driven-sdd（Claude Code Routines が GitHub Issue のラベルで propose → apply → archive を回す構成）と
+issue-label-driven（`To Do` / `In Progress` / `Done` の 3 ラベルだけで進む構成）で、
 **人の出番だけ**を複数リポジトリ横断で 1 本のキューに並べ、先頭から捌くための TUI。
 `gh` CLI をデータ層に使い、ローカルで動く。
 
@@ -126,13 +127,20 @@ issue-driven-sdd（Claude Code Routines が GitHub Issue のラベルで propose
 repos:
   - org/app
   - org/web
+  - name: org/board
+    mode: label               # sdd | label。既定 sdd。リポジトリごとの運用方式
 refresh_interval_sec: 120
 merge_method: squash          # squash | merge | rebase。リポジトリ別上書き可
 editor: $EDITOR
 notify: true                  # 人の出番が新しく増えたらデスクトップ通知
 ```
 
+`mode` はそのリポジトリの運用方式を指す。`sdd` は issue-driven-sdd（`stage:*` + `wip` + PR の段階ラベル）、
+`label` は issue-label-driven（`To Do` / `In Progress` / `Done` の 3 ラベル）である。省略すると `sdd` になる。
+2 方式のリポジトリは 1 本のキューに混ざり、同じ 4 タブ・同じキー操作・同じ優先度で捌ける。
+
 ラベル名と routine マーカーはプラグインの規約に固定し、設定で変えられるようにしない。分類器の正しさはこの規約に依存するため。
+方式を足すときも、その方式ぶんの語彙を持たせるだけで、ラベル名そのものは設定で変えられるようにしない。
 
 認証は `gh auth` を再利用する。トークンを設定ファイルに保存しない。
 
@@ -140,15 +148,17 @@ notify: true                  # 人の出番が新しく増えたらデスクト
 
 - `~/.config/loop-cli/config.yml` が無いときは、エラーで終了せず huh のフォームで `repos`（`owner/name` を 1 件以上。改行区切りで複数可）、`merge_method`（squash / merge / rebase、既定 squash）、`notify`（既定 true）、`editor`（既定 `$EDITOR`）を聞き、設定ファイルを書き出して、そのまま TUI を起動する。`refresh_interval_sec` は聞かず既定 120。
 - `gh` が無い、または `gh auth status` が失敗するときは、標準エラーに原因と次の一手（`gh` のインストール先 URL または `gh auth login`）を 1 行ずつ出して終了コード 1。
-- キューが 0 件（全タブ空）のときは、画面中央に「`stage:*` ラベルの無いリポジトリは何も出ません。issue-driven-sdd の `routines-setup` を回したリポジトリを設定してください」のヒントを出す（「前提と未決事項」の 1 項目目を利用者に見せる形）。
+- キューが 0 件（全タブ空）のときは、画面中央に「`stage:*` / `To Do` ラベルの無いリポジトリは何も出ません。issue-driven-sdd の `routines-setup` を回すか、`repos` に `mode: label` を設定してください」のヒントを出す（「前提と未決事項」の 1 項目目を利用者に見せる形）。onboarding のフォームは `mode` を聞かない（リポジトリごとの値を聞く形になっていないため。設定ファイルの手編集に委ねる）。
 - 設定ファイルが壊れているとき（YAML エラーや検証エラー）は onboarding に入らず、従来どおり原因を出して終了する（上書きしない）。
 
 ---
 
 ## 前提と未決事項
 
-- **`routines-setup` を回していないリポジトリは空**。`stage:*` ラベルが無いリポジトリを設定しても TUI には何も出ない。
-  最初の動作確認は稼働中のリポジトリ 1 件で行う。
+- **`routines-setup` を回していないリポジトリは空**。`stage:*` ラベルが無いリポジトリを `mode: sdd`（既定）で設定しても TUI には何も出ない。
+  issue-label-driven のリポジトリは `mode: label` を書けば `To Do` / `In Progress` / `Done` で分類される。どちらの規約も持たない
+  リポジトリは、issue が「着手を承認する」としてバックログに並ぶだけになる。最初の動作確認は稼働中のリポジトリ 1 件で行う。
+  `mode: label` の書き忘れは、`sdd` 扱いのリポジトリに `To Do` / `In Progress` の issue があればフッタで知らせる。
 - `question` ラベル（PR・issue とも）と `blocked` の付け外し、1 行目の N はプラグイン側（worker / dispatcher）が同期する規約。
   TUI は読むだけで書かない。TUI が書くラベルは `stage:todo` と `s` の `stage:propose` だけ。
 - 上流の「人が持つ操作」にある「取り下げる・止める（段階ラベルを外す）」は TUI に対応キーが無い。必要になったら追加する。
@@ -162,6 +172,7 @@ notify: true                  # 人の出番が新しく増えたらデスクト
 
 | 日時 | 変更内容 | 理由 |
 | --- | --- | --- |
+| 2026-09-10-0700 | 設定ファイルに `mode: sdd \| label` を、0 件ヒントの文言と「前提と未決事項」に issue-label-driven の扱いを追加 | `To Do` / `In Progress` / `Done` の 3 ラベルで進むリポジトリを同じキューに載せるため（#5） |
 | 2026-09-06-1200 | 画面構成にヘッダの `↑ update`（新しい版があるときの印）を追加 | `go install` で入れた後に更新に気づける手立てが無かったため（s23-self-update） |
 | 2026-09-06-0024 | キーバインド表に `u`（URL 一覧を開く）を追加 | PR / issue の本文に貼られた URL へ、GitHub を経由せずキーボードだけで到達できるようにするため（s22-url-picker） |
 | 2026-09-05-2130 | 「設定ファイル」節の直後に「初回起動（onboarding）」小節を追加（config.yml 無しはフォームで作成、gh 未認証の案内、空キューのヒント、壊れた設定は上書きしない） | 利用者要望。最初の起動は設定ファイルが無い状態から始まるため |

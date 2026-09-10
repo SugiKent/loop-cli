@@ -23,14 +23,16 @@ func latestIsAI(comments []model.Comment) (isAI bool, ok bool) {
 }
 
 // Issue は issue 1 件の局面を返す。評価順は「キューに入れないもの」→ 判定表 B / E / F → フォールバック。
-func Issue(is model.Issue) model.Result {
-	stages := model.IssueStages(is.Labels)
+// mode はそのリポジトリの運用方式（設定が正本。ゼロ値は sdd）。
+func Issue(is model.Issue, mode model.Mode) model.Result {
+	stages := model.IssueStages(mode, is.Labels)
 	question := model.HasLabel(is.Labels, model.LabelQuestion)
 	blocked := model.HasLabel(is.Labels, model.LabelBlocked)
 	aiLatest, hasComments := latestIsAI(is.Comments)
 
-	// 規則 1: 段階ラベル 1 件 + wip。段階が 2 件以上なら当たらず F になる。
-	if len(stages) == 1 && stages[0] != model.LabelStageTodo && model.HasLabel(is.Labels, model.LabelWip) {
+	// 規則 1: 作業中の段階ラベルが 1 件だけ。段階が 2 件以上なら当たらず F になる。
+	// label は In Progress が段階と作業中の印を兼ねるので、question を除かないと行 B に届かない。
+	if isWorking(mode, stages, is.Labels, question) {
 		return result(model.SituationInProgress, fmt.Sprintf("#%d は AI が作業中", is.Number))
 	}
 	// 規則 4: question で最新コメントが人（sweep が question を外すのを待っている）。
@@ -44,7 +46,7 @@ func Issue(is model.Issue) model.Result {
 
 	// 規則 6: 2 回書きの途中（段階ラベルが無く、最新の routine コメントが release: / restart: / advance:）。
 	// sweep が続きの段階ラベルを書くので、人に stage:todo を付けさせない。
-	if len(stages) == 0 && !blocked && model.IsMidRelabel(is.Comments) {
+	if len(stages) == 0 && !blocked && model.IsMidRelabel(mode, is.Comments) {
 		return result(model.SituationInProgress, fmt.Sprintf("#%d は段階ラベルの書き直し中。sweep 待ち", is.Number))
 	}
 
@@ -65,12 +67,24 @@ func Issue(is model.Issue) model.Result {
 	return result(model.SituationInProgress, fmt.Sprintf("#%d は進行中", is.Number))
 }
 
+// isWorking は規則 1（AI が作業中）に当たるかを返す。
+func isWorking(mode model.Mode, stages []string, labels []string, question bool) bool {
+	if len(stages) != 1 {
+		return false
+	}
+	if mode == model.ModeLabel {
+		return stages[0] == model.LabelInProgress && !question
+	}
+	return stages[0] != model.LabelStageTodo && model.HasLabel(labels, model.LabelWip)
+}
+
 // PR は open PR 1 件の局面を返す。OPEN 以外はゼロ値の Result を返す（分類対象は open だけ）。
-func PR(pr model.PR) model.Result {
+// mode はそのリポジトリの運用方式（設定が正本。ゼロ値は sdd）。
+func PR(pr model.PR, mode model.Mode) model.Result {
 	if pr.State != "OPEN" {
 		return model.Result{}
 	}
-	stages := model.PRStages(pr.Labels)
+	stages := model.PRStages(mode, pr.Labels)
 	question := model.HasLabel(pr.Labels, model.LabelQuestion)
 	aiLatest, hasComments := latestIsAI(pr.Comments)
 
@@ -86,33 +100,48 @@ func PR(pr model.PR) model.Result {
 		return result(model.SituationA, fmt.Sprintf("PR #%d の質問に答える", pr.Number))
 	}
 	// 規則 7: AI リスク評価が走っている最中。assess がラベルを外すまで merge 待ちにしない。
-	// 行 A の後に置くのは、質問が残っている PR では人の番が先だから。
-	if model.HasLabel(pr.Labels, model.LabelAIAssess) {
+	// 行 A の後に置くのは、質問が残っている PR では人の番が先だから。label にこのラベルは無い。
+	if mode != model.ModeLabel && model.HasLabel(pr.Labels, model.LabelAIAssess) {
 		return result(model.SituationInProgress, fmt.Sprintf("PR #%d は AI 評価待ち", pr.Number))
 	}
-	if isC(pr, stages, question) {
+	// label の行 C には本文 1 行目のゲートが無いので、先に C を見るとレビュー質問が緑の PR に埋もれる。
+	if mode == model.ModeLabel && isD(pr, mode) {
+		return result(model.SituationD, fmt.Sprintf("PR #%d のレビュー質問に答える", pr.Number))
+	}
+	if isC(pr, mode, stages, question) {
 		return result(model.SituationC, fmt.Sprintf("PR #%d を merge する", pr.Number))
 	}
-	if isD(pr) {
+	if mode != model.ModeLabel && isD(pr, mode) {
 		return result(model.SituationD, fmt.Sprintf("PR #%d のレビュー質問に答える", pr.Number))
 	}
 	if len(stages) >= 2 {
 		return result(model.SituationF, fmt.Sprintf("PR #%d に段階ラベルが 2 つ以上ある", pr.Number))
 	}
-	if model.HasLabel(pr.Labels, model.LabelDocs) && !question {
+	// 行 G: label に docs ラベルは無い。
+	if mode != model.ModeLabel && model.HasLabel(pr.Labels, model.LabelDocs) && !question {
 		return result(model.SituationG, fmt.Sprintf("docs PR #%d を merge する", pr.Number))
 	}
 	return result(model.SituationOther, fmt.Sprintf("PR #%d はどの局面にも当たらない", pr.Number))
 }
 
-// isC は行 C（段階 PR・未確定 0 件・question 無し・mergeable・checks 緑）を判定する。
+// isC は行 C（question 無し・mergeable・checks 緑）を判定する。対象の絞り込みは方式で分かれ、
+// sdd は段階ラベルと未確定 0 件、label は Closes #n（routine が作った PR の印）だけを見る。
 // IsDraft は見ない。draft の merge 拒否は s14 の merge ガードが持つ。
-func isC(pr model.PR, stages []string, question bool) bool {
-	if len(stages) == 0 || question {
+func isC(pr model.PR, mode model.Mode, stages []string, question bool) bool {
+	if question {
 		return false
 	}
-	if n, ok := model.ParseUndecided(pr.Body); !ok || n != 0 {
-		return false
+	if mode == model.ModeLabel {
+		if _, ok := model.ClosesIssue(pr.Body); !ok {
+			return false
+		}
+	} else {
+		if len(stages) == 0 {
+			return false
+		}
+		if n, ok := model.ParseUndecided(pr.Body); !ok || n != 0 {
+			return false
+		}
 	}
 	if pr.MergeState == nil || pr.MergeState.Mergeable != "MERGEABLE" {
 		return false
@@ -120,9 +149,14 @@ func isC(pr model.PR, stages []string, question bool) bool {
 	return ChecksGreen(pr.MergeState)
 }
 
-// isD は行 D（apply PR に未 resolve の review thread があり、thread 最終コメントが AI）を判定する。
-func isD(pr model.PR) bool {
-	if !model.HasLabel(pr.Labels, model.LabelApply) {
+// isD は行 D（未 resolve の review thread があり、thread 最終コメントが AI）を判定する。
+// 対象は sdd が apply PR、label が Closes #n を持つ PR。
+func isD(pr model.PR, mode model.Mode) bool {
+	if mode == model.ModeLabel {
+		if _, ok := model.ClosesIssue(pr.Body); !ok {
+			return false
+		}
+	} else if !model.HasLabel(pr.Labels, model.LabelApply) {
 		return false
 	}
 	for _, th := range pr.ReviewThreads {

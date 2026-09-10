@@ -1,0 +1,40 @@
+{
+  "body": "既定権限を viewer にした。\n\nCloses #64",
+  "comments": [
+    {
+      "id": "IC_kwDOB72",
+      "author": {"login": "user-1"},
+      "authorAssociation": "OWNER",
+      "body": "<!-- routine -->\n既定を viewer にしましたが、editor に変えますか。",
+      "createdAt": "2026-09-05T07:05:00Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/org/board/pull/72#issuecomment-4201",
+      "viewerDidAuthor": true
+    }
+  ],
+  "isDraft": false,
+  "labels": [
+    {"id": "LB_kwDOE", "name": "question", "color": "d876e3", "description": "確認事項あり"}
+  ],
+  "mergeStateStatus": "BLOCKED",
+  "mergeable": "MERGEABLE",
+  "number": 72,
+  "reviewDecision": "REVIEW_REQUIRED",
+  "statusCheckRollup": [
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-05T07:10:00Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/org/board/actions/runs/7201",
+      "name": "test",
+      "startedAt": "2026-09-05T07:06:00Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    }
+  ],
+  "title": "招待ユーザーの既定権限を viewer にする",
+  "url": "https://github.com/org/board/pull/72"
+}

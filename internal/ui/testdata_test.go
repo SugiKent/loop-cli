@@ -48,7 +48,7 @@ func (s *stubEditor) Editor(initial string) tea.Cmd {
 // exampleResult は example fixture から s07 の Fetch で作った Result。
 func exampleResult(t *testing.T) *fetch.Result {
 	t.Helper()
-	res, err := fetch.Fetch(context.Background(), gh.NewFake("../gh/testdata/fixtures/example"), []string{"org/app"})
+	res, err := fetch.Fetch(context.Background(), gh.NewFake("../gh/testdata/fixtures/example"), []string{"org/app"}, nil)
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}

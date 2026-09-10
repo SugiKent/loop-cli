@@ -10,15 +10,17 @@ import (
 	"github.com/SugiKent/loop-cli/internal/model"
 )
 
-// toggledMsg は 1 回の stage:todo 切り替えの完了。
+// toggledMsg は 1 回の承認ラベル切り替えの完了。todo は書いたラベル名。
 type toggledMsg struct {
 	label string
+	todo  string
 	added bool
 	err   error
 }
 
-// todoKey は `t`（stage:todo の切り替え）を扱う。対象は「画面に出ている Card の Issue」の 1 規則。
+// todoKey は `t`（承認ラベルの切り替え）を扱う。対象は「画面に出ている Card の Issue」の 1 規則。
 // 確認は出さない（取り消しはもう一度 `t`）。付けるか外すかは action.ToggleTodo が読み直して決める。
+// 書くラベルは設定由来の方式で決める（Card のラベルやスナップショットからは決めない）。
 func (m Model) todoKey() (tea.Model, tea.Cmd) {
 	if m.writing {
 		return m, nil
@@ -28,9 +30,11 @@ func (m Model) todoKey() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	label := issueLabel(issue)
+	mode := m.repoMode(issue.Repo)
+	todo := model.TodoLabel(mode)
 	m.writing = true
-	m.writeStatus, m.writeStatusErr = label+" の stage:todo を切り替え中", false
-	return m, toggleCmd(m.client, issue.Repo, issue.Number, label)
+	m.writeStatus, m.writeStatusErr = label+" の "+todo+" を切り替え中", false
+	return m, toggleCmd(m.client, issue.Repo, issue.Number, mode, label, todo)
 }
 
 // todoTarget は今の画面の切り替え対象の Issue を返す。PR 詳細と PR 単独の Card には対象が無い。
@@ -50,12 +54,12 @@ func (m Model) todoTarget() (*model.Issue, bool) {
 }
 
 // toggleCmd は action.ToggleTodo を別ゴルーチンで実行し、結果を toggledMsg で返す。
-func toggleCmd(client gh.GHClient, repo string, number int, label string) tea.Cmd {
+func toggleCmd(client gh.GHClient, repo string, number int, mode model.Mode, label, todo string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), postTimeout)
 		defer cancel()
-		added, err := action.ToggleTodo(ctx, client, repo, number)
-		return toggledMsg{label: label, added: added, err: err}
+		added, err := action.ToggleTodo(ctx, client, repo, number, mode)
+		return toggledMsg{label: label, todo: todo, added: added, err: err}
 	}
 }
 
@@ -65,11 +69,11 @@ func (m Model) updateToggled(msg toggledMsg) Model {
 	m.writing = false
 	switch {
 	case msg.err != nil:
-		m.writeStatus, m.writeStatusErr = msg.label+" の stage:todo を切り替えられません: "+msg.err.Error(), true
+		m.writeStatus, m.writeStatusErr = msg.label+" の "+msg.todo+" を切り替えられません: "+msg.err.Error(), true
 	case msg.added:
-		m.writeStatus, m.writeStatusErr = msg.label+" に stage:todo を付けました", false
+		m.writeStatus, m.writeStatusErr = msg.label+" に "+msg.todo+" を付けました", false
 	default:
-		m.writeStatus, m.writeStatusErr = msg.label+" から stage:todo を外しました", false
+		m.writeStatus, m.writeStatusErr = msg.label+" から "+msg.todo+" を外しました", false
 	}
 	return m
 }

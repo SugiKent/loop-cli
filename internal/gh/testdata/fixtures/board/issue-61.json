@@ -1,0 +1,10 @@
+{
+  "body": "取り込み処理が 30 秒を超える。",
+  "comments": [],
+  "labels": [
+    {"id": "LB_kwDOA", "name": "In Progress", "color": "1d76db", "description": "作業中"}
+  ],
+  "number": 61,
+  "title": "取り込みバッチを分割する",
+  "url": "https://github.com/org/board/issues/61"
+}
