@@ -56,6 +56,13 @@ func TestSplitNewIssueSplitsAtPlaceholders(t *testing.T) {
 			wantBody:  "背景色と競合している。\n直したい行は 2 つ。",
 			wantOK:    true,
 		},
+		"本文の行末の空白は残る": {
+			// Markdown は行末の空白 2 つを改行として読む。落とすと人が書いた改行が消える。
+			text:      "タイトル（この下の行に入力してください）\n色を見直す\n\n概要（この下に入力してください）\n1 行目です  \n2 行目です\n",
+			wantTitle: "色を見直す",
+			wantBody:  "1 行目です  \n2 行目です",
+			wantOK:    true,
+		},
 		"プレースホルダー行を消した下書きは分割できない": {
 			text: "キュー画面の色を見直す\n\n種別の色が背景色と競合している。",
 		},
