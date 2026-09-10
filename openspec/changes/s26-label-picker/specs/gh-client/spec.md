@@ -21,23 +21,42 @@
 - **WHEN** 標準出力に `{` を返すスタブに差し替えた `Client` で `ListLabels(ctx, "org/app")` を呼ぶ
 - **THEN** エラーが返り、エラー文字列に `label list` と `decode` を含む
 
-### Requirement: PR のラベルは gh pr edit で 1 つずつ付け外しする
+### Requirement: ラベルの一括編集は 1 回の gh 実行で付ける名前と外す名前を渡す
 
-`internal/gh` の `GHClient` interface は `AddLabelPR(ctx context.Context, repo string, number int, label string) error` と `RemoveLabelPR(ctx context.Context, repo string, number int, label string) error` を MUST 持つ。`Client` はそれぞれ `gh pr edit <number> -R <repo> --add-label <label>` と `gh pr edit <number> -R <repo> --remove-label <label>` を MUST 実行する。1 回の実行で渡すラベルは 1 つだけとする（不変条件 1「ラベルは 1 つずつ付け外しする」）。
+`internal/gh` の `GHClient` interface は次の 2 つを MUST 持つ。
 
-既存の `AddLabel` / `RemoveLabel`（`gh issue edit`）を PR 番号に対して使ってはならない。`gh issue edit` は内部で `issueOrPullRequest` を引くため PR 番号でも通るが、この挙動は `gh` のヘルプに書かれておらず、`Fake` が `gh` を起動しない以上、壊れてもテストが気づけない。`internal/gh` の他の PR 操作（`ViewPR` / `CommentPR` / `MergePR`）がすべて `pr` サブコマンドを使っていることにも揃える。
+- `EditIssueLabels(ctx context.Context, repo string, number int, add []string, remove []string) error`
+- `EditPRLabels(ctx context.Context, repo string, number int, add []string, remove []string) error`
 
-#### Scenario: PR にラベルを付ける引数
+`Client` はそれぞれ `gh issue edit <number> -R <repo>` と `gh pr edit <number> -R <repo>` を**ちょうど 1 回**実行し、`add` の各要素を `--add-label <名前>`、`remove` の各要素を `--remove-label <名前>` として、`add` → `remove` の順に受け取った並びのまま引数へ並べる。フラグは 1 名前につき 1 回ずつ繰り返し、コンマで連結しない（`gh` はコンマで分割するため、名前にコンマが含まれると壊れる）。`add` と `remove` がどちらも空のときは `gh` を実行せず nil を返す。
 
-- **WHEN** 実行を記録するスタブに差し替えた `Client` で `AddLabelPR(ctx, "org/app", 131, "docs")` を呼ぶ
-- **THEN** 記録された引数は `pr edit 131 -R org/app --add-label docs` である
+このメソッドは**ラベル集合の置換を行わない**。`--add-label` / `--remove-label` だけを使い、渡されなかったラベルには触れないので、他の書き手が付けたラベルは残る（不変条件 1 が守りたかったこと）。1 回の実行で複数のラベルが変わるため、GitHub は増えたラベルの数だけ `labeled` イベントを出す。
 
-#### Scenario: PR からラベルを外す引数
+PR に対して `EditIssueLabels`（`gh issue edit`）を使ってはならない。`gh issue edit` は内部で `issueOrPullRequest` を引くため PR 番号でも通るが、この挙動は `gh` のヘルプに書かれておらず、`Fake` が `gh` を起動しない以上、将来変わってもテストが気づけない。`internal/gh` の他の PR 操作（`ViewPR` / `CommentPR` / `MergePR`）がすべて `pr` サブコマンドを使っていることにも揃える。
 
-- **WHEN** 同じスタブで `RemoveLabelPR(ctx, "org/app", 131, "docs")` を呼ぶ
-- **THEN** 記録された引数は `pr edit 131 -R org/app --remove-label docs` である
+既存の `AddLabel` / `RemoveLabel`（1 ラベルずつの `gh issue edit`）はそのまま残る。s11 `todo-toggle` の `t` はそちらを使い続ける。
+
+#### Scenario: issue のラベルを 1 回の実行で足し引きする
+
+- **WHEN** 実行を記録するスタブに差し替えた `Client` で `EditIssueLabels(ctx, "org/app", 108, []string{"docs", "wip"}, []string{"blocked"})` を呼ぶ
+- **THEN** 実行はちょうど 1 回で、記録された引数は `issue edit 108 -R org/app --add-label docs --add-label wip --remove-label blocked` である
+
+#### Scenario: PR のラベルは pr edit で書く
+
+- **WHEN** 同じスタブで `EditPRLabels(ctx, "org/app", 131, []string{"docs"}, nil)` を呼ぶ
+- **THEN** 実行はちょうど 1 回で、記録された引数は `pr edit 131 -R org/app --add-label docs` である
+
+#### Scenario: 外すだけのときは add のフラグを出さない
+
+- **WHEN** 同じスタブで `EditIssueLabels(ctx, "org/app", 108, nil, []string{"question"})` を呼ぶ
+- **THEN** 記録された引数は `issue edit 108 -R org/app --remove-label question` である
+
+#### Scenario: どちらも空なら gh を実行しない
+
+- **WHEN** 同じスタブで `EditIssueLabels(ctx, "org/app", 108, nil, nil)` を呼ぶ
+- **THEN** nil が返り、`gh` を実行する関数は 1 回も呼ばれていない
 
 #### Scenario: gh の失敗はそのまま返る
 
-- **WHEN** 終了コード 1 と stderr `HTTP 403` を返すスタブに差し替えた `Client` で `AddLabelPR(ctx, "org/app", 131, "docs")` を呼ぶ
+- **WHEN** 終了コード 1 と stderr `HTTP 403` を返すスタブに差し替えた `Client` で `EditPRLabels(ctx, "org/app", 131, []string{"docs"}, nil)` を呼ぶ
 - **THEN** エラーが返り、エラー文字列に `pr edit`、`exit 1`、`HTTP 403` を含む
