@@ -405,7 +405,7 @@ func TestEmptyTabShowsHintAndEmptyPreview(t *testing.T) {
 	if !ok {
 		t.Fatalf("プレビュー領域の空文言が無い:\n%s", strings.Join(lines, "\n"))
 	}
-	if !(hint < sep && sep < empty) {
+	if hint >= sep || sep >= empty {
 		t.Errorf("ヒント(%d) / 区切り線(%d) / 空文言(%d) の順序が違う:\n%s", hint, sep, empty, strings.Join(lines, "\n"))
 	}
 }
