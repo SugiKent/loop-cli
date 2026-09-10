@@ -52,7 +52,7 @@ fixture は `internal/gh/testdata/fixtures/<repo-alias>/` 配下に MUST 置く�
 - **WHEN** `pr-131-review-threads.json` に GraphQL の生の応答がある状態で `ReviewThreads(ctx, "org/app", 131)` を呼ぶ
 - **THEN** 実行関数を差し替えて同じバイト列を返す `Client` の `ReviewThreads` の結果と `reflect.DeepEqual` で一致する
 
-### Requirement: Fake は書き込み呼び出しと ViewIssue と ListLabels を記録する
+### Requirement: Fake は書き込み呼び出しと ViewIssue を記録する
 `Fake` の書き込みメソッド（`CommentIssue` / `CommentPR` / `AddLabel` / `RemoveLabel` / `EditIssueLabels` / `EditPRLabels` / `MergePR` / `CreateIssue` / `ReplyReviewThread` / `Browse` / `OpenURL`）は `gh` を呼ばず、呼び出しをフィールド `Calls []Call` に呼び出し順で MUST 追記して nil を返す。`OpenURL` は `Method` が `OpenURL`、`URL` に受け取った URL を記録し、ブラウザ起動コマンドを実行しない。`EditIssueLabels` / `EditPRLabels` は `Repo` / `Number` に加えて `AddLabels` / `RemoveLabels` を受け取った並びのまま記録し、`Method` を分ける（不変条件 4「書き先を混同しない」を、issue へ書いたのか PR へ書いたのかとして検証できるようにするため）。`add` と `remove` がどちらも空のときも 1 件記録する（`Client` は `gh` を実行しないが、`Fake` は「呼ばれたかどうか」を検証の手がかりにするため）。読み取りのうち `ViewIssue` と `ListLabels` は `Calls` に MUST 記録する。`ViewIssue` は `Method` が `ViewIssue`、`Repo`、`Number`（不変条件 3「`stage:todo` を外し、`gh issue view --json labels` で読み直してから `stage:propose` を付ける」の順序を s15 のテストで検証するため）。`ListLabels` は `Method` が `ListLabels` と `Repo`（`Fake` は `repo` 引数でファイルを探さないので、`L` の一覧をリポジトリ単位でキャッシュして 2 回目に `gh` を呼ばないことは、この記録の件数でしか検証できないため）。他の読み取りは記録しない。`Call` は `Method string`（メソッド名）/ `Repo string` / `Number int` / `Body string` / `Label string` / `AddLabels []string` / `RemoveLabels []string` / `MergeMethod string` / `Title string` / `CommentID int64` / `URL string` を持ち、使わないフィールドはゼロ値のままにする。`CreateIssue` は `https://github.com/<repo>/issues/0` を返す。テストは `Calls` を見て「どの引数で何回呼ばれたか」を検証する（`t` の 1 操作 1 ラベルと、`L` の 1 送信 1 書き込みの検証手段）。
 
 #### Scenario: AddLabel の呼び出しが記録される
@@ -87,6 +87,6 @@ fixture は `internal/gh/testdata/fixtures/<repo-alias>/` 配下に MUST 置く�
 - **WHEN** `RemoveLabel(ctx, "org/app", 108, "stage:todo")`、`ViewIssue(ctx, "org/app", 108)`、`AddLabel(ctx, "org/app", 108, "stage:propose")` をこの順で呼ぶ
 - **THEN** `Calls` は 3 件で、`Method` は順に `RemoveLabel` / `ViewIssue` / `AddLabel`、2 件目の `Repo` は `org/app`、`Number` は 108 である
 
-#### Scenario: ViewIssue と ListLabels 以外の読み取りは記録しない
+#### Scenario: ViewIssue 以外の読み取りは記録しない
 - **WHEN** `SearchIssues` / `ViewPR` / `ViewPRMergeState` を呼んだ後に `Calls` を見る
 - **THEN** `Calls` は空である
