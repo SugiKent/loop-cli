@@ -775,6 +775,10 @@ func TestSubmitLabelsOnPRUsesPRPath(t *testing.T) {
 	if got := callsOf(fake, "EditIssueLabels"); len(got) != 0 {
 		t.Errorf("EditIssueLabels = %+v, want 空", got)
 	}
+	// ステータスの書き先の表記は PR でも `<repo> #<番号>`。
+	if footer := footerOf(plainText(m)); !strings.Contains(footer, "org/app #131 のラベルを更新しました（+docs）") {
+		t.Errorf("フッタ = %q", footer)
+	}
 }
 
 // TestSubmitLabelsWithoutChangesSkipsGh は変更 0 件なら gh を 1 度も呼ばないことを検証する。
