@@ -223,19 +223,145 @@ func TestCardDetailHeader(t *testing.T) {
 	}
 }
 
-func TestLongHeaderLineIsTruncated(t *testing.T) {
-	issue := &model.Issue{Number: 108, Title: strings.Repeat("あ", 30), UpdatedAt: at} // 表示幅 60
-	m, _ := send(detailModel(40, 40, []model.Card{issueCard(issue, nil, "対応する")}), enterKey)
+// prOnlyCard は Issue を持たない Card。PR 詳細を直接開くために Result を PR に揃える。
+func prOnlyCard(pr model.PR) model.Card {
+	pr.Result = model.Result{Situation: model.SituationD, Priority: 2, Tab: model.TabNow, Summary: "確認する"}
+	return model.Card{PRs: []model.PR{pr}, Result: pr.Result}
+}
 
-	line, ok := lineWith(linesOf(m), "org/app #")
+// titleLinesOf はヘッダのタイトル行を返す。1 行目と、それに続く行頭が接頭辞と
+// 同じ表示幅の空白である行がタイトル行である（card-detail の Scenario の手順）。
+func titleLinesOf(lines []string, prefix string) []string {
+	indent := strings.Repeat(" ", ansi.StringWidth(prefix))
+	out := []string{lines[0]}
+	for _, l := range lines[1:] {
+		if !strings.HasPrefix(l, indent) {
+			break
+		}
+		out = append(out, l)
+	}
+	return out
+}
+
+// joinTitle はタイトル行から接頭辞と行頭の空白を剥がして連結する。
+func joinTitle(titleLines []string, prefix string) string {
+	indent := strings.Repeat(" ", ansi.StringWidth(prefix))
+	s := strings.TrimPrefix(titleLines[0], prefix)
+	for _, l := range titleLines[1:] {
+		s += strings.TrimPrefix(l, indent)
+	}
+	return s
+}
+
+// wantWrappedTitle はタイトル行が全文を出し、どの行も幅に収まり、… で終わらないことを確かめる。
+func wantWrappedTitle(t *testing.T, lines []string, prefix, title string, width int) {
+	t.Helper()
+	titleLines := titleLinesOf(lines, prefix)
+	if len(titleLines) < 2 {
+		t.Fatalf("タイトル行が %d 行しかない（折り返していない）:\n%s", len(titleLines), strings.Join(lines, "\n"))
+	}
+	for i, l := range titleLines {
+		if w := ansi.StringWidth(l); w > width {
+			t.Errorf("%d 行目の表示幅 = %d, want <= %d: %q", i+1, w, width, l)
+		}
+		if strings.HasSuffix(strings.TrimRight(l, " "), "…") {
+			t.Errorf("%d 行目が切り詰められている: %q", i+1, l)
+		}
+	}
+	if got := joinTitle(titleLines, prefix); got != title {
+		t.Errorf("タイトル行の連結 = %q, want %q", got, title)
+	}
+}
+
+// TestLongHeaderLineIsTruncated は Summary の行が今までどおり幅で切り詰められることを検証する。
+func TestLongHeaderLineIsTruncated(t *testing.T) {
+	issue := &model.Issue{Number: 108, Title: "短い", UpdatedAt: at}
+	summary := strings.Repeat("ぬ", 30) // 表示幅 60
+	m, _ := send(detailModel(40, 40, []model.Card{issueCard(issue, nil, summary)}), enterKey)
+
+	line, ok := lineWith(linesOf(m), "ぬ")
 	if !ok {
-		t.Fatal("ヘッダ行が無い")
+		t.Fatal("Summary の行が無い")
 	}
 	if w := ansi.StringWidth(line); w > 40 {
-		t.Errorf("ヘッダ行の表示幅 = %d, want <= 40", w)
+		t.Errorf("Summary の行の表示幅 = %d, want <= 40", w)
 	}
 	if !strings.HasSuffix(strings.TrimRight(line, " "), "…") {
 		t.Errorf("切り詰めた行の末尾が … でない: %q", line)
+	}
+}
+
+func TestLongIssueTitleWrapsToFullText(t *testing.T) {
+	title := strings.Repeat("あ", 30) // 表示幅 60
+	issue := &model.Issue{Number: 108, Title: title, UpdatedAt: at}
+	m, _ := send(detailModel(40, 40, []model.Card{issueCard(issue, nil, "対応する")}), enterKey)
+
+	wantWrappedTitle(t, linesOf(m), "org/app #108  ", title, 40)
+}
+
+func TestLongPRTitleWrapsToFullText(t *testing.T) {
+	title := strings.Repeat("a", 60) // 表示幅 60
+	pr := prOf(131, "OPEN", []string{model.LabelApply})
+	pr.Title = title
+	m, _ := send(detailModel(40, 40, []model.Card{prOnlyCard(pr)}), enterKey)
+
+	wantWrappedTitle(t, linesOf(m), "org/app PR#131  ", title, 40)
+}
+
+func TestWidePRTitleWrapsByDisplayWidth(t *testing.T) {
+	title := strings.Repeat("あ", 40) // 表示幅 80
+	pr := prOf(131, "OPEN", []string{model.LabelApply})
+	pr.Title = title
+	m, _ := send(detailModel(40, 40, []model.Card{prOnlyCard(pr)}), enterKey)
+
+	wantWrappedTitle(t, linesOf(m), "org/app PR#131  ", title, 40)
+}
+
+// TestPRLabelsLineIsTruncated は labels 行が今までどおり幅で切り詰められることを検証する。
+func TestPRLabelsLineIsTruncated(t *testing.T) {
+	pr := prOf(131, "OPEN", []string{model.LabelApply, strings.Repeat("ら", 20)})
+	m, _ := send(detailModel(40, 40, []model.Card{prOnlyCard(pr)}), enterKey)
+
+	line, ok := lineWith(linesOf(m), "[apply]")
+	if !ok {
+		t.Fatal("labels 行が無い")
+	}
+	if w := ansi.StringWidth(line); w > 40 {
+		t.Errorf("labels 行の表示幅 = %d, want <= 40", w)
+	}
+	if !strings.HasSuffix(strings.TrimRight(line, " "), "…") {
+		t.Errorf("切り詰めた labels 行の末尾が … でない: %q", line)
+	}
+}
+
+// TestWrappedPRTitleFitsTerminalHeight は折り返したタイトルが高さを埋めても、
+// 画面の行数が端末の高さに収まることを検証する（design.md D5）。
+func TestWrappedPRTitleFitsTerminalHeight(t *testing.T) {
+	pr := prOf(131, "OPEN", []string{model.LabelApply})
+	pr.Title = strings.Repeat("a", 300)
+	pr.Body = "行01"
+	pr.Comments = []model.Comment{}
+	pr.ReviewThreads = []gh.ReviewThread{}
+	pr.MergeState = &gh.PRMergeState{Mergeable: "UNKNOWN"}
+	m, _ := send(detailModel(40, 8, []model.Card{prOnlyCard(pr)}), enterKey)
+
+	lines := linesOf(m)
+	if len(lines) != 8 {
+		t.Fatalf("行数 = %d, want 8:\n%s", len(lines), strings.Join(lines, "\n"))
+	}
+	if !strings.HasPrefix(lines[0], "org/app PR#131") {
+		t.Errorf("1 行目 = %q", lines[0])
+	}
+	titleLines := titleLinesOf(lines, "org/app PR#131  ")
+	last := titleLines[len(titleLines)-1]
+	if !strings.HasSuffix(strings.TrimRight(last, " "), "…") {
+		t.Errorf("最後のタイトル行の末尾が … でない: %q", last)
+	}
+	text := strings.Join(lines, "\n")
+	for _, want := range []string{"[apply] open  labels: apply", "─", "Esc 戻る"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("%q が無い:\n%s", want, text)
+		}
 	}
 }
 

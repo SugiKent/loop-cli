@@ -159,7 +159,7 @@ func (m Model) tableLines(h int) []string {
 	rows := m.rows[m.tab]
 	lines := make([]string, 0, len(rows))
 	for i, r := range rows {
-		lines = append(lines, m.tableRow(r, i == m.cursor))
+		lines = append(lines, m.tableRow(r, i == m.cursor)...)
 	}
 	return cut(lines, h)
 }
@@ -178,8 +178,10 @@ func (m Model) emptyHintLines(h int) []string {
 	return lines
 }
 
-// tableRow は 1 行を 優先 / 種別 / リポジトリ / # / タイトル / 経過 の順に組み、種別の色を付ける。
-func (m Model) tableRow(r row, selected bool) string {
+// tableRow は 1 枚の Card の行を 優先 / 種別 / リポジトリ / # / タイトル / 経過 の順に組み、
+// 種別の色を付ける。タイトルが列幅に収まらなければ折り返して複数行を返す（design.md D3）。
+// 継続行はタイトル列の開始位置に縦を揃え、▶ と経過は 1 行目にだけ出す。
+func (m Model) tableRow(r row, selected bool) []string {
 	mark := "  "
 	if selected {
 		mark = "▶ "
@@ -194,18 +196,33 @@ func (m Model) tableRow(r row, selected bool) string {
 	}
 	kind := r.card.Result.Situation.Kind()
 
-	line := pad(mark, colMark) + pad(prio, colPrio) + pad(kind, colKind) +
+	fixed := pad(mark, colMark) + pad(prio, colPrio) + pad(kind, colKind) +
 		pad(r.repo, colRepo) + pad(number, colNumber)
-	if titleW := m.width - colFixed; titleW > 0 {
-		line += pad(r.title, titleW)
+	elapsed := pad(Elapsed(m.at, r.updatedAt), colElapsed)
+
+	var lines []string
+	titleW := m.width - colFixed
+	if titleW <= 0 {
+		// 端末幅 48 以下ではタイトルを出さず、1 行だけを端末幅で切る。
+		lines = []string{ansi.Truncate(fixed+elapsed, m.width, "")}
+	} else {
+		// 継続行も端末幅ちょうどまで空白で埋める（異常の Card の背景色が行ごとに途切れないように）。
+		indent := strings.Repeat(" ", colFixed-colElapsed)
+		for i, frag := range wrapToWidth(r.title, titleW) {
+			if i == 0 {
+				lines = append(lines, fixed+pad(frag, titleW)+elapsed)
+				continue
+			}
+			lines = append(lines, indent+pad(frag, titleW)+strings.Repeat(" ", colElapsed))
+		}
 	}
-	line += pad(Elapsed(m.at, r.updatedAt), colElapsed)
-	line = ansi.Truncate(line, m.width, "")
 
 	if style, ok := kindStyle[kind]; ok {
-		return style.Render(line)
+		for i, l := range lines {
+			lines[i] = style.Render(l)
+		}
 	}
-	return line
+	return lines
 }
 
 // footer は左にキーヒント、右に取得状態を出す。両方が入らなければ状態を優先する。
