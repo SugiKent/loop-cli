@@ -1,0 +1,38 @@
+{
+  "body": "取り込みをチャンクに分けた。\n\nCloses #61",
+  "comments": [
+    {
+      "id": "IC_kwDOB71",
+      "author": {"login": "user-1"},
+      "authorAssociation": "OWNER",
+      "body": "<!-- routine -->\nチャンクサイズは 500 件にしました。",
+      "createdAt": "2026-09-05T06:05:00Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/org/board/pull/71#issuecomment-4101",
+      "viewerDidAuthor": true
+    }
+  ],
+  "isDraft": false,
+  "labels": [],
+  "mergeStateStatus": "CLEAN",
+  "mergeable": "MERGEABLE",
+  "number": 71,
+  "reviewDecision": "",
+  "statusCheckRollup": [
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-05T06:10:00Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/org/board/actions/runs/7101",
+      "name": "test",
+      "startedAt": "2026-09-05T06:06:00Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    }
+  ],
+  "title": "取り込みバッチを分割する",
+  "url": "https://github.com/org/board/pull/71"
+}

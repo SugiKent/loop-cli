@@ -29,7 +29,7 @@ func issue(number int, labels ...string) model.Issue {
 func TestEvaluationOrder(t *testing.T) {
 	t.Run("進行中の除外が判定表より先", func(t *testing.T) {
 		is := issue(108, model.LabelStagePropose, model.LabelWip)
-		got := Issue(is)
+		got := Issue(is, model.ModeSDD)
 		if got.Situation != model.SituationInProgress || got.Summary != "#108 は AI が作業中" {
 			t.Errorf("Issue = %+v, want in-progress / #108 は AI が作業中", got)
 		}
@@ -37,7 +37,7 @@ func TestEvaluationOrder(t *testing.T) {
 
 	t.Run("詳細が nil なら A は成立しない", func(t *testing.T) {
 		pr := openPR(131, model.LabelPropose, model.LabelQuestion)
-		if got := PR(pr).Situation; got != model.SituationOther {
+		if got := PR(pr, model.ModeSDD).Situation; got != model.SituationOther {
 			t.Errorf("Situation = %q, want other", got)
 		}
 	})
@@ -46,7 +46,7 @@ func TestEvaluationOrder(t *testing.T) {
 		pr := openPR(131, model.LabelPropose, model.LabelQuestion)
 		pr.State = "MERGED"
 		pr.Comments = []model.Comment{aiComment()}
-		if got := PR(pr); got != (model.Result{}) {
+		if got := PR(pr, model.ModeSDD); got != (model.Result{}) {
 			t.Errorf("Result = %+v, want ゼロ値", got)
 		}
 	})
@@ -57,7 +57,7 @@ func TestSituationA(t *testing.T) {
 		pr := openPR(131, model.LabelPropose, model.LabelQuestion)
 		pr.Comments = []model.Comment{aiComment()}
 
-		got := PR(pr)
+		got := PR(pr, model.ModeSDD)
 		if got.Situation != model.SituationA || got.Priority != 1 || got.Tab != model.TabNow {
 			t.Errorf("Result = %+v, want A / 1 / 今やる", got)
 		}
@@ -69,7 +69,7 @@ func TestSituationA(t *testing.T) {
 	t.Run("最新コメントが人なら A ではない", func(t *testing.T) {
 		pr := openPR(131, model.LabelPropose, model.LabelQuestion)
 		pr.Comments = []model.Comment{aiComment(), humanComment()}
-		if got := PR(pr).Situation; got != model.SituationInProgress {
+		if got := PR(pr, model.ModeSDD).Situation; got != model.SituationInProgress {
 			t.Errorf("Situation = %q, want in-progress", got)
 		}
 	})
@@ -80,7 +80,7 @@ func TestSituationB(t *testing.T) {
 		is := issue(108, model.LabelStagePropose, model.LabelBlocked, model.LabelQuestion)
 		is.Comments = []model.Comment{{Body: "&lt;!-- routine --&gt;\nblocked-by: human", AI: true}}
 
-		got := Issue(is)
+		got := Issue(is, model.ModeSDD)
 		if got.Situation != model.SituationB || got.Priority != 2 || got.Tab != model.TabNow {
 			t.Errorf("Result = %+v, want B / 2 / 今やる", got)
 		}
@@ -92,7 +92,7 @@ func TestSituationB(t *testing.T) {
 	t.Run("段階ラベルが無くても B（E より先）", func(t *testing.T) {
 		is := issue(108, model.LabelBlocked, model.LabelQuestion)
 		is.Comments = []model.Comment{aiComment()}
-		if got := Issue(is).Situation; got != model.SituationB {
+		if got := Issue(is, model.ModeSDD).Situation; got != model.SituationB {
 			t.Errorf("Situation = %q, want B", got)
 		}
 	})
@@ -107,7 +107,7 @@ func TestSituationC(t *testing.T) {
 	}
 
 	t.Run("merge する PR", func(t *testing.T) {
-		got := PR(base())
+		got := PR(base(), model.ModeSDD)
 		if got.Situation != model.SituationC || got.Priority != 3 || got.Tab != model.TabNow {
 			t.Errorf("Result = %+v, want C / 3 / 今やる", got)
 		}
@@ -119,7 +119,7 @@ func TestSituationC(t *testing.T) {
 	t.Run("draft でも C（merge 拒否は s14 のガードが持つ）", func(t *testing.T) {
 		pr := base()
 		pr.IsDraft = true
-		if got := PR(pr).Situation; got != model.SituationC {
+		if got := PR(pr, model.ModeSDD).Situation; got != model.SituationC {
 			t.Errorf("Situation = %q, want C", got)
 		}
 	})
@@ -127,7 +127,7 @@ func TestSituationC(t *testing.T) {
 	t.Run("未確定が 1 件以上なら C ではない", func(t *testing.T) {
 		pr := base()
 		pr.Body = "未確定の判断: 2 件\n…"
-		if got := PR(pr).Situation; got == model.SituationC {
+		if got := PR(pr, model.ModeSDD).Situation; got == model.SituationC {
 			t.Error("Situation = C, want C 以外")
 		}
 	})
@@ -135,7 +135,7 @@ func TestSituationC(t *testing.T) {
 	t.Run("1 行目が無ければ C ではない", func(t *testing.T) {
 		pr := base()
 		pr.Body = "issue #108 の提案。\n\nCloses #108"
-		if got := PR(pr).Situation; got == model.SituationC {
+		if got := PR(pr, model.ModeSDD).Situation; got == model.SituationC {
 			t.Error("Situation = C, want C 以外")
 		}
 	})
@@ -147,7 +147,7 @@ func TestSituationC(t *testing.T) {
 		if ChecksGreen(pr.MergeState) {
 			t.Error("ChecksGreen = true, want false")
 		}
-		if got := PR(pr).Situation; got == model.SituationC {
+		if got := PR(pr, model.ModeSDD).Situation; got == model.SituationC {
 			t.Error("Situation = C, want C 以外")
 		}
 	})
@@ -155,7 +155,7 @@ func TestSituationC(t *testing.T) {
 	t.Run("mergeable が UNKNOWN なら C ではない", func(t *testing.T) {
 		pr := base()
 		pr.MergeState.Mergeable = "UNKNOWN"
-		if got := PR(pr).Situation; got == model.SituationC {
+		if got := PR(pr, model.ModeSDD).Situation; got == model.SituationC {
 			t.Error("Situation = C, want C 以外")
 		}
 	})
@@ -184,7 +184,7 @@ func TestSituationD(t *testing.T) {
 	}
 
 	t.Run("未 resolve の thread 最終コメントが AI", func(t *testing.T) {
-		got := PR(base())
+		got := PR(base(), model.ModeSDD)
 		if got.Situation != model.SituationD || got.Priority != 1 || got.Tab != model.TabNow {
 			t.Errorf("Result = %+v, want D / 1 / 今やる", got)
 		}
@@ -196,7 +196,7 @@ func TestSituationD(t *testing.T) {
 	t.Run("resolve 済みなら D ではない", func(t *testing.T) {
 		pr := base()
 		pr.ReviewThreads[0].IsResolved = true
-		if got := PR(pr).Situation; got != model.SituationOther {
+		if got := PR(pr, model.ModeSDD).Situation; got != model.SituationOther {
 			t.Errorf("Situation = %q, want other", got)
 		}
 	})
@@ -204,7 +204,7 @@ func TestSituationD(t *testing.T) {
 	t.Run("thread 最終コメントが人なら D ではない", func(t *testing.T) {
 		pr := base()
 		pr.ReviewThreads[0].Comments = append(pr.ReviewThreads[0].Comments, gh.ReviewComment{Body: "残します"})
-		if got := PR(pr).Situation; got == model.SituationD {
+		if got := PR(pr, model.ModeSDD).Situation; got == model.SituationD {
 			t.Error("Situation = D, want D 以外")
 		}
 	})
@@ -212,7 +212,7 @@ func TestSituationD(t *testing.T) {
 
 func TestSituationE(t *testing.T) {
 	t.Run("ラベルが無い issue", func(t *testing.T) {
-		got := Issue(issue(140))
+		got := Issue(issue(140), model.ModeSDD)
 		if got.Situation != model.SituationE || got.Priority != 4 || got.Tab != model.TabBacklog {
 			t.Errorf("Result = %+v, want E / 4 / バックログ", got)
 		}
@@ -222,13 +222,13 @@ func TestSituationE(t *testing.T) {
 	})
 
 	t.Run("段階ラベル以外のラベルがあっても E", func(t *testing.T) {
-		if got := Issue(issue(140, "bug", "enhancement")).Situation; got != model.SituationE {
+		if got := Issue(issue(140, "bug", "enhancement"), model.ModeSDD).Situation; got != model.SituationE {
 			t.Errorf("Situation = %q, want E", got)
 		}
 	})
 
 	t.Run("stage:todo なら E ではない", func(t *testing.T) {
-		if got := Issue(issue(140, model.LabelStageTodo)).Situation; got != model.SituationInProgress {
+		if got := Issue(issue(140, model.LabelStageTodo), model.ModeSDD).Situation; got != model.SituationInProgress {
 			t.Errorf("Situation = %q, want in-progress", got)
 		}
 	})
@@ -236,7 +236,7 @@ func TestSituationE(t *testing.T) {
 	t.Run("blocked が付いていれば書き直しの途中でも E ではない", func(t *testing.T) {
 		is := issue(140, model.LabelBlocked)
 		is.Comments = []model.Comment{{Body: "<!-- routine -->\nrelease: stage:apply", AI: true}}
-		if got := Issue(is).Situation; got != model.SituationInProgress {
+		if got := Issue(is, model.ModeSDD).Situation; got != model.SituationInProgress {
 			t.Errorf("Situation = %q, want in-progress", got)
 		}
 	})
@@ -244,7 +244,7 @@ func TestSituationE(t *testing.T) {
 
 func TestSituationF(t *testing.T) {
 	t.Run("段階ラベルが 2 つの issue", func(t *testing.T) {
-		got := Issue(issue(108, model.LabelStagePropose, model.LabelStageApply))
+		got := Issue(issue(108, model.LabelStagePropose, model.LabelStageApply), model.ModeSDD)
 		if got.Situation != model.SituationF || got.Priority != 0 || got.Tab != model.TabAbnormal {
 			t.Errorf("Result = %+v, want F / 0 / 異常", got)
 		}
@@ -254,7 +254,7 @@ func TestSituationF(t *testing.T) {
 	})
 
 	t.Run("段階ラベルが 2 つの PR", func(t *testing.T) {
-		got := PR(openPR(131, model.LabelPropose, model.LabelApply))
+		got := PR(openPR(131, model.LabelPropose, model.LabelApply), model.ModeSDD)
 		if got.Situation != model.SituationF {
 			t.Errorf("Situation = %q, want F", got.Situation)
 		}
@@ -265,7 +265,7 @@ func TestSituationF(t *testing.T) {
 
 	t.Run("wip でも段階ラベル 2 つなら F", func(t *testing.T) {
 		is := issue(108, model.LabelStagePropose, model.LabelStageApply, model.LabelWip)
-		if got := Issue(is).Situation; got != model.SituationF {
+		if got := Issue(is, model.ModeSDD).Situation; got != model.SituationF {
 			t.Errorf("Situation = %q, want F", got)
 		}
 	})
@@ -273,7 +273,7 @@ func TestSituationF(t *testing.T) {
 	t.Run("段階ラベル 2 つでも question と blocked があれば B", func(t *testing.T) {
 		is := issue(108, model.LabelStagePropose, model.LabelStageApply, model.LabelBlocked, model.LabelQuestion)
 		is.Comments = []model.Comment{aiComment()}
-		if got := Issue(is).Situation; got != model.SituationB {
+		if got := Issue(is, model.ModeSDD).Situation; got != model.SituationB {
 			t.Errorf("Situation = %q, want B", got)
 		}
 	})
@@ -281,7 +281,7 @@ func TestSituationF(t *testing.T) {
 
 func TestSituationG(t *testing.T) {
 	t.Run("docs PR", func(t *testing.T) {
-		got := PR(openPR(160, model.LabelDocs))
+		got := PR(openPR(160, model.LabelDocs), model.ModeSDD)
 		if got.Situation != model.SituationG || got.Priority != 5 || got.Tab != model.TabNow {
 			t.Errorf("Result = %+v, want G / 5 / 今やる", got)
 		}
@@ -291,7 +291,7 @@ func TestSituationG(t *testing.T) {
 	})
 
 	t.Run("question があれば G ではない", func(t *testing.T) {
-		if got := PR(openPR(160, model.LabelDocs, model.LabelQuestion)).Situation; got != model.SituationOther {
+		if got := PR(openPR(160, model.LabelDocs, model.LabelQuestion), model.ModeSDD).Situation; got != model.SituationOther {
 			t.Errorf("Situation = %q, want other", got)
 		}
 	})
@@ -304,7 +304,7 @@ func TestInProgressRules(t *testing.T) {
 	}
 
 	t.Run("規則 1: wip の issue", func(t *testing.T) {
-		got := Issue(issue(108, model.LabelStageApply, model.LabelWip))
+		got := Issue(issue(108, model.LabelStageApply, model.LabelWip), model.ModeSDD)
 		if got.Situation != model.SituationInProgress || got.Tab != model.TabInProgress {
 			t.Errorf("Result = %+v, want in-progress / 進行中", got)
 		}
@@ -318,7 +318,7 @@ func TestInProgressRules(t *testing.T) {
 		pr.Body = "未確定の判断: 0 件"
 		pr.MergeState = mergeable()
 
-		got := PR(pr)
+		got := PR(pr, model.ModeSDD)
 		if got.Situation != model.SituationInProgress {
 			t.Errorf("Situation = %q, want in-progress（C を満たしていても進行中が先）", got.Situation)
 		}
@@ -329,7 +329,7 @@ func TestInProgressRules(t *testing.T) {
 
 	t.Run("規則 3: question PR で最新コメントが人", func(t *testing.T) {
 		pr := withComments(openPR(131, model.LabelPropose, model.LabelQuestion), aiComment(), humanComment())
-		got := PR(pr)
+		got := PR(pr, model.ModeSDD)
 		if got.Situation != model.SituationInProgress {
 			t.Errorf("Situation = %q, want in-progress", got.Situation)
 		}
@@ -342,7 +342,7 @@ func TestInProgressRules(t *testing.T) {
 		is := issue(108, model.LabelStagePropose, model.LabelBlocked, model.LabelQuestion)
 		is.Comments = []model.Comment{aiComment(), {Body: "B で進めてください"}}
 
-		got := Issue(is)
+		got := Issue(is, model.ModeSDD)
 		if got.Situation != model.SituationInProgress {
 			t.Errorf("Situation = %q, want in-progress", got.Situation)
 		}
@@ -355,7 +355,7 @@ func TestInProgressRules(t *testing.T) {
 		is := issue(108, model.LabelQuestion)
 		is.Comments = []model.Comment{aiComment()}
 
-		got := Issue(is)
+		got := Issue(is, model.ModeSDD)
 		if got.Situation != model.SituationInProgress {
 			t.Errorf("Situation = %q, want in-progress（E には当たらない）", got.Situation)
 		}
@@ -368,7 +368,7 @@ func TestInProgressRules(t *testing.T) {
 		is := issue(140)
 		is.Comments = []model.Comment{{Body: "<!-- routine -->\nrestart: 1/3", AI: true}}
 
-		got := Issue(is)
+		got := Issue(is, model.ModeSDD)
 		if got.Situation != model.SituationInProgress {
 			t.Errorf("Situation = %q, want in-progress（E には当たらない）", got.Situation)
 		}
@@ -382,7 +382,7 @@ func TestInProgressRules(t *testing.T) {
 		pr.Body = "未確定の判断: 0 件 — レビューをお願いします"
 		pr.MergeState = mergeable()
 
-		got := PR(pr)
+		got := PR(pr, model.ModeSDD)
 		if got.Situation != model.SituationInProgress {
 			t.Errorf("Situation = %q, want in-progress（C を満たしていても評価待ちが先）", got.Situation)
 		}
@@ -396,13 +396,13 @@ func TestInProgressRules(t *testing.T) {
 		pr.Body = "未確定の判断: 0 件 — レビューをお願いします"
 		pr.MergeState = mergeable()
 
-		if got := PR(pr).Situation; got != model.SituationA {
+		if got := PR(pr, model.ModeSDD).Situation; got != model.SituationA {
 			t.Errorf("Situation = %q, want A", got)
 		}
 	})
 
 	t.Run("フォールバック: 段階ラベル付きで wip の無い issue", func(t *testing.T) {
-		got := Issue(issue(108, model.LabelStagePropose))
+		got := Issue(issue(108, model.LabelStagePropose), model.ModeSDD)
 		if got.Situation != model.SituationInProgress || got.Summary != "#108 は進行中" {
 			t.Errorf("Result = %+v, want in-progress / #108 は進行中", got)
 		}
@@ -414,7 +414,7 @@ func TestOtherBucket(t *testing.T) {
 		pr := openPR(170)
 		pr.Comments = []model.Comment{}
 
-		got := PR(pr)
+		got := PR(pr, model.ModeSDD)
 		if got.Situation != model.SituationOther || got.Priority != 6 || got.Tab != model.TabNow {
 			t.Errorf("Result = %+v, want other / 6 / 今やる", got)
 		}
@@ -424,7 +424,7 @@ func TestOtherBucket(t *testing.T) {
 	})
 
 	t.Run("旧構成の retro PR", func(t *testing.T) {
-		if got := PR(openPR(170, "retro")).Situation; got != model.SituationOther {
+		if got := PR(openPR(170, "retro"), model.ModeSDD).Situation; got != model.SituationOther {
 			t.Errorf("Situation = %q, want other", got)
 		}
 	})
@@ -432,7 +432,7 @@ func TestOtherBucket(t *testing.T) {
 	t.Run("question と blocked があるのにコメント未取得の issue", func(t *testing.T) {
 		is := issue(108, model.LabelStagePropose, model.LabelBlocked, model.LabelQuestion)
 
-		got := Issue(is)
+		got := Issue(is, model.ModeSDD)
 		if got.Situation != model.SituationOther || got.Priority != 6 || got.Tab != model.TabNow {
 			t.Errorf("Result = %+v, want other / 6 / 今やる", got)
 		}

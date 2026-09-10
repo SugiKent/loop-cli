@@ -159,11 +159,17 @@ func (m Model) cardHeaderLines() []string {
 		lines = append(lines, card.Result.Summary)
 	}
 
+	mode := m.repoMode(issue.Repo)
 	stage := "段階なし"
-	if st := model.IssueStages(issue.Labels); len(st) > 0 {
+	if st := model.IssueStages(mode, issue.Labels); len(st) > 0 {
 		stage = "段階: " + strings.Join(st, " ")
 	}
-	for _, badge := range []string{model.LabelBlocked, model.LabelWip, model.LabelQuestion} {
+	// label に wip ラベルは無く、作業中は段階ラベル In Progress が示す。
+	badges := []string{model.LabelBlocked, model.LabelWip, model.LabelQuestion}
+	if mode == model.ModeLabel {
+		badges = []string{model.LabelBlocked, model.LabelQuestion}
+	}
+	for _, badge := range badges {
 		if model.HasLabel(issue.Labels, badge) {
 			stage += " [" + badge + "]"
 		}
@@ -181,28 +187,44 @@ func (m Model) cardHeaderLines() []string {
 }
 
 // prListLines は紐づく PR を段階順に 1 行ずつ並べる。無い段階は `なし`、段階ラベルの無い PR は末尾。
+// label には PR の段階ラベルが無いので、段階の見出しを持たず並び順のまま `[-]` で並べる。
 func (m Model) prListLines() []string {
 	prs := m.detail.card.PRs
+	mode := m.detailMode()
 	var lines []string
-	for _, stage := range prStageOrder {
-		found := false
-		for i, pr := range prs {
-			if st := model.PRStages(pr.Labels); len(st) == 0 || st[0] != stage {
-				continue
+	if mode != model.ModeLabel {
+		for _, stage := range prStageOrder {
+			found := false
+			for i, pr := range prs {
+				if st := model.PRStages(mode, pr.Labels); len(st) == 0 || st[0] != stage {
+					continue
+				}
+				found = true
+				lines = append(lines, m.prListRow(i, stage, pr))
 			}
-			found = true
-			lines = append(lines, m.prListRow(i, stage, pr))
-		}
-		if !found {
-			lines = append(lines, "  ["+stage+"] なし")
+			if !found {
+				lines = append(lines, "  ["+stage+"] なし")
+			}
 		}
 	}
 	for i, pr := range prs {
-		if len(model.PRStages(pr.Labels)) == 0 {
+		if len(model.PRStages(mode, pr.Labels)) == 0 {
 			lines = append(lines, m.prListRow(i, "-", pr))
 		}
 	}
 	return lines
+}
+
+// detailMode は詳細の対象カードのリポジトリの方式。Card は 1 リポジトリ分しか持たない。
+func (m Model) detailMode() model.Mode {
+	card := m.detail.card
+	if card.Issue != nil {
+		return m.repoMode(card.Issue.Repo)
+	}
+	if len(card.PRs) > 0 {
+		return m.repoMode(card.PRs[0].Repo)
+	}
+	return ""
 }
 
 // prListRow は PR 一覧の 1 行。選択中の PR には ▶ を付ける。
@@ -313,7 +335,7 @@ func (m Model) currentPR() model.PR { return m.detail.card.PRs[m.detail.prIdx] }
 func (m Model) prHeaderLines() []string {
 	pr := m.currentPR()
 	stage := "-"
-	if st := model.PRStages(pr.Labels); len(st) > 0 {
+	if st := model.PRStages(m.repoMode(pr.Repo), pr.Labels); len(st) > 0 {
 		stage = st[0]
 	}
 	return []string{

@@ -171,7 +171,7 @@ func TestCheckErrorOtherIsOneLine(t *testing.T) {
 // exampleFetcher は example fixture から s07 の Fetch で作った Result を返す Fetcher。
 func exampleFetcher(t *testing.T) (ui.Fetcher, *fetch.Result) {
 	t.Helper()
-	res, err := fetch.Fetch(context.Background(), gh.NewFake("../../internal/gh/testdata/fixtures/example"), []string{"org/app"})
+	res, err := fetch.Fetch(context.Background(), gh.NewFake("../../internal/gh/testdata/fixtures/example"), []string{"org/app"}, nil)
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}

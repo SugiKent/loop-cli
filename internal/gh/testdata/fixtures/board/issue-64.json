@@ -1,0 +1,25 @@
+{
+  "body": "権限の既定値をどちらにするか決めたい。",
+  "comments": [
+    {
+      "id": "IC_kwDOB64",
+      "author": {"login": "user-1"},
+      "authorAssociation": "OWNER",
+      "body": "<!-- routine -->\nblocked-by: human\nunblock-when: comment\n\n招待ユーザーの既定権限を viewer と editor のどちらにしますか。",
+      "createdAt": "2026-09-05T05:00:00Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/org/board/issues/64#issuecomment-4001",
+      "viewerDidAuthor": true
+    }
+  ],
+  "labels": [
+    {"id": "LB_kwDOD", "name": "blocked", "color": "b60205", "description": "ブロック中"},
+    {"id": "LB_kwDOE", "name": "question", "color": "d876e3", "description": "確認事項あり"}
+  ],
+  "number": 64,
+  "title": "招待ユーザーの既定権限を決める",
+  "url": "https://github.com/org/board/issues/64"
+}

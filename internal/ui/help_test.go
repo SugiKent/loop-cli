@@ -195,7 +195,7 @@ func TestHelpListsImplementedKeys(t *testing.T) {
 	}
 
 	wants := []struct{ prefix, desc string }{
-		{"t", "stage:todo を付ける / 外す"},
+		{"t", "stage:todo / To Do を付ける / 外す"},
 		{"m", "PR を merge する（確認あり）"},
 		{"o", "ブラウザで開く"},
 		{"u", "URL 一覧を開く"},

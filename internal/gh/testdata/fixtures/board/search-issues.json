@@ -1,0 +1,52 @@
+[
+  {
+    "body": "取り込み処理が 30 秒を超える。",
+    "commentsCount": 0,
+    "labels": [
+      {"id": "LB_kwDOA", "name": "In Progress", "color": "1d76db", "description": "作業中"}
+    ],
+    "number": 61,
+    "repository": {"name": "board", "nameWithOwner": "org/board"},
+    "title": "取り込みバッチを分割する",
+    "updatedAt": "2026-09-05T02:10:00Z",
+    "url": "https://github.com/org/board/issues/61"
+  },
+  {
+    "body": "検索結果が 0 件のときの表示が空白になる。",
+    "commentsCount": 0,
+    "labels": [
+      {"id": "LB_kwDOB", "name": "bug", "color": "d73a4a", "description": "不具合"}
+    ],
+    "number": 62,
+    "repository": {"name": "board", "nameWithOwner": "org/board"},
+    "title": "検索 0 件の表示を足す",
+    "updatedAt": "2026-09-05T03:00:00Z",
+    "url": "https://github.com/org/board/issues/62"
+  },
+  {
+    "body": "招待メールのテンプレートを差し替える。",
+    "commentsCount": 0,
+    "labels": [
+      {"id": "LB_kwDOC", "name": "To Do", "color": "0e8a16", "description": "着手してよい"},
+      {"id": "LB_kwDOA", "name": "In Progress", "color": "1d76db", "description": "作業中"}
+    ],
+    "number": 63,
+    "repository": {"name": "board", "nameWithOwner": "org/board"},
+    "title": "招待メールの文面を変える",
+    "updatedAt": "2026-09-05T04:00:00Z",
+    "url": "https://github.com/org/board/issues/63"
+  },
+  {
+    "body": "権限の既定値をどちらにするか決めたい。",
+    "commentsCount": 1,
+    "labels": [
+      {"id": "LB_kwDOD", "name": "blocked", "color": "b60205", "description": "ブロック中"},
+      {"id": "LB_kwDOE", "name": "question", "color": "d876e3", "description": "確認事項あり"}
+    ],
+    "number": 64,
+    "repository": {"name": "board", "nameWithOwner": "org/board"},
+    "title": "招待ユーザーの既定権限を決める",
+    "updatedAt": "2026-09-05T05:00:00Z",
+    "url": "https://github.com/org/board/issues/64"
+  }
+]

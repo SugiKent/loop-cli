@@ -35,8 +35,9 @@ type detailError struct {
 }
 
 // Fetch は repos の open issue / open PR を取得し、分類済みの Card 群を返す。
+// modes はリポジトリ名から運用方式を引く表で、表に無いリポジトリは model.Mode のゼロ値（sdd）。
 // search の失敗と ctx の中断は (nil, error)、詳細取得 1 件の失敗は Result.Errors に積む。
-func Fetch(ctx context.Context, client gh.GHClient, repos []string) (*Result, error) {
+func Fetch(ctx context.Context, client gh.GHClient, repos []string, modes map[string]model.Mode) (*Result, error) {
 	searchIssues, err := call(ctx, func(ctx context.Context) ([]gh.SearchIssue, error) {
 		return client.SearchIssues(ctx, repos)
 	})
@@ -64,7 +65,7 @@ func Fetch(ctx context.Context, client gh.GHClient, repos []string) (*Result, er
 		return nil, fmt.Errorf("fetch: %w", ctx.Err())
 	}
 
-	return &Result{Cards: buildCards(issues, prs), Errors: sortErrors(errs)}, nil
+	return &Result{Cards: buildCards(issues, prs, modes), Errors: sortErrors(errs)}, nil
 }
 
 // call は 1 回の gh 呼び出しに CallTimeout の子 ctx を付ける。
@@ -162,7 +163,7 @@ func comments(cs []gh.Comment) []model.Comment {
 }
 
 // buildCards は PR を紐づけ先の issue に集め、紐づかない PR を単独 Card にする。
-func buildCards(issues []model.Issue, prs []model.PR) []model.Card {
+func buildCards(issues []model.Issue, prs []model.PR, modes map[string]model.Mode) []model.Card {
 	cards := make([]model.Card, len(issues))
 	index := map[string]map[int]int{}
 	for i := range issues {
@@ -186,16 +187,28 @@ func buildCards(issues []model.Issue, prs []model.PR) []model.Card {
 	cards = append(cards, lone...)
 
 	for i := range cards {
-		sortPRs(cards[i].PRs)
-		cards[i] = classify.Card(cards[i])
+		mode := modes[cardRepo(cards[i])]
+		sortPRs(cards[i].PRs, mode)
+		cards[i] = classify.Card(cards[i], mode)
 	}
 	return cards
 }
 
+// cardRepo は Card のリポジトリを返す。1 枚の Card は 1 リポジトリ分しか持たない。
+func cardRepo(c model.Card) string {
+	if c.Issue != nil {
+		return c.Issue.Repo
+	}
+	if len(c.PRs) > 0 {
+		return c.PRs[0].Repo
+	}
+	return ""
+}
+
 // sortPRs は段階順（propose → apply → archive → 段階無し）→ 番号昇順に並べる。
-func sortPRs(prs []model.PR) {
+func sortPRs(prs []model.PR, mode model.Mode) {
 	sort.SliceStable(prs, func(i, j int) bool {
-		si, sj := stageRank(prs[i]), stageRank(prs[j])
+		si, sj := stageRank(prs[i], mode), stageRank(prs[j], mode)
 		if si != sj {
 			return si < sj
 		}
@@ -203,8 +216,8 @@ func sortPRs(prs []model.PR) {
 	})
 }
 
-func stageRank(pr model.PR) int {
-	stages := model.PRStages(pr.Labels)
+func stageRank(pr model.PR, mode model.Mode) int {
+	stages := model.PRStages(mode, pr.Labels)
 	if len(stages) == 0 {
 		return 3
 	}

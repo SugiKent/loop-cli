@@ -22,6 +22,10 @@ type Options struct {
 	Notify          Notifier           // デスクトップ通知。nil なら通知しない
 	CheckUpdate     UpdateChecker      // 起動時の更新確認。nil なら確認しない
 	MergeMethods    map[string]string  // リポジトリ名 -> merge 方式。無いリポジトリは squash
+
+	// Modes はリポジトリ名 -> 運用方式。無いリポジトリは model.Mode のゼロ値（sdd）。
+	// 表示にも書き込みにもこの表を引き、Cards やスナップショットからは方式を決めない。
+	Modes map[string]model.Mode
 }
 
 // UpdateChecker は新しい版があるかどうかを返す（s23 self-update）。
@@ -70,6 +74,7 @@ type Model struct {
 	answer         answerState
 	merge          mergeState
 	mergeMethods   map[string]string
+	modes          map[string]model.Mode
 	writing        bool
 	writeStatus    string
 	writeStatusErr bool
@@ -99,6 +104,7 @@ func New(fetcher Fetcher, client gh.GHClient, editor Editor, opts Options) Model
 		notify:          opts.Notify,
 		checkUpdate:     opts.CheckUpdate,
 		mergeMethods:    opts.MergeMethods,
+		modes:           opts.Modes,
 		spinner:         spinner.New(spinner.WithSpinner(spinner.MiniDot)),
 	}
 	// スナップショットがあれば前回の表と保存時刻から始める（D-002「起動直後は stale 表示」）。
