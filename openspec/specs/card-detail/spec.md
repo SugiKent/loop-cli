@@ -6,13 +6,13 @@ TBD - created by archiving change s09-card-detail. Update Purpose after archive.
 ## Requirements
 
 ### Requirement: Enter でカード詳細を開き、Esc で 1 つ前の画面に戻る
-`internal/ui` の `Model` は画面の状態として キュー / カード詳細 / PR 詳細 / 回答の確認 / merge の確認 / 作成の確認 / ヘルプ / URL 一覧 の 8 つを MUST 持ち、初期状態はキューである。回答の確認画面は s10 `answer-question`「確認画面では投稿・編集に戻る・中止を選ぶ」が、merge の確認画面は s14 `merge-pr`「merge の確認画面は判断材料を出し、y で merge して Esc で中止する」が、作成の確認画面は s15 `new-issue`「作成の確認画面は作成先と下書きを出し、y で作成して Esc で中止する」が、ヘルプ画面は s12 `help-screen`「? はヘルプ画面を開き、? か Esc で開いた画面に戻る」が、URL 一覧画面は s22 `url-picker`「u は画面の対象の URL 一覧画面を開く」が定める。`Update` はキー入力を画面の状態ごとに次のとおり扱う。
+`internal/ui` の `Model` は画面の状態として キュー / カード詳細 / PR 詳細 / 回答の確認 / merge の確認 / 作成の確認 / ヘルプ / URL 一覧 / ラベル一覧 の 9 つを MUST 持ち、初期状態はキューである。回答の確認画面は s10 `answer-question`「確認画面では投稿・編集に戻る・中止を選ぶ」が、merge の確認画面は s14 `merge-pr`「merge の確認画面は判断材料を出し、y で merge して Esc で中止する」が、作成の確認画面は s15 `new-issue`「作成の確認画面は作成先と下書きを出し、y で作成して Esc で中止する」が、ヘルプ画面は s12 `help-screen`「? はヘルプ画面を開き、? か Esc で開いた画面に戻る」が、URL 一覧画面は s22 `url-picker`「u は画面の対象の URL 一覧画面を開く」が、ラベル一覧画面は s28 `label-picker`「L は画面の対象のラベル一覧画面を開く」が定める。`Update` はキー入力を画面の状態ごとに次のとおり扱う。
 - キュー画面で `Enter`: 選択行があれば、その行の `model.Card` のコピーを詳細の対象として保持し、カード詳細画面に移る。`Card.Issue` が nil（PR 単独のカード）なら、カード詳細を挟まず `PRs[0]` の PR 詳細画面に直接移る（Issue の情報が無く、カード詳細に出すものが PR 一覧 1 件しか無いため。design.md 未決事項の既定値）。選択行が無い（タブが 0 行）なら何もしない。開いたときに routine コメントの展開状態は折りたたみに戻り、スクロール位置は先頭に戻る
 - カード詳細画面で `Esc`: キュー画面に戻る。キュー画面の現在のタブと選択行は開く前のまま（戻るキーは mvp.md に無く、`Esc` は design.md 未決事項の既定値）
 - PR 詳細画面で `Esc`: カード詳細画面から入ったならカード詳細に戻り、キュー画面から直接入った（`Issue` が nil）ならキュー画面に戻る
 - `q` / `Ctrl+C`: どの画面でも終了コマンドを返す（s01 `tui-entrypoint`「q で終了する」）
 - カード詳細画面と PR 詳細画面では、キュー画面のキー `1`〜`4`（タブ切替）と `R`（全件再取得。s12 `manual-refresh`）は何もしない。`p` はキュー画面でも詳細画面でも何もしない（s21 `queue-screen` が 2 ペインを常設にして切替を廃止した）。`j` / `k` / `↑` / `↓` はスクロール（Requirement「詳細の本文領域はスクロールし、ヘッダ領域は固定する」）に使う。`Tab` はカード詳細画面でだけ PR の選択（Requirement「紐づく PR 一覧は段階順に 1 行ずつ出し、選択中の PR に印を付ける」）に使い、PR 詳細画面では何もしない。詳細画面での `j` / `k` / `↑` / `↓` と `Tab` の意味は mvp.md に無く、design.md 未決事項の既定値である
-- カード詳細画面と PR 詳細画面で `?`: 戻り先を保持してヘルプ画面に移る。`o` はその画面の対象をブラウザで開く（s12 `browse-open`）。`u` は戻り先を保持して URL 一覧画面に移る（s22 `url-picker`）。`m` は対象の PR の状態を取り直し、結果が届いたときに merge の確認画面に移る（s14 `merge-pr`）。`n` は画面の対象のリポジトリを作成先にしてエディタを開き、編集の完了で作成の確認画面に移る（s15 `new-issue`）
+- カード詳細画面と PR 詳細画面で `?`: 戻り先を保持してヘルプ画面に移る。`o` はその画面の対象をブラウザで開く（s12 `browse-open`）。`u` は戻り先を保持して URL 一覧画面に移る（s22 `url-picker`）。`m` は対象の PR の状態を取り直し、結果が届いたときに merge の確認画面に移る（s14 `merge-pr`）。`n` は画面の対象のリポジトリを作成先にしてエディタを開き、編集の完了で作成の確認画面に移る（s15 `new-issue`）。`L` は戻り先を保持してラベル一覧画面に移り、対象はカード詳細では `Card.Issue`、PR 詳細では選択中の PR になる（s28 `label-picker`）。小文字の `l` はどちらの画面でも何もしない（s17 のカンバンの列移動の予約のままである）
 - 詳細を開いている間に取得完了のメッセージ（s08 の `fetchedMsg`）が届いたら、キュー画面の `Cards` と最終更新時刻は s08 の規則どおり更新するが、詳細の対象として保持している Card のコピーは差し替えない。`Esc` でキューに戻った後の `Enter` で新しい Card を開く（自動更新中の追従は s13 が決める）
 
 詳細を開いても `gh` を呼ばない。表示するのは s07 の `Fetch` が Card に入れた値だけである（design.md 未決事項「詳細を開いたときの追加取得」。mvp.md の `Enter` 内部処理 `gh issue view` / `gh pr view --json` からの逸脱で、design.md「追加取得はしない」に理由と申し送りがある）。human-turn-signals.md「merge 可否は表示時に取り直す」は、`m` を押したときの取り直し（s14 `merge-pr`）で満たす。詳細を開いた時点では取り直さない。
@@ -48,7 +48,10 @@ TBD - created by archiving change s09-card-detail. Update Purpose after archive.
 - `段階: ` に続けて `model.IssueStages(mode, Issue.Labels)` の段階ラベルを空白区切りで並べる。1 件も無ければ `段階なし`。2 件以上あればすべて並べる（異常の状態を隠さない）。続けてバッジを出す。`sdd`（ゼロ値を含む）なら `[blocked]` / `[wip]` / `[question]` の順、`label` なら `[blocked]` / `[question]` の順で、`Labels` にあるものだけ出す（`label` の方式に `wip` ラベルは無く、作業中は段階ラベル `In Progress` が示す）
 - `Issue.Body` の中に `depends on #<n>`（大文字小文字を区別しない。`<n>` は 10 進整数）が 1 つ以上あれば `depends on: #<n> #<m> …` を出現順に出す。無ければこの行を出さない（書式は design.md 未決事項の既定値）
 
-ヘッダ領域の各行（上の各行と Requirement「紐づく PR 一覧は段階順に 1 行ずつ出し、選択中の PR に印を付ける」の PR 一覧の行、PR 詳細のヘッダ領域の行）は、表示幅が端末の幅を超えれば端末の幅に切り詰めて末尾を `…` にする（design.md 未決事項の既定値）。
+1 行目 `<Repo> #<Number>  <Title>` は**タイトル行**である。タイトル行は `<Repo> #<Number>  ` を接頭辞として `Title` を続け、表示幅が端末の幅を超えれば端末の幅で MUST 折り返し、`Title` を全文出す。折り返して生まれた継続行の行頭には接頭辞と同じ表示幅の空白を置き、`Title` の開始位置に縦を揃える。幅の判定と折り返し位置は表示幅（`ansi.StringWidth` が返す値）で決め、全角文字と絵文字を含むタイトルでも桁がずれないようにする。端末の幅から接頭辞の表示幅を引いた残りが 2 列未満になるとき（全角 1 文字が入らない幅）は、空白を置かずに端末の幅で折り返す。折り返し位置にあった空白 1 個は改行に置き換わって消える（`ansi.Wrap` の仕様。design.md D1）ので、行を連結して `Title` と比べるときは空白を除いて比べる。タイトル行とその継続行は、いずれも表示幅が端末の幅を超えない。
+この規則は PR 詳細画面のタイトル行（Requirement「PR 詳細は 1 行目判定・紐づけ・本文・会話・review thread・checks を出す」の 1）にも同じく適用する。接頭辞が `<Repo> PR#<Number>  ` に変わるだけである。
+
+ヘッダ領域のうちタイトル行と継続行を除く各行は、表示幅が端末の幅を超えれば端末の幅に切り詰めて末尾を `…` にする（design.md 未決事項の既定値）。対象はカード詳細の `Card.Result.Summary` / `段階` / `depends on` の行、Requirement「紐づく PR 一覧は段階順に 1 行ずつ出し、選択中の PR に印を付ける」の PR 一覧の行、PR 詳細の labels 行である。
 「この段階に入ってからの経過時間」と段階の変遷タイムラインはデータ源が REST の timeline（D-001「ラベル変遷」。`GHClient.LabelTimeline`）であり、s17 が担当する。この change はヘッダに枠を確保せず、s17 が ADDED で行を足す。
 
 #### Scenario: issue 108 のヘッダ
@@ -56,8 +59,12 @@ TBD - created by archiving change s09-card-detail. Update Purpose after archive.
 - **THEN** `org/app #108`、issue 108 の `Title`、`PR #131 の質問に答える`、`段階: stage:propose`、`[question]` がこの順で含まれ、`[blocked]` と `[wip]` と `depends on:` は含まれない
 
 #### Scenario: 長いヘッダ行は幅で切り詰める
-- **WHEN** 幅 40・高さ 40 のサイズメッセージを与えた後、`Title` が表示幅 60 の issue の Card の詳細を開き、`View` から ANSI エスケープを除いて読む
-- **THEN** `org/app #` で始まる行の表示幅は 40 以下で、末尾が `…` である
+- **WHEN** 幅 40・高さ 40 のサイズメッセージを与えた後、`Card.Result.Summary` が表示幅 60 である issue の Card の詳細を開き、`View` から ANSI エスケープを除いて読む
+- **THEN** `Summary` の行の表示幅は 40 以下で、末尾が `…` である
+
+#### Scenario: 長い Issue タイトルは折り返して全文出す
+- **WHEN** 幅 40・高さ 40 のサイズメッセージを与えた後、`Repo` が `org/app`、`Number` が 108、`Title` が表示幅 60 の issue の Card の詳細を開き、`View` から ANSI エスケープを除いて読む。タイトル行は 1 行目と、それに続く行頭が `org/app #108  ` と同じ表示幅の空白である行とする
+- **THEN** タイトル行は 2 行以上あり、各行から接頭辞と行頭の空白を取り除いて連結した文字列が `Title` と一致し、どのタイトル行の表示幅も 40 以下で、`…` で終わるタイトル行は無い
 
 #### Scenario: 段階ラベルが無い issue と depends on
 - **WHEN** `Labels` が空、`Body` が `集計が遅い。\n\ndepends on #12\nDepends on #34` の issue の Card の詳細を開き、`View` を読む
@@ -171,7 +178,7 @@ review thread 内のコメント（Requirement「PR 詳細は 1 行目判定・�
 
 ### Requirement: PR 詳細は 1 行目判定・紐づけ・本文・会話・review thread・checks を出す
 PR 詳細画面の `View` は、対象の `model.PR` について MUST 次を上から順に出す。ヘッダ領域は 1〜2、本文領域は 3〜8（Requirement「詳細の本文領域はスクロールし、ヘッダ領域は固定する」）。
-1. `<Repo> PR#<Number>  <Title>`
+1. タイトル行。接頭辞 `<Repo> PR#<Number>  ` に `Title` を続け、Requirement「ヘッダはリポジトリ・番号・いま人が何をすべきか・現在の段階・バッジ・depends on を出す」が定めたタイトル行の規則（端末の幅で折り返して全文出し、継続行を接頭辞の表示幅ぶん字下げする）に MUST 従う
 2. `[<段階>] <状態>  labels: <Labels を空白区切り>`（段階と状態は Requirement「紐づく PR 一覧は段階順に 1 行ずつ出し、選択中の PR に印を付ける」と同じ表記）
 3. 1 行目判定: `model.ParseUndecided(Body)` が `n, true` なら `未確定の判断: <n> 件`、false なら `1 行目に未確定の判断が無い`
 4. 紐づけ: s07 の `fetch.LinkedIssue(Title, Body)` が `n, true` なら `紐づく issue: #<n>`、false なら `紐づく issue: なし`（mvp.md「`Refs #n` / `Closes #n`」）
@@ -185,6 +192,18 @@ PR 詳細画面で `g` は、カードに `Issue` があればカード詳細画
 #### Scenario: PR 131 の詳細
 - **WHEN** `example` の issue 108 のカード詳細で `Enter` を与え（PR 131 が選択中）、`View` から ANSI エスケープを除いて読む
 - **THEN** `org/app PR#131`、`[propose] open  labels: propose question`、`1 行目に未確定の判断が無い`、`紐づく issue: #108`、`mergeable: UNKNOWN BLOCKED`、`test: SUCCESS`、`ci/legacy: PENDING`、本文の `issue #108 の提案`、`▌AI  19:31  Q1: マイグレーションを分けますか。  (+0 行)`、`thread 未 resolve` がこの順で含まれ、`checks: 取得失敗` と `review thread: 取得失敗` は含まれない（s20 で全 PR の merge 状態と review thread を取るので、`example` の PR 131 はどちらも埋まる）
+
+#### Scenario: 長い PR タイトルは折り返して全文出す
+- **WHEN** 幅 40・高さ 40 のサイズメッセージを与えた後、`Repo` が `org/app`、`Number` が 131、`Title` が表示幅 60 の PR の詳細を開き、`View` から ANSI エスケープを除いて読む。タイトル行は 1 行目と、それに続く行頭が `org/app PR#131  ` と同じ表示幅の空白である行とする
+- **THEN** タイトル行は 2 行以上あり、各行から接頭辞と行頭の空白を取り除いて連結した文字列が `Title` と一致し、どのタイトル行の表示幅も 40 以下で、`…` で終わるタイトル行は無い
+
+#### Scenario: 全角文字の PR タイトルは表示幅で折り返す
+- **WHEN** 幅 40・高さ 40 のサイズメッセージを与えた後、`Repo` が `org/app`、`Number` が 131、`Title` が全角文字 40 字の PR の詳細を開き、`View` から ANSI エスケープを除いて読む
+- **THEN** 上の Scenario と同じ手順で取り出したタイトル行の連結が `Title` と一致し、どのタイトル行の表示幅も 40 を超えない
+
+#### Scenario: labels 行は今までどおり幅で切り詰める
+- **WHEN** 幅 40・高さ 40 のサイズメッセージを与えた後、`Labels` を連ねた labels 行の表示幅が 60 になる PR の詳細を開き、`View` から ANSI エスケープを除いて読む
+- **THEN** `[` で始まる labels 行の表示幅は 40 以下で、末尾が `…` である
 
 #### Scenario: 未 resolve の thread が先頭に出る
 - **WHEN** `Labels` が `apply`、`ReviewThreads` が `[{IsResolved: true, Comments: [{user-3, "直しました"}]}, {IsResolved: false, Comments: [{user-1, "<!-- routine -->\nこの分岐は残しますか"}]}]` の順、`MergeState` が `{Mergeable: MERGEABLE, MergeStateStatus: CLEAN, StatusCheckRollup: [CheckRun test SUCCESS, StatusContext ci/legacy PENDING]}` の open PR の詳細を開き、`View` を読む
@@ -207,10 +226,11 @@ PR 詳細画面で `g` は、カードに `Issue` があればカード詳細画
 - **THEN** 画面は PR 詳細のままで、コマンドは返らない
 
 ### Requirement: 詳細の本文領域はスクロールし、ヘッダ領域は固定する
-カード詳細画面と PR 詳細画面は、端末の幅と高さ（s08 の `Model` が保持する値）の全体を使う 1 ペインで MUST 描く（キュー画面の表とプレビューの 2 ペインは詳細に適用しない）。上からヘッダ領域（カード詳細: ヘッダ行と PR 一覧。PR 詳細: 1〜2 行目）、区切り線、本文領域、フッタの順で、ヘッダ領域と区切り線とフッタは常に表示され、本文領域だけが残りの高さに収まらない分をスクロールする。
+カード詳細画面と PR 詳細画面は、端末の幅と高さ（s08 の `Model` が保持する値）の全体を使う 1 ペインで MUST 描く（キュー画面の表とプレビューの 2 ペインは詳細に適用しない）。上からヘッダ領域（カード詳細: ヘッダ行と PR 一覧。PR 詳細: タイトル行と labels 行）、区切り線、本文領域、フッタの順で、ヘッダ領域と区切り線とフッタは常に表示され、本文領域だけが残りの高さに収まらない分をスクロールする。
 本文領域は Bubbles の viewport で描き、`j` / `↓` で 1 行下へ、`k` / `↑` で 1 行上へ、`PgDn` / `PgUp` で本文領域の高さぶん動く（スクロールキーは mvp.md に無く、design.md 未決事項の既定値）。先頭と末尾で止まる。キュー画面から開いたとき、および PR 詳細とカード詳細を行き来したとき、スクロール位置は先頭に戻る。
 本文領域の高さは端末の高さからヘッダ領域の行数と区切り線 1 行とフッタ 1 行を引いた値で、下限は 1 行とする。1 行を下回るときはカード詳細の PR 一覧を末尾から落として（`なし` の行を含む）本文領域 1 行を確保する（design.md 未決事項の既定値）。
-フッタの左はその画面で動く操作キーのヒント（カード詳細: `Esc 戻る  Tab PR 選択  Enter PR を開く  x 展開  g PR へ  ? ヘルプ  u URL  a 回答  t todo  m merge  n 新規  o ブラウザ  q 終了`（表示幅 125 列）。`PRs` が空なら `Tab PR 選択  Enter PR を開く  g PR へ` と `m merge` を省く（`m` は選択中の PR が無ければ動かない。`n` は PR の有無によらず動くので省かない）。PR 詳細: `Esc 戻る  x 展開  g issue へ  ? ヘルプ  u URL  a 回答  m merge  n 新規  o ブラウザ  q 終了`（表示幅 90 列）。`? ヘルプ` を `a 回答` の前に置くのは、カード詳細で末尾に置くと幅 80 で切れてヘルプの入口が見えないため（`? ヘルプ` は 65 列目で終わる。design.md 未決事項の既定値）。`t` の振る舞いは s11 `todo-toggle` が定め、PR 詳細では `t` が何もしないのでヒントを出さない。`m` の振る舞いは s14 `merge-pr` が定め、`a 回答` の次に置く。`n` の振る舞いは s15 `new-issue` が定め、mvp.md キーバインド表の順で `m merge` の次（`o ブラウザ` の前）に置く。これで PR 詳細のヒントは 90 列になり、既定幅 80 の端末では末尾の `q 終了` と `o ブラウザ` が切れる（切れても動く。キュー画面のフッタと同じ判断で、キーを隠すよりキーを出すことを採った。s14 design.md）。`o` / `?` は s12 `browse-open` / `help-screen` が定める。`u` は s22 `url-picker` が定め、`? ヘルプ` の直後に置くのは幅 80 の端末で URL 一覧の入口を見せるためである（`u URL` は 72 列目で終わる。s22 design.md）。s11 までにあった `j/k スクロール` は、キュー画面のフッタ（s12 の `queue-screen` MODIFIED）と同じく移動系のキーとして `?` のヘルプに委ね、ヒントから外す）、右は s08 と同じステータス（スピナー / エラー）とする。ヒントが端末幅に収まらないときの切り詰めは s08 のフッタの規則のままである（カード詳細のヒントは幅 124 以下の端末で末尾から切れる。design.md）。
+折り返したタイトル行が高さを押し出す場合は、PR 一覧を落とした後にタイトル行を末尾から落とし、残った最後のタイトル行の末尾を `…` にする。タイトル行の 1 行目は落とさない（どの Issue / PR を見ているのかが分からなくなるため）。この規則により、**タイトルの折り返しを原因として**画面の行数が端末の高さを超えることは MUST 無い（タイトルが 1 行に収まるときの行数が既に端末の高さを超えている場合は、この change の範囲外であり従来どおりとする）。
+フッタの左はその画面で動く操作キーのヒント（カード詳細: `Esc 戻る  Tab PR 選択  Enter PR を開く  x 展開  g PR へ  ? ヘルプ  u URL  a 回答  t todo  L ラベル  m merge  n 新規  o ブラウザ  q 終了`（表示幅 135 列）。`PRs` が空なら `Tab PR 選択  Enter PR を開く  g PR へ` と `m merge` を省く（`m` は選択中の PR が無ければ動かない。`n` は PR の有無によらず動くので省かない）。PR 詳細: `Esc 戻る  x 展開  g issue へ  ? ヘルプ  u URL  a 回答  L ラベル  m merge  n 新規  o ブラウザ  q 終了`（表示幅 100 列）。`? ヘルプ` を `a 回答` の前に置くのは、カード詳細で末尾に置くと幅 80 で切れてヘルプの入口が見えないため（`? ヘルプ` は 65 列目で終わる。design.md 未決事項の既定値）。`t` の振る舞いは s11 `todo-toggle` が定め、PR 詳細では `t` が何もしないのでヒントを出さない。`m` の振る舞いは s14 `merge-pr` が定め、`a 回答` の次に置く。`n` の振る舞いは s15 `new-issue` が定め、mvp.md キーバインド表の順で `m merge` の次（`o ブラウザ` の前）に置く（切れても動く。キュー画面のフッタと同じ判断で、キーを隠すよりキーを出すことを採った。s14 design.md）。`o` / `?` は s12 `browse-open` / `help-screen` が定める。`u` は s22 `url-picker` が定め、`? ヘルプ` の直後に置くのは幅 80 の端末で URL 一覧の入口を見せるためである（`u URL` は 72 列目で終わる。s22 design.md）。s11 までにあった `j/k スクロール` は、キュー画面のフッタ（s12 の `queue-screen` MODIFIED）と同じく移動系のキーとして `?` のヘルプに委ね、ヒントから外す。`L` は s28 `label-picker` が定め、カード詳細では `t todo` の次、PR 詳細では `a 回答` の次（どちらも `m merge` の前）に置く。`t` が PR 詳細で何もしないのに対し `L` は両方で動くので、PR 詳細にもヒントを出す。これで PR 詳細は 100 列、カード詳細は 135 列になり、幅 80 の端末では PR 詳細も `a 回答` より後ろが切れる。`PRs` が空のカード詳細（87 列）も既定幅 80 には収まらない）、右は s08 と同じステータス（スピナー / エラー）とする。ヒントが端末幅に収まらないときの切り詰めは s08 のフッタの規則のままである（カード詳細のヒントは幅 134 以下の端末で末尾から切れる。design.md）。
 
 #### Scenario: 本文が高さを超えると j でスクロールする
 - **WHEN** `Body` が `行01` から `行60` までの 60 段落（各段落を空行で区切る）である issue の Card の詳細を、幅 100・高さ 20 の `Model` で開き、`View` を読んでから `j` を 5 回与えて `View` を読む
@@ -221,16 +241,20 @@ PR 詳細画面で `g` は、カードに `Issue` があればカード詳細画
 - **THEN** `行01` を含む
 
 #### Scenario: 詳細画面のフッタ
-- **WHEN** 幅 130・高さ 40 のサイズメッセージを与えてカード詳細を開いた `Model` の `View` から ANSI エスケープを除いて読み、`Enter` で PR 詳細に移って再び読む
-- **THEN** 1 回目の最終行に `Esc 戻る`、`Tab PR 選択`、`x 展開`、`? ヘルプ`、`u URL`、`a 回答`、`t todo`、`m merge`、`n 新規`、`o ブラウザ`、`q 終了` が含まれ `1-4/Tab タブ` と `R 更新` と `j/k スクロール` は含まれない。2 回目の最終行に `Esc 戻る` と `g issue へ` と `? ヘルプ` と `u URL` と `a 回答` と `m merge` と `n 新規` と `o ブラウザ` と `q 終了` が含まれ `Tab PR 選択` と `t todo` と `R 更新` は含まれない
+- **WHEN** 幅 140・高さ 40 のサイズメッセージを与えてカード詳細を開いた `Model` の `View` から ANSI エスケープを除いて読み、`Enter` で PR 詳細に移って再び読む
+- **THEN** 1 回目の最終行に `Esc 戻る`、`Tab PR 選択`、`x 展開`、`? ヘルプ`、`u URL`、`a 回答`、`t todo`、`L ラベル`、`m merge`、`n 新規`、`o ブラウザ`、`q 終了` が含まれ `1-4/Tab タブ` と `R 更新` と `j/k スクロール` は含まれない。2 回目の最終行に `Esc 戻る` と `g issue へ` と `? ヘルプ` と `u URL` と `a 回答` と `L ラベル` と `m merge` と `n 新規` と `o ブラウザ` と `q 終了` が含まれ `Tab PR 選択` と `t todo` と `R 更新` は含まれない
 
 #### Scenario: PR の無いカードのフッタには PR のキーを出さない
-- **WHEN** `example` の issue 140 の Card（`PRs` 空）の詳細を幅 130・高さ 40 で開き、`View` から ANSI エスケープを除いて読む
-- **THEN** 最終行に `Esc 戻る` と `x 展開` と `t todo` と `n 新規` と `o ブラウザ` が含まれ、`Tab PR 選択`、`Enter PR を開く`、`g PR へ`、`m merge` は含まれない
+- **WHEN** `example` の issue 140 の Card（`PRs` 空）の詳細を幅 140・高さ 40 で開き、`View` から ANSI エスケープを除いて読む
+- **THEN** 最終行に `Esc 戻る` と `x 展開` と `t todo` と `L ラベル` と `n 新規` と `o ブラウザ` が含まれ、`Tab PR 選択`、`Enter PR を開く`、`g PR へ`、`m merge` は含まれない
 
 #### Scenario: 低い端末では PR 一覧を削って本文 1 行を残す
-- **WHEN** `Body` が `行01` の 1 行で、`PRs` が `propose` / `apply` / `archive` の open PR 3 件の issue の Card の詳細を、幅 130・高さ 7 の `Model` で開き、`View` から ANSI エスケープを除いて読む
+- **WHEN** `Body` が `行01` の 1 行で、`PRs` が `propose` / `apply` / `archive` の open PR 3 件の issue の Card の詳細を、幅 140・高さ 7 の `Model` で開き、`View` から ANSI エスケープを除いて読む
 - **THEN** ヘッダ行 `org/app #<n>` と本文の `行01` とフッタの `q 終了` が含まれ、`[archive] PR#` の行は含まれない
+
+#### Scenario: 折り返した PR タイトルが高さを埋めても画面は端末の高さに収まる
+- **WHEN** `Repo` が `org/app`、`Number` が 131、`Title` が表示幅 300、`Body` が `行01` の 1 行、`Labels` が `apply` 1 件、`Comments` と `ReviewThreads` が長さ 0、`MergeState` が `{Mergeable: UNKNOWN, StatusCheckRollup: []}` の PR の詳細を、幅 40・高さ 8 の `Model` で開き、`View` から ANSI エスケープを除いて読む
+- **THEN** 行数はちょうど 8 で、1 行目は `org/app PR#131` で始まり、最後のタイトル行の末尾は `…` であり、labels 行と区切り線とフッタが含まれる（フッタのヒントは 100 列なので幅 40 では末尾が切れる。この Requirement が定めたとおりで、先頭の `Esc 戻る` で在ることを確かめる）
 
 #### Scenario: 狭い端末でも詳細は 1 ペインで全部出す
 - **WHEN** 幅 60・高さ 40 の `Model` でカード詳細を開き、`View` を読む

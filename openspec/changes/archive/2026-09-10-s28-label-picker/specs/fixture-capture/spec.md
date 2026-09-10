@@ -2,7 +2,7 @@
 
 ### Requirement: fixture capture は指定リポジトリの fixture を採取して保存する
 `loop-cli-dev fixture capture --repo <owner/name> --alias <alias>` は、稼働中リポジトリ 1 件の open issue / open PR と、その全件の詳細と、そのリポジトリで使えるラベルの一覧を採取し、伏せ字にして `internal/gh/testdata/fixtures/<alias>/` に s03 `gh-fake` の命名規則で MUST 保存する。
-- `--repo` は `owner/name` 形式（`/` で 2 つに分かれ、どちらも空でない）でなければならない。`--alias` は `^[a-z0-9-]+$` に一致し、`example`（s03 の手書き fixture）以外で、かつ `owner` / `name` のどちらも（大文字小文字を区別せず）部分文字列として含んではならない（alias は `name` の置換先なので、含むと元の名前が fixture に残り、次の Requirement の検査 3 が落ちる）
+- `--repo` は `owner/name` 形式（`/` で 2 つに分かれ、どちらも空でない）でなければならない。`--alias` は `^[a-z0-9-]+$` に一致し、`example`（s03 の手書き fixture）以外で、かつ `owner` / `name` のどちらも（大文字小文字を区別せず）部分文字列として含んではならない（alias は `name` の置換先なので、含むと元の名前が fixture に残り、次の Requirement の検査 3 が落ちる）。違反は `gh` を実行する前のエラー
 - 保存先はカレントディレクトリからの相対パス `internal/gh/testdata/fixtures/<alias>`。`internal/gh/testdata/fixtures` が存在しなければ、リポジトリのルートで実行するよう促すエラーを返す。`<alias>` ディレクトリが既にあれば中身を消してから書く（再採取で古い issue のファイルが残らないようにする）
 - サブコマンドは、s03 `Client.Check`、`Client.Capture`（`progress` で受け取ったファイル名を 1 行ずつ標準エラーに出す）、伏せ字（次の Requirement）、書き込み、自己検査、要約をこの順に実行する。`Check` と `Capture` と伏せ字が失敗したときは、そのエラーをそのまま返し、ファイルを書かない
 - `Capture` は `labels.json`（`ListLabels` の標準出力）も採る（採取の順序は s03 `gh-client`「Client は fixture 用に読み取りコマンドの標準出力を採取する」が定める）。`labels.json` のラベル名は `"name": "…"` の形なので、次の Requirement の衝突ガードの (a)（`login` / `name` 以外のキーの値）には当たらない。固定 12 語（`todo` / `propose` / … ）に一致するラベル名だけがガードに掛かり、それ以外のプロジェクト固有ラベルがリポジトリ名や login と同じ文字列だと、伏せ字がラベル名まで書き換える

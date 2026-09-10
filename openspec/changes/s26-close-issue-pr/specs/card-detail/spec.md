@@ -65,3 +65,7 @@
 #### Scenario: 狭い端末でも詳細は 1 ペインで全部出す
 - **WHEN** 幅 60・高さ 40 の `Model` でカード詳細を開き、`View` を読む
 - **THEN** ヘッダ行 `org/app #108` と PR 一覧の `PR#131` と本文の `認証まわりの仕様を決めたい` がすべて含まれ、区切り線はちょうど 1 本で、`org/app #108` と `PR#131` はその上、`認証まわりの仕様を決めたい` はその下にある（ヘッダ領域 / 区切り線 / 本文領域 の 1 ペイン）
+
+#### Scenario: 折り返した PR タイトルが高さを埋めても画面は端末の高さに収まる
+- **WHEN** `Repo` が `org/app`、`Number` が 131、`Title` が表示幅 300、`Body` が `行01` の 1 行、`Labels` が `apply` 1 件、`Comments` と `ReviewThreads` が長さ 0、`MergeState` が `{Mergeable: UNKNOWN, StatusCheckRollup: []}` の PR の詳細を、幅 40・高さ 8 の `Model` で開き、`View` から ANSI エスケープを除いて読む
+- **THEN** 行数はちょうど 8 で、1 行目は `org/app PR#131` で始まり、最後のタイトル行の末尾は `…` であり、labels 行と区切り線とフッタが含まれる（フッタのヒントは 100 列なので幅 40 では末尾が切れる。この Requirement が定めたとおりで、先頭の `Esc 戻る` で在ることを確かめる）
