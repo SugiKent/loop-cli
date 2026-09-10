@@ -1,6 +1,6 @@
-## 0. 前提の確認
+## 0. 先行 change との突き合わせ（実装の前と archive の直前に必ず行う）
 
-- [ ] 0.1 `origin/main` の `openspec/changes/` に `s26-issue-label-driven` が残っていないこと（archive 済みであること）を確認する。残っていたら着手せず `blocked-by: change s26-issue-label-driven` で issue へ書き戻す（この change の `card-detail` / `help-screen` / `queue-screen` の delta は s26 の delta を土台に写しており、s26 より先に archive すると s26 の変更を打ち消す）
+- [ ] 0.1 `origin/main` の `openspec/specs/` を見て、この change の 5 つの MODIFIED（proposal の Impact の表）を**その時点の最新の版から写し直す**。先に archive された change の追記を消していないことを `git diff` で確かめる。まだ archive されていない change が同じ Requirement を触っているときは、それを消さないよう本文を合成する（MODIFIED は Requirement ブロック全体を置き換えるので、写し忘れると先行 change の変更が消える）
 
 ## 1. ラベルの取得と一括編集（internal/gh）
 

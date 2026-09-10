@@ -45,9 +45,19 @@ Refs #3
 - `docs/mvp/mvp.md`: キーバインド表に `L` の行と、変更履歴に 1 行
 - `docs/domain/issue-driven-sdd/human-turn-signals.md`: 不変条件 1 と 2、および冒頭の「`ai-assess:requested` は この TUI からは行わない」の 3 か所の改訂（後述）
 - `l` はカンバンの列移動（s17、未着手）の予約のまま残るので、`docs/mvp/mvp.md` の既存行は変えない
-- 先行する change: issue #5 の `s26-issue-label-driven` が `origin/main` に merge され、`openspec/changes/` 直下に未実装のまま置かれている。これは `card-detail` / `help-screen` / `queue-screen` を含む 10 の capability を MODIFIED する。この change の UI 側 delta は **s26 の delta を土台に写して書き、実装と archive は s26 → s27 の順に行う**（s22 が s21 に対して行ったのと同じ）。番号を `s26` から `s27` に繰り上げたのは、`s26` を先に merge された change が使っているためである
+- **未 archive の先行 change との衝突。** `origin/main` の `openspec/changes/` 直下に `s15-new-issue`（issue #6）・`s26-issue-label-driven`（issue #5）・`2026-09-10-s27-wrap-titles`（issue #2）の 3 つが未実装で置かれており、この change の 5 つの MODIFIED はすべてどれかと重なる。MODIFIED は Requirement ブロック全体を置き換えるので、写し忘れると先に archive された change の変更が消える。
+
+| Requirement | この change | s15-new-issue | s26-issue-label-driven | 2026-09-10-s27-wrap-titles |
+| --- | --- | --- | --- | --- |
+| queue-screen「j / k / ↑ / ↓ で行を移動し、1–4 / Tab でタブを切り替え、他のキーは何もしない」 | ✓ | ✓ | | |
+| queue-screen「ヘッダはタブ名と件数と最終更新時刻、フッタはキーヒントとステータスを出す」 | ✓ | ✓ | | |
+| card-detail「Enter でカード詳細を開き、Esc で 1 つ前の画面に戻る」 | ✓ | ✓ | | |
+| card-detail「詳細の本文領域はスクロールし、ヘッダ領域は固定する」 | ✓ | ✓ | | ✓ |
+| help-screen「ヘルプ画面は実装済みのキーだけを一覧する」 | ✓ | ✓ | ✓ | |
+
+  今この change に入っている delta の土台は、`help-screen` が `s26-issue-label-driven` の版、他の 4 つが `openspec/specs/` の版である。**archive の順序は決まっていないので、tasks 0.1 で apply と archive の直前に最新の版から写し直す。** 番号を `s26` → `s27` → `s28` と繰り上げてきたのは、`s26` と `s27` を先に merge された change が使っているためである
 - `s26-issue-label-driven` が入ると、リポジトリは `sdd` と `label` の 2 方式を持ち、`t` が付けるラベルが方式で変わる（`stage:todo` / `To Do`）。`L` のラベル一覧はリポジトリが実際に持つラベルをそのまま並べるので、方式の分岐を持たずに両方で動く
-- 並行して走っている propose との関係: issue #2 / #4 / #6 が同時に propose 段階にある（それぞれ別セッション）。#4（`c` で close）と #6（`n` で issue 作成）は同じく画面とキーを足すので `queue-screen` / `card-detail` / `help-screen` / `gh-client` / `gh-fake` の同じ Requirement を MODIFIED する。#2（タイトルの折り返し）は `card-detail` のヘッダを MODIFIED する。UI 側 delta を書く時点の `origin/main` を見て、merge 済みのものを土台にする
+- `s15-new-issue` は `n`（issue 作成）でフッタのキーヒントを触るが、「`n` はヒントに足さない」と決めている。この change は人の判断（Q5）で `L ラベル` を足すので、フッタの列数の記述は写し直しのときに両方を合わせる
 
 ## 確定した判断
 
