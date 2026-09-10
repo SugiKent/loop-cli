@@ -57,10 +57,11 @@ close にコメントを添える機能は入れない（コメントは `a` が
 - `gh` は `y` の後に `gh issue close` または `gh pr close` を 1 回呼ぶだけで、読み取りは呼ばない
 - close された issue / PR は次の取得（`R` / 自動更新）で `gh search --state open` の結果から消え、キューの行としては落ちる
 - 書き込み後の対象 1 件再取得（D-002）は s18 の担当で、この change では行わない
-- 順序依存と衝突: `origin/main` の `openspec/changes/` にある未 archive の change 3 本が、この change と同じ Requirement を
+- 順序依存と衝突: `origin/main` の `openspec/changes/` にある未 archive の change が、この change と同じ Requirement を
   MODIFIED している。`openspec archive` は MODIFIED をその時点のメイン spec に上書きするので、**apply / archive の直前に
   下の Requirement を、そのときのメイン spec と未 archive の先行 change の delta から写し直す**（tasks 1.0）。
-  写し直さずに archive すると、先に archive された change の変更が消える。
+  写し直さずに archive すると、先に archive された change の変更が消える。下の一覧は 2026-09-10 09:15 時点の断面で、
+  この repo は propose PR が次々 merge されるので、tasks 1.0 はそのときに存在する change を見て写し直す（一覧の更新は要らない）。
   - `help-screen`「ヘルプ画面は実装済みのキーだけを一覧する」: `s26-issue-label-driven`（`t` の行を
     `stage:todo / To Do を付ける / 外す` に変更）と `s15-new-issue`（`n` の行を `m` の次に追加）。この change の delta は
     `s26-issue-label-driven` の版を土台にしているので、`s15-new-issue` の `n` の行を足す作業が残る（3 本すべてが入ると
@@ -73,6 +74,12 @@ close にコメントを添える機能は入れない（コメントは `a` が
   - `card-detail`「詳細の本文領域はスクロールし、ヘッダ領域は固定する」: `s15-new-issue`（詳細のフッタに `n` を追加）と
     `2026-09-10-s27-wrap-titles`（タイトル行の折り返しと切り詰めを追加）
   - `todo-toggle`「書き込み中は t と a を受け付けない」: `s15-new-issue`（`n` を追加）
+  - `gh-fake`「Fake は書き込み呼び出しと ViewIssue を記録する」: `s28-label-picker`（`ListLabels` とラベルの一括編集の
+    記録を追加）。この change は同じ Requirement に `CloseIssue` / `ClosePR` を足す
+
+  `s28-label-picker` は上のうち `help-screen` 1 本・`queue-screen` 2 本・`card-detail` 2 本・`gh-fake` 1 本を触る
+  （`L` のラベル一覧画面を足す change）。`2026-09-10-s27-wrap-titles` は `card-detail` 1 本、`s15-new-issue` は 5 本、
+  `s26-issue-label-driven` は `help-screen` 1 本である。
 - フッタの budget の食い違い: `s15-new-issue` は「キュー画面のヒントは 80 列で埋まっているので `n 新規` は足さず、
   入口は `?` のヘルプと詳細画面のフッタが見せる」と決めている。この change は人の判断（PR #10 のコメント）で
   `c close` を足して 89 列にするので、両方が入ると「`c` はヒントにあって `n` は無い」状態になる。判断は人のもので、
