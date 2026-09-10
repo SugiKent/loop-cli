@@ -30,3 +30,15 @@
 #### Scenario: CloseIssue と ClosePR の呼び出しが記録される
 - **WHEN** `CloseIssue(ctx, "org/app", 108)` の後に `ClosePR(ctx, "org/app", 131)` を呼ぶ
 - **THEN** `Calls` は 2 件で、`Method` は順に `CloseIssue` / `ClosePR`、`Repo` はどちらも `org/app`、`Number` は順に 108 と 131 であり、`Body` と `Label` はゼロ値である
+
+#### Scenario: ラベルの一括編集は付ける並びと外す並びごと記録される
+- **WHEN** `EditIssueLabels(ctx, "org/app", 108, []string{"docs", "wip"}, []string{"blocked"})` を呼ぶ
+- **THEN** `Calls` は 1 件で、`Method` が `EditIssueLabels`、`Repo` が `org/app`、`Number` が 108、`AddLabels` が `["docs", "wip"]`、`RemoveLabels` が `["blocked"]`、`Label` はゼロ値である
+
+#### Scenario: PR へのラベル書き込みは issue と別の Method で記録される
+- **WHEN** `EditPRLabels(ctx, "org/app", 131, []string{"docs"}, nil)` を呼ぶ
+- **THEN** `Calls` は 1 件で、`Method` が `EditPRLabels`、`Number` が 131、`AddLabels` が `["docs"]`、`RemoveLabels` が空である
+
+#### Scenario: ListLabels の呼び出しが記録される
+- **WHEN** `ListLabels(ctx, "org/app")` を 2 回呼ぶ
+- **THEN** `Calls` は 2 件で、どちらも `Method` が `ListLabels`、`Repo` が `org/app` であり、`Number` と `Label` はゼロ値である
