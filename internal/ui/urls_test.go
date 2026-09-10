@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -248,7 +249,7 @@ func TestURLListEnterOpensSelected(t *testing.T) {
 	m, _ = runCmd(t, m, cmd)
 
 	want := gh.Call{Method: "OpenURL", URL: "https://example.com/1"}
-	if len(fake.Calls) != 1 || fake.Calls[0] != want {
+	if len(fake.Calls) != 1 || !reflect.DeepEqual(fake.Calls[0], want) {
 		t.Fatalf("呼び出し = %+v, want [%+v]", fake.Calls, want)
 	}
 	if m.screen != screenURL {

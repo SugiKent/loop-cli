@@ -70,5 +70,10 @@ func (c *Client) Capture(ctx context.Context, repo string, progress func(name st
 		}
 	}
 
+	// ラベルの一覧はリポジトリ単位の 1 ファイルなので、issue / PR の繰り返しの後に 1 回だけ採る。
+	if _, err := capture(fixtureLabels, argsListLabels(repo)); err != nil {
+		return nil, err
+	}
+
 	return files, nil
 }

@@ -11,7 +11,7 @@ context: |
     - docs/mvp/validation-plan.md（V-1 / V-2。未定事項あり）
     - docs/domain/issue-driven-sdd/human-turn-signals.md（局面 A〜G の判定表と書き込み不変条件 1〜8）
   内部構成（D-003）: cmd/loop-cli, cmd/loop-cli-dev, internal/{config,gh,model,classify,ui,action}
-  ラベル名と routine マーカー（<!-- routine -->）はプラグイン規約に固定。TUI が書くラベルは stage:todo と s の stage:propose のみ。
+  ラベル名と routine マーカー（<!-- routine -->）はプラグイン規約に固定。TUI が書くラベルは t の stage:todo と s の stage:propose に加え、L のラベル一覧で人が選んだ任意のラベル（段階ラベルを含む）。
   プロジェクトの CLAUDE.md（シンプルさ最優先・投機的機能を書かない）に従う。
 
 rules:

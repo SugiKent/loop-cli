@@ -111,6 +111,13 @@ func argsPRView(repo string, number int, fields string) []string {
 	return []string{"pr", "view", strconv.Itoa(number), "-R", repo, "--json", fields}
 }
 
+// argsListLabels は --sort name --order asc を明示する。gh の既定は作成順で、
+// リポジトリごとに並びが変わると画面も fixture も非決定になる。
+func argsListLabels(repo string) []string {
+	return []string{"label", "list", "-R", repo, "--json", "name,description,color",
+		"--sort", "name", "--order", "asc", "--limit", "100"}
+}
+
 func argsReviewThreads(repo string, number int) []string {
 	owner, name := splitRepo(repo)
 	return []string{"api", "graphql",
@@ -270,6 +277,20 @@ func (c *Client) LabelTimeline(ctx context.Context, repo string, number int) ([]
 	return events, nil
 }
 
+func (c *Client) ListLabels(ctx context.Context, repo string) ([]RepoLabel, error) {
+	args := argsListLabels(repo)
+
+	out, err := c.run(ctx, "", args...)
+	if err != nil {
+		return nil, err
+	}
+	labels, err := decodeRepoLabels(out)
+	if err != nil {
+		return nil, decodeErr(args, err)
+	}
+	return labels, nil
+}
+
 func (c *Client) CommentIssue(ctx context.Context, repo string, number int, body string) error {
 	_, err := c.run(ctx, body, "issue", "comment", strconv.Itoa(number), "-R", repo, "--body-file", "-")
 	return err
@@ -287,6 +308,34 @@ func (c *Client) AddLabel(ctx context.Context, repo string, number int, label st
 
 func (c *Client) RemoveLabel(ctx context.Context, repo string, number int, label string) error {
 	_, err := c.run(ctx, "", "issue", "edit", strconv.Itoa(number), "-R", repo, "--remove-label", label)
+	return err
+}
+
+func (c *Client) EditIssueLabels(ctx context.Context, repo string, number int, add, remove []string) error {
+	return c.editLabels(ctx, "issue", repo, number, add, remove)
+}
+
+// EditPRLabels は gh pr edit で書く。gh issue edit は PR 番号でも通るが、その挙動はヘルプに
+// 書かれておらず Fake では検証できないので、PR の操作は pr サブコマンドに揃える。
+func (c *Client) EditPRLabels(ctx context.Context, repo string, number int, add, remove []string) error {
+	return c.editLabels(ctx, "pr", repo, number, add, remove)
+}
+
+// editLabels は付ける名前と外す名前を 1 回の gh 実行で渡す。フラグは 1 名前 1 回ずつ繰り返す
+// （--add-label a,b はコンマを含む名前で割れる）。ラベル集合の置換は行わないので、
+// 渡さなかったラベルには触らない。ただし gh は付ける・外すを別の mutation で送るので原子的ではない。
+func (c *Client) editLabels(ctx context.Context, kind, repo string, number int, add, remove []string) error {
+	if len(add) == 0 && len(remove) == 0 {
+		return nil
+	}
+	args := []string{kind, "edit", strconv.Itoa(number), "-R", repo}
+	for _, l := range add {
+		args = append(args, "--add-label", l)
+	}
+	for _, l := range remove {
+		args = append(args, "--remove-label", l)
+	}
+	_, err := c.run(ctx, "", args...)
 	return err
 }
 

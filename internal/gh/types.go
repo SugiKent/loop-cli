@@ -7,6 +7,14 @@ type Label struct {
 	Name string `json:"name"`
 }
 
+// RepoLabel は gh label list の 1 件。リポジトリで使えるラベルの定義を表す。
+// issue / PR に付いているラベル（Label）とは取得元も用途も違うので型を分ける。
+type RepoLabel struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Color       string `json:"color"`
+}
+
 // Repository は gh search の repository フィールド。
 type Repository struct {
 	Name          string `json:"name"`

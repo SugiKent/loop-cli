@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -194,7 +195,7 @@ func TestNewConfirmKeys(t *testing.T) {
 			Method: "CreateIssue", Repo: "org/app",
 			Title: "キュー画面の色を見直す", Body: "種別の色が背景色と競合している。",
 		}
-		if len(fake.Calls) != 1 || fake.Calls[0] != want {
+		if len(fake.Calls) != 1 || !reflect.DeepEqual(fake.Calls[0], want) {
 			t.Fatalf("呼び出し = %+v, want 1 件の %+v", fake.Calls, want)
 		}
 		if m.screen != screenQueue {

@@ -18,11 +18,14 @@ type GHClient interface {
 	ReviewThreads(ctx context.Context, repo string, number int) ([]ReviewThread, error)
 	CrossReferencedPRs(ctx context.Context, repo string, number int) ([]CrossReferencedPR, error)
 	LabelTimeline(ctx context.Context, repo string, number int) ([]LabelEvent, error)
+	ListLabels(ctx context.Context, repo string) ([]RepoLabel, error)
 
 	CommentIssue(ctx context.Context, repo string, number int, body string) error
 	CommentPR(ctx context.Context, repo string, number int, body string) error
 	AddLabel(ctx context.Context, repo string, number int, label string) error
 	RemoveLabel(ctx context.Context, repo string, number int, label string) error
+	EditIssueLabels(ctx context.Context, repo string, number int, add, remove []string) error
+	EditPRLabels(ctx context.Context, repo string, number int, add, remove []string) error
 	MergePR(ctx context.Context, repo string, number int, method string) error
 	CreateIssue(ctx context.Context, repo string, title string, body string) (string, error)
 	ReplyReviewThread(ctx context.Context, repo string, number int, commentID int64, body string) error

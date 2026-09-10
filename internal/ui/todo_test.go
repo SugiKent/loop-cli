@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -70,7 +71,7 @@ func TestTodoAddsStageTodo(t *testing.T) {
 		t.Fatalf("呼び出し = %+v, want %+v", fake.Calls, want)
 	}
 	for i, w := range want {
-		if fake.Calls[i] != w {
+		if !reflect.DeepEqual(fake.Calls[i], w) {
 			t.Errorf("%d 件目 = %+v, want %+v", i+1, fake.Calls[i], w)
 		}
 	}
@@ -100,7 +101,7 @@ func TestTodoTargetsIssueOfPRCard(t *testing.T) {
 	m, _ = runCmd(t, m, cmd)
 
 	want := gh.Call{Method: "ViewIssue", Repo: "org/app", Number: 108}
-	if len(fake.Calls) != 1 || fake.Calls[0] != want {
+	if len(fake.Calls) != 1 || !reflect.DeepEqual(fake.Calls[0], want) {
 		t.Fatalf("呼び出し = %+v, want 1 件の %+v", fake.Calls, want)
 	}
 	text := plainText(m)
@@ -124,7 +125,7 @@ func TestTodoRemovesStageTodo(t *testing.T) {
 	m, _ = runCmd(t, m, cmd)
 
 	want := gh.Call{Method: "RemoveLabel", Repo: "org/app", Number: 150, Label: model.LabelStageTodo}
-	if len(fake.Calls) != 2 || fake.Calls[1] != want {
+	if len(fake.Calls) != 2 || !reflect.DeepEqual(fake.Calls[1], want) {
 		t.Fatalf("呼び出し = %+v, want 2 件目が %+v", fake.Calls, want)
 	}
 	if text := plainText(m); !strings.Contains(text, "org/app #150 から stage:todo を外しました") {
@@ -141,7 +142,7 @@ func TestTodoWorksOnCardDetail(t *testing.T) {
 	m, _ = runCmd(t, m, cmd)
 
 	want := gh.Call{Method: "AddLabel", Repo: "org/app", Number: 140, Label: model.LabelStageTodo}
-	if len(fake.Calls) != 2 || fake.Calls[1] != want {
+	if len(fake.Calls) != 2 || !reflect.DeepEqual(fake.Calls[1], want) {
 		t.Fatalf("呼び出し = %+v, want 2 件目が %+v", fake.Calls, want)
 	}
 	if m.screen != screenCard || m.detail.card.Issue.Number != 140 {

@@ -112,6 +112,7 @@ issue-label-driven（`To Do` / `In Progress` / `Done` の 3 ラベルだけで�
 | `a` | 回答・コメント（`$EDITOR` を開く）。PR の `question`（局面 A）と issue の `question`（局面 B）の両方。ラベルは触らない | `gh pr comment -R … --body-file` / `gh issue comment` |
 | `A` | review thread に返信（PR 詳細で thread 選択中） | `gh api -X POST repos/{o}/{r}/pulls/{n}/comments/{id}/replies` |
 | `t` | `stage:todo` を付ける / 外す（付け直しは dispatcher への「もう一度評価しろ」の合図） | `gh issue edit --add-label` / `--remove-label`（1 操作 1 ラベル） |
+| `L` | ラベル一覧を開いて付け外し（対象は issue でも PR でもよい。`Space` で印を切り替え、`Enter` でまとめて反映） | `gh label list -R … --json name,description,color`（リポジトリ単位でキャッシュ）→ `gh issue edit` / `gh pr edit` の `--add-label` / `--remove-label` を 1 回 |
 | `s` | 順番を飛ばして即着手 | 確認 → `stage:todo` が付いていれば外す → `stage:propose` を付ける（段階ラベルは同時に 1 つ）。TUI が段階ラベルを書く唯一の強制操作 |
 | `m` | merge | ガード判定 → 確認 → `gh pr merge -R … --<method>` |
 | `n` | 新規 Issue 作成。選択中の対象の repo に `$EDITOR` で作成（1 行目がタイトル、以降が本文）→ 確認 → 作成。repo は選ばせない | `gh issue create -R <選択中の repo>`。ラベルは付けない（段階ラベルも assignee も付けない） |
@@ -177,6 +178,7 @@ notify: true                  # 人の出番が新しく増えたらデスクト
 | 日時 | 変更内容 | 理由 |
 | --- | --- | --- |
 | 2026-09-10-1100 | キュー画面の画面図を、長いタイトルが折り返して全文出る形に描き直し、折り返しの規則を 1 項目足した | タイトルの切り詰めをやめて折り返しに変えたため（#2・s27-wrap-titles） |
+| 2026-09-10-0900 | キーバインド表に `L`（ラベル一覧を開いて付け外し）を追加 | `t` の `stage:todo` 以外のラベルを触るには画面を離れるしかなかったため。キーを 1 つにすればラベルの種類が増えてもキーは増えない（#3・s28-label-picker） |
 | 2026-09-10-0800 | キーバインド表の `n` を「選択中の対象の repo に `$EDITOR` で作成」に変更（フォームでの repo 選択を廃止） | 気づいた瞬間に repo を選び直す往復を無くすため。作成先は画面が見せている対象から決まる（#6・s15-new-issue） |
 | 2026-09-10-0700 | 設定ファイルに `mode: sdd \| label` を、0 件ヒントの文言と「前提と未決事項」に issue-label-driven の扱いを追加 | `To Do` / `In Progress` / `Done` の 3 ラベルで進むリポジトリを同じキューに載せるため（#5） |
 | 2026-09-06-1200 | 画面構成にヘッダの `↑ update`（新しい版があるときの印）を追加 | `go install` で入れた後に更新に気づける手立てが無かったため（s23-self-update） |
