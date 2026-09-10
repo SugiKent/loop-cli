@@ -2,7 +2,9 @@
 
 ## Purpose
 TBD - created by archiving change s08-queue-screen. Update Purpose after archive.
+
 ## Requirements
+
 ### Requirement: Model は Card をタブ別に並べ、選択行を 1 つ持つ
 `internal/ui` は Bubble Tea の Model として型 `Model` と、取得関数・`gh` クライアント・エディタ起動・起動時の選択肢を受け取る `New(fetcher Fetcher, client gh.GHClient, editor Editor, opts Options) Model` を MUST 提供する。`Fetcher` は `func(ctx context.Context) (*fetch.Result, error)` で、s07 の `fetch.Fetch` を `client` と `repos` で閉じ、s13 `snapshot-cache`「取得が成功するたびにスナップショットを保存する」の保存で包んだものを `cmd/loop-cli` が渡す。`client` は書き込み（s10 `answer-question` の `a`。後続の `t` / `m` / `n` / `s` も同じ `client` を使う）に使い、取得には使わない。`Editor` は s10 `answer-question`「a は画面の対象を決めて回答テンプレートを入れたエディタを開く」の型で、`cmd/loop-cli` は `ExternalEditor(Config.Editor)` を、テストは固定文字列を返すスタブを渡す。`Options` は公開する構造体で、次の 5 つのフィールドを持ち、ゼロ値は「スナップショット無し・自動更新無し・通知無し・更新の確認無し・merge 方式は既定」である（s13 が導入。テストは `Options{}` を渡してよい）。
 - `Snapshot *snapshot.Snapshot`: `Model` が起動時の stale 表示に使う Card 群と保存時刻を持つ。`nil` なら `Model` は空の画面から始める（s13 `snapshot-cache`「起動時にスナップショットがあれば stale 表示から始める」）
@@ -250,10 +252,10 @@ TBD - created by archiving change s08-queue-screen. Update Purpose after archive
 - **THEN** 表は 0 行、ヘッダは `↻ --:--`、フッタに error の文字列が含まれ、`取得中` は含まれない
 
 ### Requirement: 取得が成功して Card が 0 件のときは表の領域にヒントを出す
-キュー画面は、直近の取得が成功して `Cards` が 0 件（全タブが空）のとき、表の領域の代わりに次の 2 行を MUST 出す（mvp.md「初回起動（onboarding）」の文言。Markdown のバッククォートは付けない）。
+キュー画面は、直近の取得が成功して `Cards` が 0 件（全タブが空）のとき、表の領域の代わりに次の 2 行を MUST 出す（mvp.md「初回起動（onboarding）」の文言。Markdown のバッククォートは付けない）。2 方式のどちらの利用者も設定を直せるように、両方の入口を示す。
 ```
-stage:* ラベルの無いリポジトリは何も出ません。
-issue-driven-sdd の routines-setup を回したリポジトリを設定してください
+stage:* / To Do ラベルの無いリポジトリは何も出ません。
+issue-driven-sdd の routines-setup を回すか、repos に mode: label を設定してください
 ```
 2 行は表の領域（表の高さ）の縦中央に置き、各行を端末幅の横中央に置く（左に空白を置き、右には足さない）。端末幅より長い行は幅で切る。プレビューの領域は変えない。
 次のときは出さない。
@@ -264,7 +266,7 @@ issue-driven-sdd の routines-setup を回したリポジトリを設定して�
 
 #### Scenario: 取得成功で 0 件ならヒントが出る
 - **WHEN** `Cards` が空で `Errors` も空の `Result` を取得完了として渡し、`View` から ANSI エスケープを除いて読む
-- **THEN** `stage:* ラベルの無いリポジトリは何も出ません。` と `issue-driven-sdd の routines-setup を回したリポジトリを設定してください` の 2 行が含まれ、ヘッダの `[1]今やる 0` とフッタは従来どおり出る
+- **THEN** `stage:* / To Do ラベルの無いリポジトリは何も出ません。` と `issue-driven-sdd の routines-setup を回すか、repos に mode: label を設定してください` の 2 行が含まれ、ヘッダの `[1]今やる 0` とフッタは従来どおり出る
 
 #### Scenario: 取得中はヒントを出さない
 - **WHEN** `New` 直後（初回取得前）の `Model` の `View` から ANSI エスケープを除いて読む
@@ -286,3 +288,31 @@ issue-driven-sdd の routines-setup を回したリポジトリを設定して�
 - **WHEN** `Cards` が空の `Result` を渡した `Model` に幅 60・高さ 40 のサイズメッセージを与え、`View` から ANSI エスケープを除いて読む
 - **THEN** `routines-setup` を含む行と、プレビュー領域の `（このタブにはカードがありません）` の両方が含まれる
 
+### Requirement: リポジトリごとの運用方式を設定から受け取る
+`internal/ui` の `Options` は `Modes map[string]model.Mode`（リポジトリ名 → 運用方式）を MUST 持ち、`Model` は方式が要るときに必ずこの表を引く。表に無いリポジトリは `model.Mode` のゼロ値（`sdd`）として扱う。`cmd/loop-cli` が `Config.Repos` から表を作って渡す（`MergeMethods` と同じ経路で、`internal/ui` は `internal/config` を import しない）。
+表示（カード詳細の段階行・バッジ・PR 一覧）と書き込み（`t` のラベル切り替え）は、どちらもこの表の方式を使う。`Cards` の中の値や前回のスナップショットから方式を決めない。スナップショットは前回の実行時の派生データであり、設定を変える前に保存された値が残るため、そこから方式を決めると設定と食い違ったラベルを書き込む経路ができる。
+
+#### Scenario: 表に無いリポジトリは sdd として扱う
+- **WHEN** `Options.Modes` が `org/board` だけを `label` にした `Model` で、`org/app` の issue の Card の詳細を開き、`View` を読む
+- **THEN** `org/app` の issue は sdd の語彙で表示される（`Labels` が `stage:propose` なら `段階: stage:propose`）
+
+#### Scenario: スナップショットの Card でも設定の方式で表示する
+- **WHEN** `Options.Snapshot` に前回の `Cards` を持たせ、`Options.Modes` が `org/board` を `label` にした `Model` を初回取得の前に描き、`org/board` の `In Progress` の issue の Card の詳細を開いて `View` を読む
+- **THEN** `段階: In Progress` が含まれる
+
+### Requirement: 方式の取り違えらしき状態をフッタで知らせる
+キュー画面は、取得が成功したとき、`sdd` として扱っているリポジトリに `To Do` または `In Progress` のラベルが付いた open issue が 1 件以上あれば、フッタのステータスに `<Repo> に To Do / In Progress の issue があります。mode: label の設定漏れかもしれません` を MUST 出す（複数のリポジトリが当たるときは、リポジトリ名の昇順で最初の 1 件だけ出す）。追加の `gh` 呼び出しはせず、取得済みの `Cards` のラベルだけで判定する。
+この知らせは、取得中・取得失敗・書き込みステータス・部分失敗のいずれかを出しているときは出さない（フッタのステータスは 1 つで、既存の表示を隠さない）。`label` として扱っているリポジトリについては何も出さない。
+方式を書き忘れた ILD リポジトリは、issue が段階ラベル無しに見えて局面 E（着手を承認する）に並び、`t` が `stage:todo` を書いてしまう。0 件のヒント（Requirement「取得が成功して Card が 0 件のときは表の領域にヒントを出す」）はカードが 1 件でもあれば出ないので、この状態を人に伝える経路が他に無い。
+
+#### Scenario: sdd 扱いのリポジトリに To Do があれば知らせる
+- **WHEN** `Options.Modes` が空の `Model` に、`org/board` の `Labels` が `To Do` の issue を持つ `Result` を取得完了として渡し、`View` から ANSI エスケープを除いて読む
+- **THEN** フッタに `org/board に To Do / In Progress の issue があります。mode: label の設定漏れかもしれません` が含まれる
+
+#### Scenario: label 扱いのリポジトリでは知らせない
+- **WHEN** `Options.Modes` が `org/board` を `label` にした `Model` に同じ `Result` を渡し、`View` を読む
+- **THEN** フッタに `設定漏れ` は含まれない
+
+#### Scenario: 部分失敗があればそちらを優先する
+- **WHEN** 同じ `Result` に `Errors` を 1 件持たせて取得完了として渡し、`View` を読む
+- **THEN** フッタに `詳細取得の失敗 1 件` が含まれ、`設定漏れ` は含まれない
