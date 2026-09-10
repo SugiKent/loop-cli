@@ -343,6 +343,18 @@ func TestBlockedByHumanWithoutQuestionsShowsBody(t *testing.T) {
 	wantOrder(t, linesOf(m), "blocked-by: human", "次の方針をコメントで教えてください")
 }
 
+func TestUnblockWhenFollowsBlockedBy(t *testing.T) {
+	body := "<!-- routine -->\nblocked-by: human\nunblock-when: docs\n## Q1. 認可の方針をどこに書くか\n- 選択肢 A（推奨）: docs/policy.md"
+	m, _ := send(detailModel(120, 40, []model.Card{blockedCard(body)}), enterKey)
+	wantOrder(t, linesOf(m), "blocked-by: human", "unblock-when: docs", "Q1. 認可の方針をどこに書くか")
+}
+
+func TestUnblockWhenIsNotRepeatedInTheSummaryBody(t *testing.T) {
+	body := "<!-- routine -->\nblocked-by: human\nunblock-when: comment\n次の方針をコメントで教えてください"
+	m, _ := send(detailModel(120, 40, []model.Card{blockedCard(body)}), enterKey)
+	wantOrder(t, linesOf(m), "blocked-by: human", "unblock-when: comment", "次の方針をコメントで教えてください")
+}
+
 // TestCommentsEmpty は、取得できてコメントが 0 件の issue が「なし」と出ることを検証する
 // （issue-140.json の comments は空配列。s20 で全 issue のコメントを取る）。
 func TestCommentsEmpty(t *testing.T) {

@@ -41,7 +41,7 @@ func pendingChecks() *gh.PRMergeState {
 	}
 }
 
-// TestCheckMerge は draft だけが拒否になり、他の判断材料が警告として並ぶことを検証する。
+// TestCheckMerge は draft と open でない PR が拒否になり、他の判断材料が警告として並ぶことを検証する。
 func TestCheckMerge(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -57,6 +57,24 @@ func TestCheckMerge(t *testing.T) {
 				MergeState: &gh.PRMergeState{},
 			},
 			wantBlocked: []string{"draft の PR です"},
+		},
+		{
+			name: "merged 済みの PR は拒否になる",
+			pr: model.PR{
+				State:      "MERGED",
+				Body:       "未確定の判断: 0 件",
+				MergeState: &gh.PRMergeState{},
+			},
+			wantBlocked: []string{"MERGED の PR です"},
+		},
+		{
+			name: "AI 評価が未完了なら警告になる",
+			pr: model.PR{
+				Labels:     []string{model.LabelPropose, model.LabelAIAssess},
+				Body:       "未確定の判断: 0 件",
+				MergeState: greenChecks(),
+			},
+			wantWarnings: []string{"ai-assess:requested が付いています（AI 評価が未完了）"},
 		},
 		{
 			name: "question と未確定と checks は警告になる",
