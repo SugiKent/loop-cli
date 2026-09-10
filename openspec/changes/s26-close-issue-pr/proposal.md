@@ -38,7 +38,9 @@ close にコメントを添える機能は入れない（コメントは `a` が
   作り直す（Scenario 名に幅が入っており MODIFIED では書き直せない）
 - `card-detail`: 画面の状態が 7 つから 8 つ（close の確認画面を追加）になり、詳細画面の `c` の対象が決まる。
   カード詳細・PR 詳細のフッタのヒントに `c close` が入る（126 列 / `PRs` 空で 78 列 / PR 詳細 91 列）
-- `help-screen`: 実装済みキーの一覧に `c` が入る
+- `help-screen`: 実装済みキーの一覧に `c` が入る。この delta は先行 change `s26-issue-label-driven`（`origin/main` の
+  `openspec/changes/` に未 archive で存在し、同じ Requirement を MODIFIED している）の版を土台に写して `c` の行を足した。
+  `t` の行の「stage:todo / To Do を付ける / 外す」はその change の変更で、打ち消さない。archive はその change を先に行う
 - `todo-toggle`: 「書き込み中は `t` と `a` を受け付けない」の対象に `c` が加わる（Requirement 名は変えない）
 
 ## Impact
@@ -55,6 +57,10 @@ close にコメントを添える機能は入れない（コメントは `a` が
 - `gh` は `y` の後に `gh issue close` または `gh pr close` を 1 回呼ぶ。読み取りを呼ぶかどうかは下記 Q1 が未確定
 - close された issue / PR は次の取得（`R` / 自動更新）で `gh search --state open` の結果から消え、キューの行としては落ちる
 - 書き込み後の対象 1 件再取得（D-002）は s18 の担当で、この change では行わない
+- 順序依存: `help-screen` の同じ Requirement を `s26-issue-label-driven` も MODIFIED しているので、archive は
+  `s26-issue-label-driven` → `s26-close-issue-pr` の順に行う。逆順にすると、あちらの `t` の行の変更が
+  メイン spec に入らないまま上書きされる。実装（`internal/ui/help.go`）は既に `origin/main` にその変更が入っているので、
+  この change は `c` の行を足すだけで済む
 
 ## 確定した判断
 

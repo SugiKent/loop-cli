@@ -1,5 +1,8 @@
 ## 1. close の呼び出し（internal/gh）
 
+- [ ] 1.0 `origin/main` の `openspec/changes/` を見て、先行 change `s26-issue-label-driven` が archive 済みかを確かめる
+      （`help-screen` の delta はその change の版を土台にしている。未 archive なら archive の順序を守る）
+
 - [ ] 1.1 `internal/gh/gh.go` の `GHClient` に `CloseIssue(ctx, repo, number)` と `ClosePR(ctx, repo, number)` を足す
 - [ ] 1.2 `internal/gh/client.go` に `Client.CloseIssue` / `Client.ClosePR` を実装する（引数は `issue close <n> -R <repo>` と
       `pr close <n> -R <repo>`、標準出力は読み捨て、失敗は既存の `gh` エラーに載せる）
