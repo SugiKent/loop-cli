@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/viewport"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/SugiKent/loop-cli/internal/classify"
 	"github.com/SugiKent/loop-cli/internal/fetch"
@@ -139,24 +140,39 @@ func (m *Model) refreshDetail() {
 }
 
 // detailHeader はヘッダ領域の行と本文領域の高さを返す。
-// 本文 1 行を確保できないときはカード詳細の PR 一覧を末尾から落とす。
+// 本文 1 行を確保できないときはカード詳細の PR 一覧を末尾から落とし、それでも足りなければ
+// 折り返したタイトル行を末尾から落とす（design.md D5）。
 func (m Model) detailHeader() ([]string, int) {
 	var fixed, prs []string
+	var titleLines int
 	if m.screen == screenPR {
-		fixed = m.prHeaderLines()
+		fixed, titleLines = m.prHeaderLines()
 	} else {
-		fixed, prs = m.cardHeaderLines(), m.prListLines()
+		fixed, titleLines = m.cardHeaderLines()
+		prs = m.prListLines()
 	}
 	keep := min(len(prs), max(m.height-2-len(fixed)-1, 0))
 	header := append(fixed, prs[:keep]...)
+
+	// 3 は区切り線 1 行 + フッタ 1 行 + 本文 1 行（戻り値の高さの下限と対応する）。
+	// タイトルの 1 行目は落とさない（どの Issue / PR を見ているのか分からなくなる）。
+	if over := len(header) + 3 - m.height; over > 0 && titleLines > 1 {
+		drop := min(over, titleLines-1)
+		header = append(header[:titleLines-drop], header[titleLines:]...)
+		// 折り返し済みの行は幅以下なので Truncate は … を付けない。1 列空けて明示的に付ける。
+		last := titleLines - drop - 1
+		header[last] = ansi.Truncate(header[last], max(m.width-1, 0), "") + "…"
+	}
 	return header, max(m.height-2-len(header), 1)
 }
 
-// cardHeaderLines はカード詳細のヘッダ行（PR 一覧を除く）を mvp.md の順で作る。
-func (m Model) cardHeaderLines() []string {
+// cardHeaderLines はカード詳細のヘッダ行（PR 一覧を除く）を mvp.md の順で作り、
+// 先頭の何行がタイトル行かを添えて返す。
+func (m Model) cardHeaderLines() ([]string, int) {
 	card := m.detail.card
 	issue := card.Issue
-	lines := []string{fmt.Sprintf("%s #%d  %s", issue.Repo, issue.Number, issue.Title)}
+	title := wrapTitle(fmt.Sprintf("%s #%d  ", issue.Repo, issue.Number), issue.Title, m.width)
+	lines := title
 	if card.Result.Summary != "" {
 		lines = append(lines, card.Result.Summary)
 	}
@@ -185,7 +201,7 @@ func (m Model) cardHeaderLines() []string {
 		}
 		lines = append(lines, "depends on: "+strings.Join(refs, " "))
 	}
-	return lines
+	return lines, len(title)
 }
 
 // prListLines は紐づく PR を段階順に 1 行ずつ並べる。無い段階は `なし`、段階ラベルの無い PR は末尾。
@@ -333,17 +349,17 @@ func (m Model) commentSection(comments []model.Comment) []string {
 // currentPR は詳細で選択中の PR。
 func (m Model) currentPR() model.PR { return m.detail.card.PRs[m.detail.prIdx] }
 
-// prHeaderLines は PR 詳細のヘッダ 2 行。
-func (m Model) prHeaderLines() []string {
+// prHeaderLines は PR 詳細のヘッダ（タイトル行と labels 行）と、
+// 先頭の何行がタイトル行かを返す。
+func (m Model) prHeaderLines() ([]string, int) {
 	pr := m.currentPR()
 	stage := "-"
 	if st := model.PRStages(m.repoMode(pr.Repo), pr.Labels); len(st) > 0 {
 		stage = st[0]
 	}
-	return []string{
-		fmt.Sprintf("%s PR#%d  %s", pr.Repo, pr.Number, pr.Title),
-		fmt.Sprintf("[%s] %s  labels: %s", stage, prState(pr.State), strings.Join(pr.Labels, " ")),
-	}
+	title := wrapTitle(fmt.Sprintf("%s PR#%d  ", pr.Repo, pr.Number), pr.Title, m.width)
+	labels := fmt.Sprintf("[%s] %s  labels: %s", stage, prState(pr.State), strings.Join(pr.Labels, " "))
+	return append(title, labels), len(title)
 }
 
 // prBodyLines は 1 行目判定・紐づけ・checks・本文・会話・review thread を並べる。
