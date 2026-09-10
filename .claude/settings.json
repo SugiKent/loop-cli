@@ -1,0 +1,14 @@
+{
+  "enabledPlugins": {
+    "openspec@sugiken-dev-public": true,
+    "issue-driven-sdd@sugiken-dev-public": true
+  },
+  "extraKnownMarketplaces": {
+    "sugiken-dev-public": {
+      "source": {
+        "source": "github",
+        "repo": "SugiKent/sugiken-dev-plugin-public"
+      }
+    }
+  }
+}
