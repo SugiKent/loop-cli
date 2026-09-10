@@ -15,9 +15,10 @@ const usage = `loop-cli-dev は loop-cli の動作確認用 CLI です。
   loop-cli-dev fixture capture --repo owner/name --alias <alias>
       指定リポジトリの open issue / PR を採取し、伏せ字にして
       internal/gh/testdata/fixtures/<alias>/ に保存する（リポジトリのルートで実行する）
-  loop-cli-dev classify --fixture <alias>
+  loop-cli-dev classify --fixture <alias> [--mode sdd|label]
       internal/gh/testdata/fixtures/<alias>/ の open issue / PR を分類し、4 タブ別に
       優先 / 種別 / リポジトリ / 番号 / タイトル / 経過 をタブ区切りで出す（リポジトリのルートで実行する）
+      --mode はその fixture の運用方式（既定 sdd）
   loop-cli-dev notify test
       デスクトップ通知を 1 件出す
 `

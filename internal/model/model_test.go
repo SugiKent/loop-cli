@@ -8,7 +8,7 @@ import (
 )
 
 func TestIssueStagesReturnsStageLabelsInStageOrder(t *testing.T) {
-	got := IssueStages([]string{"question", "stage:apply", "blocked", "stage:propose"})
+	got := IssueStages(ModeSDD, []string{"question", "stage:apply", "blocked", "stage:propose"})
 	want := []string{"stage:propose", "stage:apply"}
 	if !slices.Equal(got, want) {
 		t.Errorf("IssueStages = %v, want %v", got, want)
@@ -16,10 +16,48 @@ func TestIssueStagesReturnsStageLabelsInStageOrder(t *testing.T) {
 }
 
 func TestPRStagesReturnsOnlyPRStageLabels(t *testing.T) {
-	got := PRStages([]string{"question", "archive", "docs"})
+	got := PRStages(ModeSDD, []string{"question", "archive", "docs"})
 	want := []string{"archive"}
 	if !slices.Equal(got, want) {
 		t.Errorf("PRStages = %v, want %v", got, want)
+	}
+}
+
+func TestZeroModeBehavesAsSDD(t *testing.T) {
+	if got := IssueStages("", []string{"stage:propose"}); !slices.Equal(got, []string{"stage:propose"}) {
+		t.Errorf("IssueStages(\"\", …) = %v, want [stage:propose]", got)
+	}
+	if got := PRStages("", []string{"propose"}); !slices.Equal(got, []string{"propose"}) {
+		t.Errorf("PRStages(\"\", …) = %v, want [propose]", got)
+	}
+	if got := TodoLabel(""); got != LabelStageTodo {
+		t.Errorf("TodoLabel(\"\") = %q, want %q", got, LabelStageTodo)
+	}
+}
+
+func TestIssueStagesLabelModeUsesILDVocabulary(t *testing.T) {
+	got := IssueStages(ModeLabel, []string{"bug", "In Progress", "To Do"})
+	want := []string{"To Do", "In Progress"}
+	if !slices.Equal(got, want) {
+		t.Errorf("IssueStages(ModeLabel, …) = %v, want %v", got, want)
+	}
+}
+
+func TestLabelModeIgnoresSDDStageLabels(t *testing.T) {
+	if got := IssueStages(ModeLabel, []string{"stage:propose", "wip"}); len(got) != 0 {
+		t.Errorf("IssueStages(ModeLabel, …) = %v, want 空", got)
+	}
+	if got := PRStages(ModeLabel, []string{"propose", "docs"}); len(got) != 0 {
+		t.Errorf("PRStages(ModeLabel, …) = %v, want 空", got)
+	}
+}
+
+func TestTodoLabelPerMode(t *testing.T) {
+	if got := TodoLabel(ModeSDD); got != "stage:todo" {
+		t.Errorf("TodoLabel(ModeSDD) = %q, want stage:todo", got)
+	}
+	if got := TodoLabel(ModeLabel); got != "To Do" {
+		t.Errorf("TodoLabel(ModeLabel) = %q, want To Do", got)
 	}
 }
 

@@ -1,0 +1,11 @@
+{
+  "body": "招待メールのテンプレートを差し替える。",
+  "comments": [],
+  "labels": [
+    {"id": "LB_kwDOC", "name": "To Do", "color": "0e8a16", "description": "着手してよい"},
+    {"id": "LB_kwDOA", "name": "In Progress", "color": "1d76db", "description": "作業中"}
+  ],
+  "number": 63,
+  "title": "招待メールの文面を変える",
+  "url": "https://github.com/org/board/issues/63"
+}

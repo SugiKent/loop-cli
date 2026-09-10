@@ -1,0 +1,10 @@
+{
+  "body": "検索結果が 0 件のときの表示が空白になる。",
+  "comments": [],
+  "labels": [
+    {"id": "LB_kwDOB", "name": "bug", "color": "d73a4a", "description": "不具合"}
+  ],
+  "number": 62,
+  "title": "検索 0 件の表示を足す",
+  "url": "https://github.com/org/board/issues/62"
+}

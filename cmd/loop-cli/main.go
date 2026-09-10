@@ -19,6 +19,7 @@ import (
 	"github.com/SugiKent/loop-cli/internal/config"
 	"github.com/SugiKent/loop-cli/internal/fetch"
 	"github.com/SugiKent/loop-cli/internal/gh"
+	"github.com/SugiKent/loop-cli/internal/model"
 	"github.com/SugiKent/loop-cli/internal/onboarding"
 	"github.com/SugiKent/loop-cli/internal/snapshot"
 	"github.com/SugiKent/loop-cli/internal/ui"
@@ -134,13 +135,15 @@ func runTUI() error {
 		repos[i] = r.Name
 	}
 
+	modes := repoModes(cfg)
 	var fetcher ui.Fetcher = func(ctx context.Context) (*fetch.Result, error) {
-		return fetch.Fetch(ctx, client, repos)
+		return fetch.Fetch(ctx, client, repos, modes)
 	}
 	opts := ui.Options{
 		RefreshInterval: time.Duration(cfg.RefreshIntervalSec) * time.Second,
 		CheckUpdate:     updateChecker(version.NewClient()),
 		MergeMethods:    mergeMethods(cfg),
+		Modes:           modes,
 	}
 	if cfg.Notify {
 		// icon は string か []byte でなければならない。空文字列でアイコンなし（s06 と同じ）。
@@ -166,6 +169,16 @@ func mergeMethods(cfg *config.Config) map[string]string {
 	out := make(map[string]string, len(cfg.Repos))
 	for _, r := range cfg.Repos {
 		out[r.Name] = string(r.MergeMethod)
+	}
+	return out
+}
+
+// repoModes は リポジトリ名 -> 運用方式 の対応表を作る（s26 issue-label-driven）。
+// internal/ui と internal/fetch は internal/config を import しないので、対応表はここで作って渡す。
+func repoModes(cfg *config.Config) map[string]model.Mode {
+	out := make(map[string]model.Mode, len(cfg.Repos))
+	for _, r := range cfg.Repos {
+		out[r.Name] = r.Mode
 	}
 	return out
 }

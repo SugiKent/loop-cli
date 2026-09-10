@@ -5,19 +5,20 @@ import (
 )
 
 // Card は Issue と open PR 群を分類し、最上位の局面を Card.Result に置いたコピーを返す。
+// 1 枚の Card は 1 リポジトリ分なので、mode はカード全体で 1 つに決まる。
 // 入力は変更しない（呼び出し側がスナップショットを保持したまま再分類できるようにするため）。
-func Card(c model.Card) model.Card {
+func Card(c model.Card, mode model.Mode) model.Card {
 	out := model.Card{PRs: append([]model.PR(nil), c.PRs...)}
 	if c.Issue != nil {
 		is := *c.Issue
-		is.Result = Issue(is)
+		is.Result = Issue(is, mode)
 		out.Issue = &is
 	}
 	for i := range out.PRs {
 		out.PRs[i].Canonical = false
-		out.PRs[i].Result = PR(out.PRs[i])
+		out.PRs[i].Result = PR(out.PRs[i], mode)
 	}
-	markCanonical(out.PRs)
+	markCanonical(out.PRs, mode)
 
 	best := -1
 	if out.Issue != nil && isCandidate(out.Issue.Result) {
@@ -56,10 +57,10 @@ func fallbackSummary(c model.Card) string {
 
 // markCanonical は同段階の MERGED PR のうち番号最大のものを正本にする。
 // 人の回答後に作り直された PR が正本であり、古い PR に残った question は無視する。
-func markCanonical(prs []model.PR) {
+func markCanonical(prs []model.PR, mode model.Mode) {
 	latest := map[string]int{}
 	for i, pr := range prs {
-		stages := model.PRStages(pr.Labels)
+		stages := model.PRStages(mode, pr.Labels)
 		if pr.State != "MERGED" || len(stages) != 1 {
 			continue
 		}

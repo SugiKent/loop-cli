@@ -206,8 +206,43 @@ func TestIsMidRelabel(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsMidRelabel(tt.comments); got != tt.want {
+			if got := IsMidRelabel(ModeSDD, tt.comments); got != tt.want {
 				t.Errorf("IsMidRelabel = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsMidRelabelLabelModeOnlyMarksRestart(t *testing.T) {
+	release := []Comment{{Body: "<!-- routine -->\nrelease: To Do", AI: true}}
+	if IsMidRelabel(ModeLabel, release) {
+		t.Error("label 方式で release: を残骸の目印にしている")
+	}
+	restart := []Comment{{Body: "<!-- routine -->\nrestart: 1/3", AI: true}}
+	if !IsMidRelabel(ModeLabel, restart) {
+		t.Error("label 方式で restart: を残骸の目印にしていない")
+	}
+}
+
+func TestClosesIssue(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want int
+		ok   bool
+	}{
+		{name: "本文の Closes を読む", body: "ラベル一覧をモーダルで出す。\n\nCloses #12", want: 12, ok: true},
+		{name: "Refs は採らない", body: "Refs #48"},
+		{name: "番号だけの言及は採らない", body: "#108 と同じ問題"},
+		{name: "単語の途中は採らない", body: "xCloses #12"},
+		{name: "大文字小文字を区別しない", body: "closes #7", want: 7, ok: true},
+		{name: "最初の 1 件を返す", body: "Closes #3\nCloses #9", want: 3, ok: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := ClosesIssue(tt.body)
+			if got != tt.want || ok != tt.ok {
+				t.Errorf("ClosesIssue(%q) = %d, %v, want %d, %v", tt.body, got, ok, tt.want, tt.ok)
 			}
 		})
 	}

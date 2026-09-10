@@ -298,14 +298,16 @@ func TestPDoesNothing(t *testing.T) {
 	}
 }
 
-// hintLine2 は空キューのヒントの 2 行目。
-const hintLine2 = "issue-driven-sdd の routines-setup を回したリポジトリを設定してください"
+// hintLine1 / hintLine2 は空キューのヒントの 2 行。既定幅 80 には収まらないので幅 120 で確かめる。
+const hintLine1 = "stage:* / To Do ラベルの無いリポジトリは何も出ません。"
+
+const hintLine2 = "issue-driven-sdd の routines-setup を回すか、repos に mode: label を設定してください"
 
 func TestEmptyQueueShowsHint(t *testing.T) {
-	m, _ := send(newModel(nil), fetchedMsg{res: &fetch.Result{}, at: at})
+	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: &fetch.Result{}, at: at})
 
 	text := plainText(m)
-	for _, want := range []string{"stage:* ラベルの無いリポジトリは何も出ません。", hintLine2} {
+	for _, want := range []string{hintLine1, hintLine2} {
 		if !strings.Contains(text, want) {
 			t.Errorf("画面に %q が無い:\n%s", want, text)
 		}
@@ -355,10 +357,10 @@ func TestCardsPresentShowNoHint(t *testing.T) {
 
 func TestPartialFailureWithNoCardsShowsHint(t *testing.T) {
 	res := &fetch.Result{Errors: []error{errors.New("ViewPR org/app#131: open pr-131.json: no such file")}}
-	m, _ := send(newModel(nil), fetchedMsg{res: res, at: at})
+	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: res, at: at})
 
 	text := plainText(m)
-	for _, want := range []string{"stage:* ラベルの無いリポジトリは何も出ません。", hintLine2} {
+	for _, want := range []string{hintLine1, hintLine2} {
 		if !strings.Contains(text, want) {
 			t.Errorf("画面に %q が無い:\n%s", want, text)
 		}

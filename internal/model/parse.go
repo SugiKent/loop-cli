@@ -17,12 +17,17 @@ const (
 
 // relabelPrefixes は 2 回書き（`[]` を書いてから `[stage:X]` を書く）の 1 回目の前に
 // routine が投稿する行の目印。sweep はこの目印で続きを書く（routine-common / routine-sweep）。
-var relabelPrefixes = []string{"release:", "restart:", "advance:"}
+// issue-label-driven の 2 回書きは死んだ worker の再起動だけなので `restart:` しか無い。
+var (
+	relabelPrefixes      = []string{"release:", "restart:", "advance:"}
+	relabelPrefixesLabel = []string{"restart:"}
+)
 
 var (
 	undecidedRe = regexp.MustCompile(`^未確定の判断:\s*(\d+)\s*件`)
 	questionRe  = regexp.MustCompile(`^##\s*Q(\d+)\.\s*(.*)$`)
 	optionRe    = regexp.MustCompile(`^[-*]\s*選択肢\s*([A-Z])\s*(（推奨）|\(推奨\))?\s*[:：]\s*(.*)$`)
+	closesRe    = regexp.MustCompile(`(?i)\bcloses\s+#(\d+)`)
 )
 
 // IsAI は本文だけで routine（AI）の発言かを判定する。
@@ -75,14 +80,18 @@ func LatestBlockedBy(comments []Comment) (*Comment, string, bool) {
 
 // IsMidRelabel は最新の routine コメントが 2 回書きの途中を示すかを返す。
 // 段階ラベルの無い issue がこれに当たるとき、sweep が続きの段階ラベルを書く途中である。
-func IsMidRelabel(comments []Comment) bool {
+func IsMidRelabel(mode Mode, comments []Comment) bool {
+	prefixes := relabelPrefixes
+	if mode == ModeLabel {
+		prefixes = relabelPrefixesLabel
+	}
 	for i := len(comments) - 1; i >= 0; i-- {
 		if !comments[i].AI {
 			continue
 		}
 		for _, line := range strings.Split(comments[i].Body, "\n") {
 			line = strings.TrimSpace(line)
-			for _, p := range relabelPrefixes {
+			for _, p := range prefixes {
 				if strings.HasPrefix(line, p) {
 					return true
 				}
@@ -91,6 +100,20 @@ func IsMidRelabel(comments []Comment) bool {
 		return false
 	}
 	return false
+}
+
+// ClosesIssue は本文の最初の `Closes #<n>` の番号を返す。`Refs #<n>` は採らない。
+// issue-label-driven では、これが「routine が作った PR か」の唯一の目印になる。
+func ClosesIssue(body string) (int, bool) {
+	m := closesRe.FindStringSubmatch(body)
+	if m == nil {
+		return 0, false
+	}
+	n, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0, false
+	}
+	return n, true
 }
 
 // UnblockWhen は `blocked-by: human` のコメントに書かれた解除条件を返す。
