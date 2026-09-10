@@ -54,7 +54,7 @@ close にコメントを添える機能は入れない（コメントは `a` が
   `routine-sweep` 手順 6 が「孤児 proposal」として人に reopen か取り下げかを問う（sweep は reopen しない）
 - コードは 3 か所を触る。`internal/gh` に `CloseIssue` / `ClosePR` を足し、`internal/action` に close のファイルを足し、
   `internal/ui` に `c` のキー処理と確認画面とステータスを足す。`cmd/loop-cli` の配線は変わらない（設定項目を増やさない）
-- `gh` は `y` の後に `gh issue close` または `gh pr close` を 1 回呼ぶ。読み取りを呼ぶかどうかは下記 Q1 が未確定
+- `gh` は `y` の後に `gh issue close` または `gh pr close` を 1 回呼ぶだけで、読み取りは呼ばない
 - close された issue / PR は次の取得（`R` / 自動更新）で `gh search --state open` の結果から消え、キューの行としては落ちる
 - 書き込み後の対象 1 件再取得（D-002）は s18 の担当で、この change では行わない
 - 順序依存: `help-screen` の同じ Requirement を `s26-issue-label-driven` も MODIFIED しているので、archive は
@@ -85,35 +85,30 @@ close にコメントを添える機能は入れない（コメントは `a` が
   人の回答（PR #10 のコメント）で決まった。位置は `m merge` の次で、`PRs` が空のカード詳細では `t todo` の次に置く。
   幅 90〜97 の端末では取得中や書き込み中にヒントが丸ごと消えるようになる（s14 がフッタを 80 列に伸ばしたときの
   「キーを隠すよりキーを出すことを採った」と同じ引き換え）
+- **`c` の押下では `gh` を呼ばない（対象のラベルと状態を取り直さない）**。人の回答（PR #10 のコメント）で決まった。
+  `c` は待ち時間なしで確認画面を出し、`labels:` は最終取得時点の値を出す。`y` は常に出す。
+  「すでに closed なものは対象にしない」（issue #4）に対応する拒否は入れない。画面に出る issue と PR は取得時点で
+  必ず open で（`SearchIssues` / `SearchPRs` が `--state open`、`internal/fetch` は検索結果からしか Card を作らない）、
+  closed / merged の PR がカード詳細に並ぶ経路は cross-reference 紐づけ（mvp.md §3 の P2）が入るまで無いので、
+  拒否を書いても発火しない防御コードになる（CLAUDE.md「起こり得ない状態への防御コードを追加しない」）
 - **mvp.md のキーバインド表に `c` の行を足す**。`u` を足した s22（`openspec/changes/archive/2026-09-06-s22-url-picker/tasks.md` 5.5）と
   `↑ update` を足した s23 の前例に従う。`help-screen` の行順は「前半は mvp.md キーバインド表の順」なので、表に足さないと
   ヘルプの行を置く位置が決まらない。mvp.md「前提と未決事項」の「取り下げる・止める（段階ラベルを外す）」は `c` では
   解消しない。その行が指すのは段階ラベルを外す操作であり、不変条件 2 がそれを TUI に置くことを禁じているので、この行は触らない
 
-## 未確定の判断
+## 明示的に延期した判断と残るリスク
 
-### Q1. `c` を押した時点で、対象のラベルと状態を GitHub から取り直すか
-
-issue #4 は「すでに closed なものは対象にしない（確認画面でその旨を出して実行させない）」と書いているが、画面に出ている
-issue と PR に closed のものは無い。`internal/gh/client.go:87-103` の search は `--state open` で、`internal/fetch/fetch.go` は
-search の結果からしか Card を作らず、`model.PRFromSearch` は `State` に必ず `OPEN` を入れる（`internal/model/model.go:222-235`）。
-`CrossReferencedPRs` による紐づけ補完は未実装（mvp.md §3 の P2）なので、closed / merged の PR がカード詳細の一覧に並ぶ経路も
-今は無い。つまり `State` を見る拒否を書いても、本番では発火しない防御コードになる（CLAUDE.md「起こり得ない状態への防御コードを
-追加しない」）。同じことは `action.CheckMerge` の `State` の拒否にも起きている（`internal/ui/merge.go:145-153` は
-`merge-pr` spec が要求する「画面の Card の `State` を写す」を行っておらず、この拒否は発火しない。s26 では直さず申し送る）。
-
-古くなるのは `State` より**ラベル**である。確認画面の `labels:` は最終取得時点の値で、自動更新の既定は 120 秒、
-スナップショットから起動した直後（`internal/snapshot`）は前回セッションの値なので、直前に付いた `wip`（AI が作業中）は
-確認画面に出ない。初回取得が終わる前でも `c` は動く（取得中かどうかを見るキーは `R` だけである。`internal/ui/model.go`）。
-
-- 選択肢 A（推奨）: **取り直さない。拒否も持たない。** `c` は即座に確認画面を出し、`labels:` は取得時点の値を出す。`y` は常に出す。
-  取得後に人が GitHub 側で close していた場合、`gh issue close` はすでに closed なものへの close なので状態を変えない。
-  `t` / `a` が画面の値で書き込むのと同じ扱いで、実装は最小。**リスク**: `wip` が付いた直後の issue を、人が気づかずに close しうる。
-  また `gh issue close` / `gh pr close` がすでに closed の対象に対して終了コード 0 を返す場合、TUI は
-  `… を close しました` と表示する（この環境に `gh` が無いため未実測。merged PR の close は失敗するはず）
-- 選択肢 B: **`m` と同じく押下時に取り直す。** issue は `gh issue view` の `--json` に `state` を足し、PR は `ViewPR` の結果を使う
-  （`gh pr view --json state` が使えるかは要確認。`merge-pr` spec:40 は「`gh pr view` の `--json` に `state` が無い」と書いており、
-  実機で確かめる）。取り直した `labels` と `state` で確認画面を作り、open でなければ `close できません: <State> です` を出して
-  `y` を出さない。`wip` も最新が出る。代わりに `gh-client` spec と fixture（`internal/gh/testdata`）と型が変わり、
-  `c` に 1 往復ぶんの待ちと失敗経路（取り直し中の画面移動）が増える
-- 依存: なし
+- **close の入口に「open でないものを止める」ガードを入れない。** 上記のとおり今は発火しないため。P2 の
+  cross-reference 紐づけが入って closed / merged の PR がカード詳細の PR 一覧に並ぶようになったら、その回に
+  ガードを足す（`action.CheckMerge` の `State` の拒否を実際に働かせる作業と同じ回にまとめるのが安い）
+- **確認画面の `labels:` は古いことがある。** 自動更新の既定は 120 秒、スナップショットから起動した直後は前回
+  セッションの値なので、直前に付いた `wip`（AI が作業中）は確認画面に出ない。`t` / `a` が画面の値で書き込むのと
+  同じ性質で、この change では受け入れる
+- **すでに closed の対象を close したときの表示は未実測。** `gh issue close` / `gh pr close` がその場合に終了コード 0 を
+  返すなら、TUI は `… を close しました` と出す（この環境に `gh` が無く確認できなかった）。状態は変わらないので
+  影響は表示だけで、実装時に手元の `gh` で確かめて spec の文言をそろえる
+- **`internal/ui/merge.go` が `model.PR.State` を写していない既存の spec 違反は直さない。** s14 の取りこぼしで、
+  `action.CheckMerge` の `State` の拒否が本番で発火しない。今は closed / merged の PR が画面に出ないので実害は無く、
+  P2 の cross-reference 紐づけの回にまとめて直すのが安い
+- **カード詳細では `m` が選択中の PR、`c` が `Issue` を対象にする。** ▶ を PR に合わせている人が `c` を押すと issue が
+  閉じるので、確認画面の `種別:` と番号とタイトルで気づける形にしてある（issue #4 の指定どおり）
