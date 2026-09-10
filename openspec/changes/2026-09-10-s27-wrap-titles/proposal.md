@@ -1,0 +1,90 @@
+# 2026-09-10-s27-wrap-titles
+
+Refs #2
+
+## Why
+
+タイトルは Issue / PR を識別する主要な情報なのに、表示している 3 か所すべてが端末幅で切り詰められて `…` になり、全文が読めない（#2）。
+折り返して全文を出せば、タイトルを読むためにブラウザを開いたり詳細画面へ移ったりする必要がなくなる。
+
+## What Changes
+
+タイトルを出している 3 か所すべてを、切り詰めから折り返しへ変える。
+
+- キュー画面の表のタイトル列を、列幅（端末幅 − 48）で折り返して全文出す。継続行はタイトル列の開始位置（43 列目）まで空白を置いて縦を揃え、経過と `▶` は 1 行目にだけ出す
+- カード詳細画面のヘッダ 1 行目 `<Repo> #<Number>  <Title>` を端末幅で折り返し、タイトルを全文出す
+- PR 詳細画面のヘッダ 1 行目 `<Repo> PR#<Number>  <Title>` も同じ規則で折り返す
+- 詳細画面の継続行は接頭辞 `<Repo> #<Number>  ` の表示幅ぶんインデントし、タイトルの開始位置に縦を揃える
+- 折り返しの幅計算は `ansi.StringWidth` ベースで行い、全角文字・絵文字でも桁がずれないようにする
+- 折り返しでヘッダが端末の高さを超えないよう、詳細画面のヘッダ領域に上限の規則を足す
+- タイトル行以外の行（`Summary` / `段階` / `depends on` / PR 一覧 / PR 詳細の labels 行）は今までどおり端末幅で切り詰める
+- `docs/mvp/mvp.md` のキュー画面の画面図を、折り返し後の見た目に合わせて描き直す
+
+## Capabilities
+
+### New Capabilities
+
+なし。
+
+### Modified Capabilities
+
+- `queue-screen`: 表のタイトル列を折り返しにし、1 枚の Card が複数行を占めることを認める。経過と `▶` は 1 行目にだけ出す
+- `card-detail`: カード詳細と PR 詳細のヘッダ 1 行目を折り返しにし、ヘッダ領域の切り詰め規則からタイトル行を除く。折り返しでヘッダが端末高を超えないよう上限を定める
+
+## 先行 change への依存
+
+**この change は `s26-issue-label-driven` の後に apply / archive しなければならない。**
+
+`s26-issue-label-driven`（issue #5。proposal は PR #12 で merge 済み）は、`card-detail` の Requirement
+「ヘッダはリポジトリ・番号・いま人が何をすべきか・現在の段階・バッジ・depends on を出す」を MODIFIED しており、
+この change も同じ Requirement を MODIFIED する。MODIFIED は Requirement ブロック全体を置き換えるので、
+後から archive した側の内容だけが残り、先に archive した側の変更は消える。
+
+`openspec/config.yaml` の `rules.specs`（「先行 change の specs から Requirement ブロック全体をコピーして書き換える」）
+に従い、この change の delta は `s26-issue-label-driven` の版を土台にしている。つまりこの delta には
+`Options.Modes` と `model.IssueStages(mode, Issue.Labels)` と `label` 方式のバッジ規則、および
+`label` 方式の Scenario 2 本が既に入っている。**先にこの change を archive すると、まだ実装されていない
+方式まわりの記述がメイン spec に入ってしまう。**
+
+`queue-screen` は衝突しない。`s26-issue-label-driven` が MODIFIED するのは
+「取得が成功して Card が 0 件のときは表の領域にヒントを出す」で、この change が MODIFIED する
+「表の行は優先記号・種別・リポジトリ・番号・タイトル・経過を種別の色で出す」とは別の Requirement である。
+
+## Impact
+
+- `internal/ui/view.go`: `tableRow` が 1 枚の Card について複数行を返す形になる。`tableLines` はそれを平らに並べる
+- `internal/ui/detail.go`: `cardHeaderLines` / `prHeaderLines` が 1 行目を複数行にして返し、タイトルが何行あるかを添える。`detailHeader` はそれを受け取り、高さが足りないときにタイトルの末尾行を落とす
+- `internal/ui/view.go` の `renderDetail` は変更しない。`ansi.Truncate` は折り返し済みの行に対して何もしない（`ansi` v0.11.8 の `Truncate` は表示幅が上限以下の文字列をそのまま返す）ので、タイトル行以外を切る役目のまま残る
+- `internal/ui/view_test.go` / `detail_test.go`: 切り詰めを期待している既存テストの書き換え
+- `docs/mvp/mvp.md`: キュー画面の画面図
+
+## 確定した判断
+
+調査で確定したこと。根拠は `origin/main` のファイル、`ansi` v0.11.8 の実装、PR #8 での人の回答。
+
+1. **タイトルを画面に描いているのは 3 か所だけ**。`internal/ui` の中で `Title` を描くのは次の 3 か所で、ほかは無い。
+   - `internal/ui/view.go:195` が表のタイトル列を `pad(r.title, titleW)` で書く
+   - `internal/ui/detail.go:157` がカード詳細のヘッダ 1 行目に `Issue.Title` を書く
+   - `internal/ui/detail.go:320` が PR 詳細のヘッダ 1 行目に `PR.Title` を書く
+2. **#2 が挙げた `answer.go` / `urls.go` にタイトルは出ていない**。`internal/ui/answer.go:74-77` は `<repo> #<n>` / `<repo> PR#<n>` の `label` を作り、`internal/ui/urls.go:79` はリンクテキストと URL を出す。どちらも `Title` を読まない。
+3. **`merge.go` はタイトルを保持しているが描いていない**。`internal/ui/merge.go:148` が `msg.detail.Title` を `m.merge.pr` に取り込むのに、`renderMergeConfirm`（`internal/ui/merge.go:208-239`）は `label`（`<repo> PR#<n>`）と `Body` しか描かない。#2 の「`merge.go` の PR タイトルを含む行」に当たる行は存在しない。merge 確認画面にタイトルを出すかは #2 の依頼（切り詰めをやめる）とは別の追加要望なので、この change では出さない。
+4. **`rows.go` は描画しない**。`internal/ui/rows.go` は行のデータ（`row.title`）を作るだけで、描画は `view.go` の `tableRow`。#2 の対象箇所の `rows.go` は `view.go` と読み替える。
+5. **PR 一覧の行（`prListRow`）にタイトルは無い**。この行が並べるのは段階と PR 番号と状態と未確定件数と labels と checks だけなので、この change は触らない。
+6. **詳細ヘッダの切り詰めは製品の決定ではない**。`openspec/specs/card-detail/spec.md:49` が「端末の幅に切り詰めて末尾を `…` にする（design.md 未決事項の既定値）」と明記している。さらに `docs/mvp/mvp.md:85` のカード詳細ヘッダの定義は「リポジトリ、Issue 番号、現在の段階、バッジ、この段階に入ってからの経過時間」で、タイトルを列挙していない。
+7. **キュー画面の表も折り返す**（PR #8 で人が回答）。#2 の文面どおり全行を折り返す。表はスクロールを持たないので、表に出るカードの枚数は減り、溢れた行は捨てられる。この代償を承知のうえでの判断である。`docs/mvp/mvp.md:51-73` の画面図は 1 カード 1 行で描いているので、この change で描き直す。
+8. **カード詳細ヘッダの Issue タイトルも折り返す**（PR #8 で人が回答）。#2 の文面は「PR のタイトル」だが、表のタイトル列には Issue と PR が混在する（`internal/ui/rows.go:45` の `Subject`）ため、区別せず「タイトル」として扱う。
+9. **`ansi.Wrap` は日本語でも表示幅どおりに折る**。`ansi` v0.11.8 の `Wrap`（`wrap.go:267-278`）は「必要なら単語境界を割る」と契約しており、実測でも全角 28 字を幅 20 で折ると各行の表示幅が 20 / 20 / 20 / 20 / 4 になる。英語では単語境界を守って 12 / 14 / 15 / 17 になる。`Wordwrap` は長い語を割らないので、全角 84 幅が 1 行のまま返り使えない。
+10. **`ansi.Truncate` は幅以下の文字列に `…` を付けない**。`truncate.go:66-69` が `StringWidth(s) <= length` で入力をそのまま返す。折り返し済みの行に `…` を付けるには `ansi.Truncate(l, width-1, "") + "…"` のように明示的に付ける必要がある（実測で確認）。
+11. **詳細画面は今も端末高を超えうる**。`PRs` が空でも `prListLines` は 3 行返す（`internal/ui/detail.go:184-199`）ため、幅 120・高さ 5・`Summary` あり・`PRs` 空のカードでは合計 6 行になる。この経路は折り返しの前から存在するので、この change は「折り返しが原因で超えないこと」だけを引き受け、既存の溢れは直さない。
+
+## 明示的に延期した判断
+
+- **merge 確認画面にタイトルを出すこと**（上の 3）。#2 が求めているのは既に出ている行の切り詰めをやめることで、この画面には元からタイトルの行が無い。新しい表示の追加として、必要なら別 issue で起票する
+- **キュー画面の表のスクロール**。折り返しで表に出るカードが減る問題は、スクロールがあれば和らぐが、mvp.md にスクロールのキーが無く、この change の範囲を超える
+- **詳細画面の既存の高さ超過**（上の 11）。折り返しと無関係な経路なので直さない
+
+## 残るリスク
+
+- **表に出るカードが減る**。幅 80 の端末で全角 30 文字のタイトルなら 1 枚が 2 行になり、表に出る枚数が約半分になる。スクロールが無いので、溢れたカードは画面から見えなくなる（カーソルは移動できるが表示されない）。人はこの代償を承知で折り返しを選んでいる
+- **`ansi.Wrap` は英語の長い 1 語を割る**。URL や識別子を含むタイトルでは語の途中で改行される
+- **`docs/mvp/mvp.md` の画面図と実装がずれる**。この change で図を描き直すが、以降の変更で再びずれる余地は残る
