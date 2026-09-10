@@ -27,6 +27,13 @@ const (
 	routeNewIssue                  // `n`（新しい issue）
 )
 
+// openEditor は経路を記録してエディタを開く。記録と起動を別に書くと、
+// 新しい入口が記録を忘れたときに下書きが別の経路へ落ちるので 1 か所にまとめる（design.md）。
+func (m *Model) openEditor(route editRoute, initial string) tea.Cmd {
+	m.route = route
+	return m.editor(initial)
+}
+
 // updateEdited は編集の完了を、エディタを開いた経路で振り分ける。
 // 経路はエディタを開くたびに記録し、作成・中止・エラーでは消さない
 // （消すと作成の確認画面の `e` から戻った編集が回答として投稿される）。

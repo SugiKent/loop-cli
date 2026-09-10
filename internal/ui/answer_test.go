@@ -353,13 +353,20 @@ func TestEditRouteSeparatesAnswerFromNewIssue(t *testing.T) {
 	})
 
 	t.Run("回答の確認画面の e から戻った編集完了は回答として投稿される", func(t *testing.T) {
-		m, fake := confirmModel(t)
-
-		m, cmd := send(m, runeKey('e'))
-		if cmd == nil {
-			t.Fatal("e でエディタが起動していない")
+		const draft = "Q1: A\n  blocked-by: human"
+		ed := &stubEditor{msg: editedMsg{text: draft}}
+		m, fake := answerModel([]model.Card{prCard(nil)}, ed)
+		m, _ = answer(t, m)
+		if m.screen != screenConfirm {
+			t.Fatalf("確認画面に移っていない: screen = %d", m.screen)
 		}
-		m, cmd = send(m, editedMsg{text: "Q1: A"})
+
+		ed.msg = editedMsg{text: "Q1: A"}
+		m, cmd := send(m, runeKey('e'))
+		m, cmd = runCmd(t, m, cmd)
+		if ed.initial != draft {
+			t.Errorf("エディタに渡した下書き = %q, want %q", ed.initial, draft)
+		}
 		m, _ = runCmd(t, m, cmd)
 
 		want := gh.Call{Method: "CommentPR", Repo: "org/app", Number: 131, Body: "Q1: A"}

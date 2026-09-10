@@ -42,10 +42,10 @@ func (m Model) newKey() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.newIssue = newIssueState{repo: repo, from: m.screen}
-	m.route = routeNewIssue
 	m.writeStatus, m.writeStatusErr = "", false
 	// 書式の案内を初期テキストに入れると、それがそのままタイトルになる（書式は確認画面が見せる）。
-	return m, m.editor("")
+	cmd := m.openEditor(routeNewIssue, "")
+	return m, cmd
 }
 
 // newIssueRepo は今の画面の作成先のリポジトリを返す。主体が issue か PR かでは変わらない。
@@ -66,10 +66,12 @@ func (m Model) newIssueRepo() (string, bool) {
 // updateNewEdited は `n` で始めた編集の完了を扱う。分割と検査は action の関数を借り、
 // internal/ui に別の判定を持たない。作れない下書きは確認画面へ進めず、理由をフッタに出す。
 func (m Model) updateNewEdited(msg editedMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		m.writeStatus, m.writeStatusErr = "エディタ: "+msg.err.Error(), true
+		return m, nil
+	}
 	title, body := action.SplitNewIssue(msg.text)
 	switch {
-	case msg.err != nil:
-		m.writeStatus, m.writeStatusErr = "エディタ: "+msg.err.Error(), true
 	case title == "":
 		m.writeStatus, m.writeStatusErr = "作成を中止しました（タイトルが空）", false
 	case body == "":
@@ -96,8 +98,8 @@ func (m Model) updateNewConfirmKey(key string) (tea.Model, tea.Cmd) {
 		return m, createIssueCmd(m.client, m.newIssue.repo, m.newIssue.title, m.newIssue.body)
 	case "e":
 		m.screen = m.newIssue.from
-		m.route = routeNewIssue
-		return m, m.editor(m.newIssue.draft)
+		cmd := m.openEditor(routeNewIssue, m.newIssue.draft)
+		return m, cmd
 	case "esc":
 		m.screen = m.newIssue.from
 		m.writeStatus, m.writeStatusErr = "作成を中止しました", false

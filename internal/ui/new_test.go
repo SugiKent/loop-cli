@@ -387,6 +387,25 @@ func TestNewIssueResultShowsURL(t *testing.T) {
 		}
 	})
 
+	t.Run("作成の結果は次の n で消える", func(t *testing.T) {
+		m, _ := answerModel(exampleResult(t).Cards, &stubEditor{msg: editedMsg{text: newDraft}})
+		m = newIssueConfirm(t, m)
+
+		m, cmd := send(m, runeKey('y'))
+		m, _ = runCmd(t, m, cmd)
+		if !strings.Contains(plainText(m), "issue を作成しました") {
+			t.Fatalf("作成の成功が出ていない: %q", footerOf(plainText(m)))
+		}
+
+		m, cmd = send(m, nKey)
+		if cmd == nil {
+			t.Fatal("作成完了後の n でエディタが起動していない")
+		}
+		if text := plainText(m); strings.Contains(text, "issue を作成しました") {
+			t.Errorf("作成のステータスが残っている: %q", footerOf(text))
+		}
+	})
+
 	t.Run("失敗は赤で出て表を変えない", func(t *testing.T) {
 		client := failingCreateIssue{gh.NewFake(fixtureDir)}
 		cards := exampleResult(t).Cards

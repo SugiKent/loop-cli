@@ -52,9 +52,9 @@ func (m Model) answerKey() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.answer = answerState{target: target, label: label, from: m.screen}
-	m.route = routeAnswer
 	m.writeStatus, m.writeStatusErr = "", false
-	return m, m.editor(action.AnswerTemplate(comments))
+	cmd := m.openEditor(routeAnswer, action.AnswerTemplate(comments))
+	return m, cmd
 }
 
 // answerTarget は今の画面の回答対象・表示名・テンプレートの元にするコメントを返す。
@@ -150,8 +150,8 @@ func (m Model) updateConfirmKey(key string) (tea.Model, tea.Cmd) {
 		return m.post(m.answer.draft)
 	case "e":
 		m.screen = m.answer.from
-		m.route = routeAnswer
-		return m, m.editor(m.answer.draft)
+		cmd := m.openEditor(routeAnswer, m.answer.draft)
+		return m, cmd
 	case "esc":
 		m.screen = m.answer.from
 		m.writeStatus, m.writeStatusErr = "回答を中止しました", false
