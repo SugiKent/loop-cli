@@ -29,13 +29,30 @@ AI agent が TUI を開かずに「今やる」の状態を読めるようにす
 | キー | 中身 |
 | --- | --- |
 | `situation` | 局面の記号。「今やる」に入るのは `A` / `B` / `C` / `D` / `G` / `other` の 6 つ |
+| `kind` | 画面の表に出す種別。`質問` / `方針` / `merge` / `その他` のいずれか |
+| `priority` | 優先度の整数。小さいほど先 |
 | `summary` | 「いま人が何をすべきか」の 1 行 |
 | `repo` | `owner/name`。1 枚のカードは 1 リポジトリ分しか持たない |
 | `subject` | その局面を出した issue または PR を指す `type`（`issue` または `pr`）と `number` |
 | `issue` | カードの issue の `number`・`title`・`url`・`labels`・`updated_at`。PR 単独のカードでは `null` |
-| `prs` | カードの PR の配列。1 件は `number`・`title`・`url`・`labels`・`draft`・`updated_at` を持つ。無ければ `[]` |
+| `prs` | カードの PR の配列。無ければ `[]` |
 
 `subject` は番号だけを持ち、内容は `issue` か `prs` の該当する要素から引く（同じ値を二重に出さない）。
+issue の段階（`stage:propose` など）は `issue.labels` に入るので、別の欄を作らない。
+
+`prs` の 1 件は次のキーを持つ。`mergeable` から `unresolved_threads` までは PR 詳細画面が出している状態で、
+詳細の取得に失敗した PR では `null` になる。値が空である場合と、取得そのものが失敗した場合を区別するためである。
+
+| キー | 中身 |
+| --- | --- |
+| `number` / `title` / `url` / `labels` / `draft` / `updated_at` | 検索結果から引く PR 自身の値 |
+| `undecided` | 本文 1 行目の `未確定の判断: N 件` の N。1 行目に書かれていなければ `null` |
+| `mergeable` | `gh` の `mergeable`（`MERGEABLE` / `CONFLICTING` など） |
+| `merge_state_status` | `gh` の `mergeStateStatus`（`CLEAN` / `BLOCKED` など） |
+| `review_decision` | `gh` の `reviewDecision`。レビューが無ければ空文字 |
+| `checks_green` | checks が merge を妨げない状態かどうかの真偽値。判定は merge のガードと同じものを使う |
+| `checks` | チェックごとの `name` と `state` の配列。`state` は CheckRun なら結論（空なら進行状況）、StatusContext なら state。0 件なら `[]` |
+| `unresolved_threads` | 未解決の review thread の件数 |
 
 #### Scenario: 今やるのカードが JSON で出る
 
@@ -66,6 +83,18 @@ AI agent が TUI を開かずに「今やる」の状態を読めるようにす
 
 - **WHEN** issue に紐づかない PR 1 本だけのカードが「今やる」に入っている取得結果で出力を組み立てる
 - **THEN** その要素の `issue` は `null` で、`subject.type` は `pr` である
+
+#### Scenario: PR の状態が出る
+
+- **WHEN** 本文 1 行目が `未確定の判断: 0 件`、`mergeable` が `MERGEABLE`、`mergeStateStatus` が `CLEAN`、
+  checks が成功した CheckRun 1 件、未解決の review thread が 1 件の PR を含む取得結果で出力を組み立てる
+- **THEN** その PR の `undecided` は 0、`mergeable` は `MERGEABLE`、`merge_state_status` は `CLEAN`、
+  `checks_green` は `true`、`checks` はその 1 件を含み、`unresolved_threads` は 1 である
+
+#### Scenario: PR の詳細が取れなかったとき
+
+- **WHEN** merge 状態と review thread の取得に失敗した PR を含む取得結果で出力を組み立てる
+- **THEN** その PR は状態の 6 つの欄（`mergeable`、`merge_state_status`、`review_decision`、`checks_green`、`checks`、`unresolved_threads`）をすべて `null` にして、`number` と `title` と `url` と `labels` を出す
 
 ### Requirement: now は設定ファイルを読み gh を呼ぶ
 

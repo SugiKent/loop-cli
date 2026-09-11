@@ -46,6 +46,22 @@
 主体の判定には `internal/ui` の `Subject`（公開済み）を使う。これが返す `isPR` と `number` が
 そのまま `subject` になるので、`internal/ui` に手を入れずに済み、主体の判定を書き写す必要も無い。
 
+### D2b. PR の状態は既にある判定と表示をそのまま写す
+
+状態の欄は新しい判定を作らず、次を呼ぶだけにする。
+
+| 欄 | 出どころ |
+| --- | --- |
+| `undecided` | `model.ParseUndecided(pr.Body)`。2 つ目の戻り値が false なら `null` |
+| `mergeable` / `merge_state_status` / `review_decision` | `pr.MergeState` の各欄。`MergeState` が `nil` なら `null` |
+| `checks_green` | `classify.ChecksGreen(pr.MergeState)`。merge のガード（s14）と同じ判定 |
+| `checks` | `StatusCheckRollup` を PR 詳細画面と同じ規則で 1 件 1 要素にする。CheckRun は `Name` と `Conclusion`（空なら `Status`）、StatusContext は `Context` と `State` |
+| `unresolved_threads` | `pr.ReviewThreads` のうち `IsResolved` が false の件数。`nil` なら `null` |
+
+`MergeState` と `ReviewThreads` の `nil` は詳細取得の失敗を表す（`internal/model` の定義）。
+`checks_green` はここで `false` にせず `null` にする。`ChecksGreen` は `nil` に `false` を返すが、
+それは「merge させない」という意味であって「checks が赤い」ではないので、JSON でそのまま出すと読み違える。
+
 ### D3. `errors` と `items` は必ず配列として出す
 
 Go の `nil` スライスは `null` になる。agent 側で `null` と `[]` の分岐を書かせないため、
