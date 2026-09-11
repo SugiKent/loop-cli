@@ -1,5 +1,15 @@
 # ルール
 
+## docs/mvp はこれ以降更新しない
+
+`docs/mvp/` の 4 文書（`mvp.md` / `decisions.md` / `implementation-tasks.md` / `validation-plan.md`）は、
+MVP を定義した時点の記録として凍結すること。
+
+- 仕様の正本は `openspec/specs/` で、change のたびに更新するのはそちらだけにする
+- キーバインド表・設定ファイル・画面構成が変わっても `docs/mvp` に書き戻さず、変更履歴の行も足さない
+- `docs/mvp` は背景と当初の判断を知るために読む。そこに無い仕様は issue と `openspec/` で決める
+- 利用者向けの説明は `README.md` で保つ
+
 ## シンプルさを最優先にする
 
 問題を解くために必要な最小限のコードのみを書くこと。
