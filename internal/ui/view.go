@@ -7,8 +7,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-
-	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // 表の固定列幅（design.md の未決事項の既定値）。合計 48 列で、残りをタイトルに充てる。
@@ -154,7 +152,7 @@ func (m Model) headerLeft(shortened int, styled bool) string {
 // emptyHint は取得成功で 0 件のときに表の領域へ出す 2 行（mvp.md「初回起動（onboarding）」）。
 var emptyHint = []string{
 	"stage:* / To Do ラベルの無いリポジトリは何も出ません。",
-	"issue-driven-sdd の routines-setup を回すか、repos に mode: label を設定してください",
+	"issue-driven-sdd の routines-setup を回すか、issue-label-driven の To Do ラベルを作ってください",
 }
 
 // tableLines は現在タブの行を h 行ぶん返す。取得成功で 0 件ならヒントを縦横中央に出す。
@@ -236,22 +234,19 @@ func (m Model) tableRow(r row, selected bool) []string {
 func (m Model) footer(hint string) string {
 	var status string
 	switch {
-	case m.fetching:
-		status = m.spinner.View() + " 取得中"
+	// 書き込みのステータスは押されたキーへの直接の返事なので、取得中のスピナーより先に出す
+	// （初回取得の最中に t を拒否したときも、押したキーが黙って効かないように見えない）。
 	case m.writeStatus != "":
 		status = m.writeStatus
 		if m.writeStatusErr {
 			status = errorStyle.Render(status)
 		}
+	case m.fetching:
+		status = m.spinner.View() + " 取得中"
 	case m.errText != "":
 		status = errorStyle.Render(m.errText)
 	case m.partial != "":
 		status = errorStyle.Render(m.partial)
-	case m.screen == screenQueue:
-		// 方式の書き忘れは 0 件ヒントでは拾えない（カードが 1 件でもあれば出ない）。
-		if repo, ok := m.missingLabelMode(); ok {
-			status = repo + " に To Do / In Progress の issue があります。mode: label の設定漏れかもしれません"
-		}
 	}
 	if status == "" {
 		return ansi.Truncate(hint, m.width, "")
@@ -263,25 +258,6 @@ func (m Model) footer(hint string) string {
 		return ansi.Truncate(status, m.width, "")
 	}
 	return hint + strings.Repeat(" ", m.width-hintW-statusW) + status
-}
-
-// missingLabelMode は sdd 扱いのリポジトリに ILD の段階ラベルが付いた open issue があるかを返す。
-// 追加の gh 呼び出しはせず、取得済みの Cards のラベルだけで判定する。
-func (m Model) missingLabelMode() (string, bool) {
-	found := ""
-	for _, c := range m.cards {
-		is := c.Issue
-		if is == nil || m.repoMode(is.Repo) == model.ModeLabel {
-			continue
-		}
-		if !model.HasLabel(is.Labels, model.LabelToDo) && !model.HasLabel(is.Labels, model.LabelInProgress) {
-			continue
-		}
-		if found == "" || is.Repo < found {
-			found = is.Repo
-		}
-	}
-	return found, found != ""
 }
 
 // pad は表示幅 w に切り詰めて埋める。

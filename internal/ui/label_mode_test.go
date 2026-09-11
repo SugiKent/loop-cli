@@ -29,13 +29,18 @@ func boardCard(number int, labels ...string) model.Card {
 }
 
 // boardModel は org/board の Card を持ち、書き込み先が action の todo fixture である Model。
+// 方式は取得結果（fetch.Result.Modes）から来るので、Options には渡さない。
 func boardModel(cards []model.Card, opts Options) (Model, *gh.Fake) {
+	return boardModelWith(&fetch.Result{Cards: cards, Modes: boardModes}, opts)
+}
+
+// boardModelWith は取得結果そのものを差し替えられる boardModel。
+func boardModelWith(res *fetch.Result, opts Options) (Model, *gh.Fake) {
 	fake := gh.NewFake("../action/testdata/todo")
-	opts.Modes = boardModes
 	// Card は Result.Tab がバックログなので、そのタブへ移ってから使う。
 	m, _ := send(New(nil, fake, (&stubEditor{}).Editor, opts),
 		tea.WindowSizeMsg{Width: 120, Height: 40},
-		fetchedMsg{res: &fetch.Result{Cards: cards}, at: at},
+		fetchedMsg{res: res, at: at},
 		runeKey('2'))
 	return m, fake
 }
@@ -70,23 +75,108 @@ func TestTodoLabelModeWritesToDo(t *testing.T) {
 	}
 }
 
-// TestTodoLabelModeUsesConfigOnSnapshot は、初回取得の前（スナップショット表示中）でも
-// 設定の方式でラベルを書くことを検証する。
-func TestTodoLabelModeUsesConfigOnSnapshot(t *testing.T) {
-	fake := gh.NewFake("../action/testdata/todo")
-	snap := &snapshot.Snapshot{Cards: []model.Card{boardCard(160)}, At: at}
-	m := New(nil, fake, (&stubEditor{}).Editor, Options{Modes: boardModes, Snapshot: snap})
-	m, _ = send(m, tea.WindowSizeMsg{Width: 120, Height: 40}, runeKey('2'))
+// TestTodoUnknownModeWritesNothing は、方式が分からないリポジトリで t が何も書かず
+// 理由をフッタに出すことを検証する。推測したラベルを書くと worker の起動がずれる。
+func TestTodoUnknownModeWritesNothing(t *testing.T) {
+	const reason = "org/board の運用方式が分かりません（stage:todo / To Do のラベルがありません）"
 
-	_, cmd := send(m, tKey)
-	if cmd == nil {
-		t.Fatal("t でコマンドが返っていない")
-	}
-	send(m, cmd())
+	t.Run("初回取得の前は書き込まずに理由を出す", func(t *testing.T) {
+		fake := gh.NewFake("../action/testdata/todo")
+		snap := &snapshot.Snapshot{Cards: []model.Card{boardCard(160)}, At: at}
+		m := New(nil, fake, (&stubEditor{}).Editor, Options{Snapshot: snap})
+		m, _ = send(m, tea.WindowSizeMsg{Width: 120, Height: 40}, runeKey('2'))
 
-	if len(fake.Calls) != 2 || fake.Calls[1].Label != "To Do" {
-		t.Errorf("呼び出し = %+v, want 2 件目が To Do", fake.Calls)
-	}
+		m, cmd := send(m, tKey)
+		if cmd != nil {
+			t.Error("t でコマンドが返っている")
+		}
+		if len(fake.Calls) != 0 {
+			t.Errorf("呼び出し = %+v, want 空", fake.Calls)
+		}
+		if text := plainText(m); !strings.Contains(text, reason) {
+			t.Errorf("理由が出ていない: %q", footerOf(text))
+		}
+	})
+
+	t.Run("ラベル一覧の取得に失敗したリポジトリでは書き込まない", func(t *testing.T) {
+		res := &fetch.Result{
+			Cards:  []model.Card{boardCard(160)},
+			Modes:  map[string]model.Mode{},
+			Errors: []error{errors.New("ListLabels org/board: gh label list: exit 1")},
+		}
+		m, fake := boardModelWith(res, Options{})
+
+		m, cmd := send(m, tKey)
+		if cmd != nil {
+			t.Error("t でコマンドが返っている")
+		}
+		if len(fake.Calls) != 0 {
+			t.Errorf("呼び出し = %+v, want 空", fake.Calls)
+		}
+		if text := plainText(m); !strings.Contains(text, "org/board の運用方式が分かりません") {
+			t.Errorf("理由が出ていない: %q", footerOf(text))
+		}
+	})
+
+	t.Run("方式が分かるリポジトリは同じ画面でも書ける", func(t *testing.T) {
+		// issue 153 は todo fixture でラベルが空なので、t は stage:todo を付ける側に倒れる。
+		appCard := boardCard(153)
+		appCard.Issue.Repo = "org/app"
+		res := &fetch.Result{
+			Cards:  []model.Card{boardCard(160), appCard},
+			Modes:  map[string]model.Mode{"org/app": model.ModeSDD},
+			Errors: []error{errors.New("ListLabels org/board: gh label list: exit 1")},
+		}
+		// 同じ優先度・同じ更新時刻ならリポジトリ名順なので、選択行は org/app の Card。
+		m, fake := boardModelWith(res, Options{})
+
+		m, cmd := send(m, tKey)
+		if cmd == nil {
+			t.Fatal("t でコマンドが返っていない")
+		}
+		send(m, cmd())
+
+		want := gh.Call{Method: "AddLabel", Repo: "org/app", Number: 153, Label: model.LabelStageTodo}
+		if len(fake.Calls) != 2 || !reflect.DeepEqual(fake.Calls[1], want) {
+			t.Errorf("呼び出し = %+v, want 2 件目が %+v", fake.Calls, want)
+		}
+	})
+}
+
+// TestModesComeFromFetchResult は方式の表が取得結果で入れ替わることを検証する。
+func TestModesComeFromFetchResult(t *testing.T) {
+	t.Run("取得の結果で方式の表が入れ替わる", func(t *testing.T) {
+		card := boardCard(160, model.LabelStagePropose)
+		m, _ := boardModel([]model.Card{card}, Options{})
+		// 次の取得で org/board が sdd になる。
+		m, _ = send(m,
+			fetchedMsg{res: &fetch.Result{Cards: []model.Card{card},
+				Modes: map[string]model.Mode{"org/board": model.ModeSDD}}, at: at},
+			enterKey)
+
+		if text := plainText(m); !strings.Contains(text, "段階: stage:propose") {
+			t.Errorf("前の取得の label が残っている:\n%s", text)
+		}
+	})
+
+	t.Run("取得が失敗したら前回の表を残す", func(t *testing.T) {
+		m, _ := boardModel([]model.Card{boardCard(160, model.LabelInProgress)}, Options{})
+		m, _ = send(m, fetchedMsg{err: errors.New("search issues: rate limited"), at: at}, enterKey)
+
+		if text := plainText(m); !strings.Contains(text, "段階: In Progress") {
+			t.Errorf("取得失敗で前回の表が消えている:\n%s", text)
+		}
+	})
+
+	t.Run("初回取得の前は方式が分からない", func(t *testing.T) {
+		snap := &snapshot.Snapshot{Cards: []model.Card{boardCard(160, model.LabelInProgress)}, At: at}
+		m := New(nil, gh.NewFake("../action/testdata/todo"), (&stubEditor{}).Editor, Options{Snapshot: snap})
+		m, _ = send(m, tea.WindowSizeMsg{Width: 120, Height: 40}, runeKey('2'), enterKey)
+
+		if text := plainText(m); !strings.Contains(text, "段階なし") {
+			t.Errorf("方式が分からないのに label の語彙で描いている:\n%s", text)
+		}
+	})
 }
 
 // TestDetailLabelModeStageLine は label 方式の段階行とバッジを検証する。
@@ -162,44 +252,6 @@ func TestDetailLabelModePRList(t *testing.T) {
 		text := plainText(m)
 		if strings.Contains(text, "[-] PR#") || strings.Contains(text, "[propose] なし") {
 			t.Errorf("PR の行が出ている:\n%s", text)
-		}
-	})
-}
-
-// TestMissingLabelModeNotice は方式の書き忘れをフッタで知らせることを検証する。
-func TestMissingLabelModeNotice(t *testing.T) {
-	const notice = "org/board に To Do / In Progress の issue があります。mode: label の設定漏れかもしれません"
-	cards := []model.Card{boardCard(160, model.LabelToDo)}
-
-	t.Run("sdd 扱いなら知らせる", func(t *testing.T) {
-		m, _ := send(newModelOpts(nil, Options{}),
-			tea.WindowSizeMsg{Width: 120, Height: 40},
-			fetchedMsg{res: &fetch.Result{Cards: cards}, at: at})
-		if text := plainText(m); !strings.Contains(text, notice) {
-			t.Errorf("設定漏れの知らせが無い: %q", footerOf(text))
-		}
-	})
-
-	t.Run("label 扱いなら知らせない", func(t *testing.T) {
-		m, _ := send(newModelOpts(nil, Options{Modes: boardModes}),
-			tea.WindowSizeMsg{Width: 120, Height: 40},
-			fetchedMsg{res: &fetch.Result{Cards: cards}, at: at})
-		if text := plainText(m); strings.Contains(text, "設定漏れ") {
-			t.Errorf("label 扱いなのに知らせている: %q", footerOf(text))
-		}
-	})
-
-	t.Run("部分失敗が優先される", func(t *testing.T) {
-		res := &fetch.Result{Cards: cards, Errors: []error{errors.New("ViewPR org/board#61: open pr-61.json: no such file")}}
-		m, _ := send(newModelOpts(nil, Options{}),
-			tea.WindowSizeMsg{Width: 120, Height: 40},
-			fetchedMsg{res: res, at: at})
-		text := plainText(m)
-		if !strings.Contains(text, "詳細取得の失敗 1 件") {
-			t.Errorf("部分失敗が出ていない: %q", footerOf(text))
-		}
-		if strings.Contains(text, "設定漏れ") {
-			t.Errorf("部分失敗より設定漏れを優先している: %q", footerOf(text))
 		}
 	})
 }

@@ -11,8 +11,6 @@ import (
 	"strings"
 
 	"go.yaml.in/yaml/v3"
-
-	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // MergeMethod は gh pr merge に渡す merge 方式。値は gh のフラグ名と一致する。
@@ -25,11 +23,10 @@ const (
 	MergeRebase MergeMethod = "rebase"
 )
 
-// Repo は監視対象リポジトリ。MergeMethod と Mode は Load が必ず埋める。
+// Repo は監視対象リポジトリ。MergeMethod は Load が必ず埋める。
 type Repo struct {
 	Name        string
 	MergeMethod MergeMethod
-	Mode        model.Mode
 }
 
 // Config は設定ファイルの内容。
@@ -50,7 +47,7 @@ func DefaultPath() (string, error) {
 	return filepath.Join(home, ".config", "loop-cli", "config.yml"), nil
 }
 
-// UnmarshalYAML は repos の要素を「文字列」または「{name, merge_method, mode} のマッピング」として読む。
+// UnmarshalYAML は repos の要素を「文字列」または「{name, merge_method} のマッピング」として読む。
 func (r *Repo) UnmarshalYAML(node *yaml.Node) error {
 	switch node.Kind {
 	case yaml.ScalarNode:
@@ -67,7 +64,8 @@ func (r *Repo) UnmarshalYAML(node *yaml.Node) error {
 			case "merge_method":
 				r.MergeMethod = MergeMethod(value)
 			case "mode":
-				r.Mode = model.Mode(value)
+				// s30 で廃止。値が正しくても止める（汎用の未知キーの文言では理由が読み取れない）。
+				return errors.New("repos の mode は廃止しました。運用方式はリポジトリのラベル一覧から判定するので、この行を削除してください")
 			default:
 				return fmt.Errorf("repos の要素に未知のキー %q があります", key)
 			}
@@ -77,7 +75,7 @@ func (r *Repo) UnmarshalYAML(node *yaml.Node) error {
 		}
 		return nil
 	default:
-		return errors.New("repos の要素は文字列か {name, merge_method, mode} のマッピングで書いてください")
+		return errors.New("repos の要素は文字列か {name, merge_method} のマッピングで書いてください")
 	}
 }
 
@@ -111,9 +109,6 @@ func Load(path string) (*Config, error) {
 		if cfg.Repos[i].MergeMethod == "" {
 			cfg.Repos[i].MergeMethod = cfg.MergeMethod
 		}
-		if cfg.Repos[i].Mode == "" {
-			cfg.Repos[i].Mode = model.ModeSDD
-		}
 	}
 	return &cfg, nil
 }
@@ -133,9 +128,6 @@ func validate(cfg *Config) error {
 	for i, repo := range cfg.Repos {
 		if repo.MergeMethod != "" && !isMergeMethod(repo.MergeMethod) {
 			return fmt.Errorf("repos[%d] %q の merge_method %q: squash / merge / rebase のいずれかを指定してください", i, repo.Name, repo.MergeMethod)
-		}
-		if repo.Mode != "" && repo.Mode != model.ModeSDD && repo.Mode != model.ModeLabel {
-			return fmt.Errorf("repos[%d] %q の mode %q: sdd / label のいずれかを指定してください", i, repo.Name, repo.Mode)
 		}
 	}
 	if cfg.RefreshIntervalSec < 1 {

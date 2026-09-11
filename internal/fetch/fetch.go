@@ -18,16 +18,25 @@ const CallTimeout = 30 * time.Second
 // detailConcurrency は詳細取得の並行度。secondary rate limit に当たらない範囲。
 const detailConcurrency = 4
 
-// Result は Fetch の返り値。Errors は詳細取得 1 件ごとの部分失敗。
+// Result は Fetch の返り値。Modes は判定できたリポジトリの運用方式、
+// Errors は詳細取得とラベル一覧の取得 1 件ごとの部分失敗。
 type Result struct {
 	Cards  []model.Card
+	Modes  map[string]model.Mode
 	Errors []error
 }
+
+// 失敗した層。Errors の並びは層 → repo → number → メソッド の順で決まる。
+const (
+	layerRepo = iota
+	layerIssue
+	layerPR
+)
 
 // detailError は Errors を決定的に並べるために発生元を保持する。
 // 1 つの PR が 3 つの詳細で失敗し得るので、メソッドも並び順のキーに使う。
 type detailError struct {
-	isPR   bool
+	layer  int
 	repo   string
 	number int
 	method string
@@ -35,9 +44,9 @@ type detailError struct {
 }
 
 // Fetch は repos の open issue / open PR を取得し、分類済みの Card 群を返す。
-// modes はリポジトリ名から運用方式を引く表で、表に無いリポジトリは model.Mode のゼロ値（sdd）。
+// 運用方式はリポジトリごとのラベル一覧から取得のたびに判定し、Result.Modes に入れる。
 // search の失敗と ctx の中断は (nil, error)、詳細取得 1 件の失敗は Result.Errors に積む。
-func Fetch(ctx context.Context, client gh.GHClient, repos []string, modes map[string]model.Mode) (*Result, error) {
+func Fetch(ctx context.Context, client gh.GHClient, repos []string) (*Result, error) {
 	searchIssues, err := call(ctx, func(ctx context.Context) ([]gh.SearchIssue, error) {
 		return client.SearchIssues(ctx, repos)
 	})
@@ -60,12 +69,12 @@ func Fetch(ctx context.Context, client gh.GHClient, repos []string, modes map[st
 		prs[i] = model.PRFromSearch(sp)
 	}
 
-	errs := fetchDetails(ctx, client, issues, prs)
+	modes, errs := fetchDetails(ctx, client, repos, issues, prs)
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("fetch: %w", ctx.Err())
 	}
 
-	return &Result{Cards: buildCards(issues, prs, modes), Errors: sortErrors(errs)}, nil
+	return &Result{Cards: buildCards(issues, prs, modes), Modes: modes, Errors: sortErrors(errs)}, nil
 }
 
 // call は 1 回の gh 呼び出しに CallTimeout の子 ctx を付ける。
@@ -75,18 +84,21 @@ func call[T any](ctx context.Context, f func(context.Context) (T, error)) (T, er
 	return f(c)
 }
 
-// fetchDetails は全 issue / 全 PR の詳細を並行取得し、部分失敗を返す。
-func fetchDetails(ctx context.Context, client gh.GHClient, issues []model.Issue, prs []model.PR) []detailError {
+// fetchDetails は全 issue / 全 PR の詳細とリポジトリごとのラベル一覧を並行取得し、
+// 判定できた方式の表と部分失敗を返す。
+func fetchDetails(ctx context.Context, client gh.GHClient, repos []string,
+	issues []model.Issue, prs []model.PR) (map[string]model.Mode, []detailError) {
 	var (
-		wg   sync.WaitGroup
-		mu   sync.Mutex
-		errs []detailError
-		sem  = make(chan struct{}, detailConcurrency)
+		wg    sync.WaitGroup
+		mu    sync.Mutex
+		errs  []detailError
+		modes = map[string]model.Mode{}
+		sem   = make(chan struct{}, detailConcurrency)
 	)
-	fail := func(isPR bool, method, repo string, number int, err error) {
+	fail := func(layer int, method, repo string, number int, err error) {
 		mu.Lock()
 		defer mu.Unlock()
-		errs = append(errs, detailError{isPR: isPR, repo: repo, number: number, method: method,
+		errs = append(errs, detailError{layer: layer, repo: repo, number: number, method: method,
 			err: fmt.Errorf("%s %s#%d: %w", method, repo, number, err)})
 	}
 	run := func(f func()) {
@@ -99,6 +111,29 @@ func fetchDetails(ctx context.Context, client gh.GHClient, issues []model.Issue,
 		}()
 	}
 
+	for _, repo := range repos {
+		// 0. リポジトリごとのラベル一覧。判定できたものだけを表に入れる。
+		run(func() {
+			labels, err := call(ctx, func(ctx context.Context) ([]gh.RepoLabel, error) {
+				return client.ListLabels(ctx, repo)
+			})
+			if err != nil {
+				mu.Lock()
+				defer mu.Unlock()
+				errs = append(errs, detailError{layer: layerRepo, repo: repo, method: "ListLabels",
+					err: fmt.Errorf("ListLabels %s: %w", repo, err)})
+				return
+			}
+			mode, ok := model.ModeFromLabels(labels)
+			if !ok {
+				return
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			modes[repo] = mode
+		})
+	}
+
 	for i := range issues {
 		// 1. 全 open issue のコメント。
 		run(func() {
@@ -106,7 +141,7 @@ func fetchDetails(ctx context.Context, client gh.GHClient, issues []model.Issue,
 				return client.ViewIssue(ctx, issues[i].Repo, issues[i].Number)
 			})
 			if err != nil {
-				fail(false, "ViewIssue", issues[i].Repo, issues[i].Number, err)
+				fail(layerIssue, "ViewIssue", issues[i].Repo, issues[i].Number, err)
 				return
 			}
 			issues[i].Comments = comments(detail.Comments)
@@ -121,7 +156,7 @@ func fetchDetails(ctx context.Context, client gh.GHClient, issues []model.Issue,
 				return client.ViewPR(ctx, pr.Repo, pr.Number)
 			})
 			if err != nil {
-				fail(true, "ViewPR", pr.Repo, pr.Number, err)
+				fail(layerPR, "ViewPR", pr.Repo, pr.Number, err)
 				return
 			}
 			pr.Comments = comments(detail.Comments)
@@ -132,7 +167,7 @@ func fetchDetails(ctx context.Context, client gh.GHClient, issues []model.Issue,
 				return client.ViewPRMergeState(ctx, pr.Repo, pr.Number)
 			})
 			if err != nil {
-				fail(true, "ViewPRMergeState", pr.Repo, pr.Number, err)
+				fail(layerPR, "ViewPRMergeState", pr.Repo, pr.Number, err)
 				return
 			}
 			pr.MergeState = ms
@@ -143,7 +178,7 @@ func fetchDetails(ctx context.Context, client gh.GHClient, issues []model.Issue,
 				return client.ReviewThreads(ctx, pr.Repo, pr.Number)
 			})
 			if err != nil {
-				fail(true, "ReviewThreads", pr.Repo, pr.Number, err)
+				fail(layerPR, "ReviewThreads", pr.Repo, pr.Number, err)
 				return
 			}
 			pr.ReviewThreads = th
@@ -151,7 +186,7 @@ func fetchDetails(ctx context.Context, client gh.GHClient, issues []model.Issue,
 	}
 
 	wg.Wait()
-	return errs
+	return modes, errs
 }
 
 func comments(cs []gh.Comment) []model.Comment {
@@ -243,12 +278,13 @@ func methodRank(method string) int {
 	}
 }
 
-// sortErrors は issue のエラーを (repo, number) 順、
+// sortErrors はリポジトリのエラーを repo 順、続けて issue のエラーを (repo, number) 順、
 // 続けて PR のエラーを (repo, number, メソッド) 順に並べる。
+// ListLabels の失敗は特定の issue / PR に属さないので番号を持つエラーより前に置く。
 func sortErrors(errs []detailError) []error {
 	sort.SliceStable(errs, func(i, j int) bool {
-		if errs[i].isPR != errs[j].isPR {
-			return !errs[i].isPR
+		if errs[i].layer != errs[j].layer {
+			return errs[i].layer < errs[j].layer
 		}
 		if errs[i].repo != errs[j].repo {
 			return errs[i].repo < errs[j].repo

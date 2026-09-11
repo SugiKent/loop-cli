@@ -1,10 +1,10 @@
 # issue-driven-sdd における人の出番（判定ルール）
 
-最終更新: 2026-09-10-0700
+最終更新: 2026-09-11-1030
 
 loop-cli の分類器（`internal/classify`）と action 層はこの文書を仕様の正本とする。
 この文書は 2 つの運用方式を扱う。既定は issue-driven-sdd（`stage:*`）で、issue-label-driven（`To Do` / `In Progress` / `Done`）の
-差分は「issue-label-driven（`mode: label`）のシグナル対応表」の節にまとめる。
+差分は「issue-label-driven のシグナル対応表」の節にまとめる。
 関連文書として [MVP 定義](../../mvp/mvp.md) と [技術的意思決定](../../mvp/decisions.md) を参照する。
 
 ## 人の出番と検知シグナル
@@ -47,25 +47,31 @@ dispatcher が回収する残骸なので、異常扱いせず進行中に置く
 - `ai-assess:requested` が付いた open PR。未確定 0 件になった PR の AI リスク評価が走っている最中で、評価を終えた assess がラベルを外す。
   評価前に merge させないため、外れるまでは C に出さない。`question` も付いている壊れた状態では、人の質問（A）を先に出す。
 
-### issue-label-driven（`mode: label`）のシグナル対応表
+### issue-label-driven のシグナル対応表
 
 OpenSpec を挟まない **issue-label-driven**（以下 ILD）のリポジトリは、`To Do` / `In Progress` / `Done` の 3 ラベルだけで進む。
-局面 A–G の意味は同じで、違うのはラベルの語彙と、下の 6 点の規則だけである。方式はリポジトリ設定（`repos` の `mode: sdd | label`。
-既定は `sdd`）が正本で、ラベル集合からは判定しない。ILD のラベル遷移は全部 1 回書きで、`In Progress` が `To Do` を置き換える。
-PR にラベルは付かず、issue との紐づけは `Closes #n` だけである（issue 1 件 = PR 1 本）。
+局面 A–G の意味は同じで、違うのはラベルの語彙と、下の 7 点の規則だけである。方式はリポジトリのラベル一覧が正本で、
+取得のたびに判定する（`stage:todo` があれば sdd、無くて `To Do` があれば ILD。D-005）。
+ILD のラベル遷移は全部 1 回書きで、`In Progress` が `To Do` を置き換える。
+PR にラベルは付かず、issue との紐づけは `Closes #n` だけである（issue 1 件 = PR 1 本）。ただし分類はその紐づけで絞り込まない。
 
-| # | 検知シグナル（`mode: label`） | sdd との違い |
+| # | 検知シグナル（ILD） | sdd との違い |
 | --- | --- | --- |
-| A | open PR、`question` ラベル、最新コメントが routine のもの | 同じ |
+| A | open PR、`question` ラベル | 最新コメントが人でも A のまま。ILD は PR の「最新コメントが人 → 進行中」を適用しない |
 | B | open issue、`question`（`blocked` に重ねて付く）、最新コメントが routine のもの | 同じ |
-| C | open PR、本文に `Closes #n`、`question` なし、checks 緑、mergeable | 段階ラベルと本文 1 行目 `未確定の判断: 0 件` を見ない。`question` だけが merge 禁止の印 |
-| D | open PR、本文に `Closes #n`、未 resolve の review thread、thread 最終コメントが routine のもの | 対象の絞り込みが `apply` ラベルから `Closes #n` に変わり、**行 C より先に評価する** |
+| C | open PR、`question` なし、checks 緑、mergeable | 段階ラベル・本文 1 行目 `未確定の判断: 0 件`・`Closes #n` を見ない。`question` だけが merge 禁止の印 |
+| D | open PR、未 resolve の review thread、thread 最終コメントが routine のもの | 対象の絞り込み（sdd は `apply` ラベル）が無くなり、**行 C より先に評価する** |
 | E | open issue、`To Do` / `In Progress` / `Done` なし、`blocked` なし | 段階ラベルの語彙だけが違う |
 | F | `To Do` / `In Progress` / `Done` が 2 つ以上 | PR には段階ラベルが無いので、F になるのは issue だけ |
 | G | （無し） | `docs` ラベルが無い方式なので評価しない |
 
 行 D を行 C より先に評価するのは、ILD の C から本文 1 行目のゲートが外れるためである。C を先に見ると、未 resolve の
 レビュー質問がある緑の PR が常に「merge する」になり、D が checks の赤い PR にしか出なくなる。優先度も D が 1、C が 3 でこの順に一致する。
+
+行 C と行 D から `Closes #n` の絞り込みを外したのは、ILD の open PR を全件キューに出すためである。`Closes #n` は
+「routine が作った PR の印」として使っていたが、それで絞ると外部から来た PR や `Closes` を書き忘れた PR が人から見えなくなる。
+結果として ILD の open PR は「`question` あり → A」「未 resolve の AI thread あり → D」「`question` 無しで mergeable かつ
+checks 緑 → C」「それ以外 → その他」の 4 つに分かれ、どれも `[1]今やる` に並ぶ（`[3]進行中` には 1 件も入らない）。
 
 **ILD でキューに入れないもの（進行中タブに出す）**:
 
@@ -75,10 +81,13 @@ PR にラベルは付かず、issue との紐づけは `Closes #n` だけであ�
 - 段階ラベルも `blocked` も無く、最新の routine コメントが `restart:` の issue。ILD の 2 回書きの残骸は `restart:` だけで、
   `release:` / `advance:` を書く経路が無い。
 - `ai-assess:requested` の規則は適用しない（ILD にこのラベルは無い）。
-- 進行中の残り 4 規則（PR / issue の「最新コメントが人」、`question` 単独の issue）は sdd と同じである。
+- **PR の「最新コメントが人」の 2 規則は適用しない。** sdd では auto-fix や worker が同じ PR を受け取って続きを進めるので進行中に
+  落とす意味があるが、ILD は 1 issue = 1 PR を人が捌く方式で、キューから外れると人の出番が見えなくなる。
+- 進行中の残り 2 規則（issue の「最新コメントが人」、`question` 単独の issue）は sdd と同じである。
 
-**方式の書き忘れ**: `mode: label` を書き忘れた ILD リポジトリは、issue が段階ラベル無しに見えて行 E に並び、`t` が `stage:todo` を
-書いてしまう。キュー画面は `sdd` として扱っているリポジトリに `To Do` / `In Progress` の issue があればフッタで知らせる。
+**方式を判定できないリポジトリ**: `stage:todo` も `To Do` も持たないリポジトリ（と、ラベル一覧の取得に失敗したリポジトリ、
+初回取得が終わる前のスナップショット表示）は方式が分からない。分類と表示はゼロ値の `sdd` の語彙で行い、`t` は書き込まずに
+フッタへ理由を赤で出す。推測したラベルを書くと、書いたラベルで worker が起動しないか、方式の違う worker を起動するためである。
 
 ### 稼働中プロジェクトの実データで確認した事象（設計判断の根拠）
 
@@ -134,6 +143,7 @@ issue-driven-sdd を運用しているリポジトリを 1 つ読んで確認し
 | 日時 | 変更内容 | 理由 |
 | --- | --- | --- |
 | 2026-09-10-0900 | 冒頭の `ai-assess:requested` の一文と不変条件 1・2 を `L`（ラベル一覧）に合わせて改訂。不変条件 1 を「ラベル集合の置換は行わない」に狭め、まとめ送信が原子的でないことと Routine の起動順の帰結を追記 | `L` が任意のラベルを 1 回の書き込みでまとめて変えるようになり、「1 ラベルずつ」「書くラベルは 2 つに限る」が事実と合わなくなったため（#3・s28-label-picker） |
+| 2026-09-11-1030 | ILD の方式の正本をラベル一覧に変え、行 C / 行 D から `Closes #n` を外し、PR の「最新コメントが人」の 2 規則を ILD で適用しないことにした | ILD の open PR を全件「今やる」に出し、方式の書き忘れという状態を無くすため（#24） |
 | 2026-09-10-0700 | issue-label-driven（`mode: label`）のシグナル対応表と、その方式でキューに入れないものを追加した | `To Do` / `In Progress` / `Done` の 3 ラベルで進むリポジトリを同じキューに載せるため（#5） |
 | 2026-09-07-1500 | 上流 `2b1b791` に同期。同期点を更新し、C の条件に `ai-assess:requested` なしを足し、キューに入れないものへ「2 回書きの途中の issue」と「AI 評価待ちの PR」を足し、不変条件 1 の理由をラベル集合による起動判定に書き直し、不変条件 5 に `ai-assess:requested` を足した | 上流が Routine の起動条件をラベル集合の判定に合わせて作り直し、ブロック解除と再起動を 2 回書きにし、PR の AI 評価を `ai-assess:requested` ラベルで起動する経路に変えたため |
 | 2026-09-05-1805 | 上流 `d8db3842` に同期。B を「`question` 付き issue にコメントするだけ」に変更、F を段階ラベル重複のみに縮小、G から `retro` を除外、進行中に「回答済み issue（sweep 待ち）」を追加、不変条件 2〜4 を人がラベルを触らない規約に合わせて書き直し | 上流が人の操作を `stage:todo` とコメントに限定し、issue の人待ちを `question` で可視化するようになったため |

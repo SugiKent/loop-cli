@@ -23,7 +23,7 @@ func answerModel(cards []model.Card, ed *stubEditor) (Model, *gh.Fake) {
 	fake := gh.NewFake(fixtureDir)
 	m, _ := send(New(nil, fake, ed.Editor, Options{}),
 		tea.WindowSizeMsg{Width: 120, Height: 40},
-		fetchedMsg{res: &fetch.Result{Cards: cards}, at: at})
+		fetchedMsg{res: &fetch.Result{Cards: cards, Modes: sddModes}, at: at})
 	return m, fake
 }
 

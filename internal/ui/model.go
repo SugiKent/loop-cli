@@ -22,10 +22,6 @@ type Options struct {
 	Notify          Notifier           // デスクトップ通知。nil なら通知しない
 	CheckUpdate     UpdateChecker      // 起動時の更新確認。nil なら確認しない
 	MergeMethods    map[string]string  // リポジトリ名 -> merge 方式。無いリポジトリは squash
-
-	// Modes はリポジトリ名 -> 運用方式。無いリポジトリは model.Mode のゼロ値（sdd）。
-	// 表示にも書き込みにもこの表を引き、Cards やスナップショットからは方式を決めない。
-	Modes map[string]model.Mode
 }
 
 // UpdateChecker は新しい版があるかどうかを返す（s23 self-update）。
@@ -72,16 +68,18 @@ type Model struct {
 	urls     urlListState
 
 	labelPicker labelPickerState
-	// repoLabels はリポジトリ名 -> そのリポジトリのラベル。R でも自動更新でも捨てない
-	// （ラベルの集合はセッション中にまず変わらないので、L を押すたびに gh を呼ばない）。
+	// repoLabels はリポジトリ名 -> そのリポジトリのラベル。取得が成功するたびに捨てる
+	// （方式は毎回の取得で判定し直すので、L の一覧だけが起動時のまま古く残らないようにする）。
 	repoLabels map[string][]gh.RepoLabel
 
-	answer         answerState
-	merge          mergeState
-	close          closeState
-	newIssue       newIssueState
-	route          editRoute // 今の編集を始めたキー。エディタを開くたびに記録する
-	mergeMethods   map[string]string
+	answer       answerState
+	merge        mergeState
+	close        closeState
+	newIssue     newIssueState
+	route        editRoute // 今の編集を始めたキー。エディタを開くたびに記録する
+	mergeMethods map[string]string
+	// modes はリポジトリ名 -> 判定できた運用方式。取得が成功するたびに丸ごと差し替える。
+	// 表に無いリポジトリは「方式が分からない」で、表示はゼロ値（sdd）、t は書き込まない。
 	modes          map[string]model.Mode
 	writing        bool
 	writeStatus    string
@@ -112,7 +110,6 @@ func New(fetcher Fetcher, client gh.GHClient, editor Editor, opts Options) Model
 		notify:          opts.Notify,
 		checkUpdate:     opts.CheckUpdate,
 		mergeMethods:    opts.MergeMethods,
-		modes:           opts.Modes,
 		spinner:         spinner.New(spinner.WithSpinner(spinner.MiniDot)),
 	}
 	// スナップショットがあれば前回の表と保存時刻から始める（D-002「起動直後は stale 表示」）。
@@ -186,6 +183,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			prev, hadPrev := m.cards, !m.at.IsZero()
 			m.cards = msg.res.Cards
 			m.rows = buildRows(m.cards)
+			// 方式は毎回の判定で丸ごと入れ替え、L のラベル一覧も同じ鮮度にそろえて捨てる。
+			m.modes = msg.res.Modes
+			m.repoLabels = nil
 			m.at = msg.at
 			m.errText = ""
 			m.partial = ""

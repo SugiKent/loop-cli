@@ -187,6 +187,42 @@ func TestLabelKeyTargetPerScreen(t *testing.T) {
 		}
 	})
 
+	t.Run("取得のたびに一覧を取り直す", func(t *testing.T) {
+		m, fake := exampleLabelModel(t, 100, 24)
+		m = openLabels(t, m)
+		m, _ = send(m, escKey, fetchedMsg{res: exampleResult(t), at: at})
+
+		m, cmd := send(m, lKey)
+		if cmd == nil {
+			t.Fatal("取得の後なのにコマンドが返らない（一覧を捨てていない）")
+		}
+		m, _ = send(m, cmd())
+
+		if m.screen != screenLabels {
+			t.Fatalf("画面 = %d, want ラベル一覧", m.screen)
+		}
+		if got := callsOf(fake, "ListLabels"); len(got) != 2 {
+			t.Errorf("ListLabels = %+v, want 2 件", got)
+		}
+	})
+
+	t.Run("取得の失敗では一覧を捨てない", func(t *testing.T) {
+		m, fake := exampleLabelModel(t, 100, 24)
+		m = openLabels(t, m)
+		m, _ = send(m, escKey, fetchedMsg{err: errors.New("search issues: rate limited"), at: at})
+
+		m, cmd := send(m, lKey)
+		if cmd != nil {
+			t.Error("取得が失敗しただけなのに取り直している")
+		}
+		if m.screen != screenLabels {
+			t.Fatalf("画面 = %d, want ラベル一覧", m.screen)
+		}
+		if got := callsOf(fake, "ListLabels"); len(got) != 1 {
+			t.Errorf("ListLabels = %+v, want 1 件", got)
+		}
+	})
+
 	t.Run("PR 詳細は選択中の PR", func(t *testing.T) {
 		m, _ := exampleLabelModel(t, 100, 24)
 		m, _ = send(m, enterKey, enterKey)

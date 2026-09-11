@@ -20,7 +20,7 @@ var savedAt = time.Date(2026, 9, 5, 3, 4, 0, 0, time.UTC)
 // exampleCards は example fixture から s07 の Fetch で作った Card 群。
 func exampleCards(t *testing.T) []model.Card {
 	t.Helper()
-	res, err := fetch.Fetch(context.Background(), gh.NewFake("../gh/testdata/fixtures/example"), []string{"org/app"}, nil)
+	res, err := fetch.Fetch(context.Background(), gh.NewFake("../gh/testdata/fixtures/example"), []string{"org/app"})
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}

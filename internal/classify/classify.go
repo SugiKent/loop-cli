@@ -89,14 +89,17 @@ func PR(pr model.PR, mode model.Mode) model.Result {
 	aiLatest, hasComments := latestIsAI(pr.Comments)
 
 	// 規則 2 / 3: 最新コメントが人。question の有無で文言だけ変える。
-	if hasComments && !aiLatest {
+	// label では適用しない（1 issue = 1 PR を人が捌く方式なので、キューから外すと人の出番が見えなくなる）。
+	if mode != model.ModeLabel && hasComments && !aiLatest {
 		if question {
 			return result(model.SituationInProgress, fmt.Sprintf("PR #%d は回答済み。worker が受け取り中", pr.Number))
 		}
 		return result(model.SituationInProgress, fmt.Sprintf("PR #%d は auto-fix が受け取り中", pr.Number))
 	}
 
-	if question && hasComments && aiLatest {
+	// 行 A: sdd は最新コメントが AI のものだけ（人が答えたものは規則 3 が進行中にする）。
+	// label は規則 3 を適用しないので、人が答えた question の PR も質問のまま今やるに残す。
+	if question && (mode == model.ModeLabel || aiLatest) {
 		return result(model.SituationA, fmt.Sprintf("PR #%d の質問に答える", pr.Number))
 	}
 	// 規則 7: AI リスク評価が走っている最中。assess がラベルを外すまで merge 待ちにしない。
@@ -125,17 +128,13 @@ func PR(pr model.PR, mode model.Mode) model.Result {
 }
 
 // isC は行 C（question 無し・mergeable・checks 緑）を判定する。対象の絞り込みは方式で分かれ、
-// sdd は段階ラベルと未確定 0 件、label は Closes #n（routine が作った PR の印）だけを見る。
+// sdd は段階ラベルと未確定 0 件を見る。label は絞り込まない（open PR が全件対象）。
 // IsDraft は見ない。draft の merge 拒否は s14 の merge ガードが持つ。
 func isC(pr model.PR, mode model.Mode, stages []string, question bool) bool {
 	if question {
 		return false
 	}
-	if mode == model.ModeLabel {
-		if _, ok := model.ClosesIssue(pr.Body); !ok {
-			return false
-		}
-	} else {
+	if mode != model.ModeLabel {
 		if len(stages) == 0 {
 			return false
 		}
@@ -150,13 +149,9 @@ func isC(pr model.PR, mode model.Mode, stages []string, question bool) bool {
 }
 
 // isD は行 D（未 resolve の review thread があり、thread 最終コメントが AI）を判定する。
-// 対象は sdd が apply PR、label が Closes #n を持つ PR。
+// 対象は sdd が apply PR、label は open PR の全件。
 func isD(pr model.PR, mode model.Mode) bool {
-	if mode == model.ModeLabel {
-		if _, ok := model.ClosesIssue(pr.Body); !ok {
-			return false
-		}
-	} else if !model.HasLabel(pr.Labels, model.LabelApply) {
+	if mode != model.ModeLabel && !model.HasLabel(pr.Labels, model.LabelApply) {
 		return false
 	}
 	for _, th := range pr.ReviewThreads {

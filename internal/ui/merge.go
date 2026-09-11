@@ -86,8 +86,12 @@ func (m Model) mergeTarget() (string, int, string, bool) {
 	return "", 0, "", false
 }
 
-// repoMode は対象のリポジトリの運用方式。対応表に無ければゼロ値（sdd）。
-func (m Model) repoMode(repo string) model.Mode { return m.modes[repo] }
+// repoMode は対象のリポジトリの判定済みの運用方式。表に無ければゼロ値（sdd）と false を返す。
+// 表示はゼロ値で描いてよいが、書き込み（t）は false のリポジトリで止める。
+func (m Model) repoMode(repo string) (model.Mode, bool) {
+	mode, ok := m.modes[repo]
+	return mode, ok
+}
 
 // mergeMethod は対象のリポジトリの merge 方式。対応表に無ければ squash。
 func (m Model) mergeMethod(repo string) string {

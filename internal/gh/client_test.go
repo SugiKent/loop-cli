@@ -519,7 +519,7 @@ func TestListLabelsArgsAndDecode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListLabels: %v", err)
 	}
-	wantArgs(t, rec, "label list -R org/app --json name,description,color --sort name --order asc --limit 100")
+	wantArgs(t, rec, "label list -R org/app --json name,description,color --sort name --order asc --limit 1000")
 
 	want := []RepoLabel{
 		{Name: "docs", Description: ".claude/ と docs/ だけの PR", Color: "0075ca"},
