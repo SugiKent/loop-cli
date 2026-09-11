@@ -65,9 +65,10 @@ TBD - created by archiving change s02-config. Update Purpose after archive.
 - `repos` の要素が「文字列」でも「`name` を持つマッピング」でもない
 - `repos` の要素が `owner/name` 形式でない。判定は「`/` がちょうど 1 つ、その両側が空でない、空白を含まない」に限る
 - `merge_method`（グローバル・リポジトリ別とも）が `squash` / `merge` / `rebase` 以外（リポジトリ別の空文字列は未指定扱いで対象外）
-- `mode` が `sdd` / `label` 以外（空文字列は未指定扱いで対象外）
 - `refresh_interval_sec` が 1 未満
 - 未知のキーがある（トップレベル、および `repos` 要素のマッピング内のどちらも）
+
+`repos` の要素の `mode` キーは s30 で廃止した。`mode` を持つ設定ファイルに対しては、`repos の mode は廃止しました。運用方式はリポジトリのラベル一覧から判定するので、この行を削除してください` を含むエラーを MUST 返す。汎用の未知キーの文言は使わない。この 1 件だけ専用の文言を持つのは、s26 から s30 の間に `mode: label` を書いた設定ファイルが、この change の後は起動しなくなるためである。汎用の文言だけでは、値が正しいのになぜ止まるのかが読み取れない。
 
 #### Scenario: ファイルが無い
 - **WHEN** 存在しないパスを `Load` に渡す
@@ -86,8 +87,8 @@ TBD - created by archiving change s02-config. Update Purpose after archive.
 - **THEN** エラーが返り、エラー文字列に `merge_method` と `fast-forward` が含まれる
 
 #### Scenario: mode が不正
-- **WHEN** `repos` の要素に `{name: org/board, mode: kanban}` と書いたファイルを `Load` に渡す
-- **THEN** エラーが返り、エラー文字列に `org/board` と `kanban` が含まれる
+- **WHEN** `repos` の要素に `{name: org/board, mode: label}` と書いたファイル、`{name: org/board, mode: kanban}` と書いたファイルのそれぞれを `Load` に渡す
+- **THEN** いずれもエラーが返り、エラー文字列に `mode は廃止しました` と `削除してください` が含まれる（値が正しくても廃止したキーとして止める）
 
 #### Scenario: refresh_interval_sec が 0 以下
 - **WHEN** `refresh_interval_sec: 0` と書いたファイルを `Load` に渡す
@@ -140,20 +141,3 @@ TBD - created by archiving change s02-config. Update Purpose after archive.
 #### Scenario: owner/name でない文字列を拒否する
 - **WHEN** `IsRepoName("app")`、`IsRepoName("org/app/extra")`、`IsRepoName("/app")`、`IsRepoName("org/")`、`IsRepoName("org/ app")` をそれぞれ呼ぶ
 - **THEN** いずれも false が返る
-
-### Requirement: リポジトリごとに issue の運用方式を mode で指定できる
-`repos` の各要素は、そのリポジトリがどちらの運用方式かを `mode` キーで MUST 指定できる。値は 2 つある。`sdd` は issue-driven-sdd を指し、`stage:*` と `wip` と PR の段階ラベルで進む方式である。`label` は issue-label-driven を指し、`To Do` と `In Progress` と `Done` の 3 ラベルで進む方式である。利用者は `merge_method` と同じく、マッピング形式で書いた要素の中に `mode` を書く。省略した要素は `sdd` になる（既存の設定ファイルは書き換えずに従来どおり動く）。
-`Load` は解決済みの方式を `Repo` に埋めて返し、消費側は指定の有無を知らずに読めばよい。方式はリポジトリ単位でだけ決まり、トップレベルの既定値は持たない（2 方式を混在させて監視するのがこの機能の目的であり、全リポジトリ共通の既定を書きたい状況が無い）。
-`mode` に空文字列を明示した場合は未指定として扱い、`sdd` になる。ラベル名そのものは設定で変えられない（mvp.md「ラベル名と routine マーカーはプラグインの規約に固定し、設定で変えられるようにしない」）。
-
-#### Scenario: mode を書かないリポジトリは sdd になる
-- **WHEN** `repos` に `org/app`（文字列）と `{name: org/web, merge_method: rebase}` を書いたファイルを `Load` に渡す
-- **THEN** どちらの `Repo` も方式は `sdd` である
-
-#### Scenario: mode: label を指定したリポジトリだけ label になる
-- **WHEN** `repos` に `org/app` と `{name: org/board, mode: label}` を書いたファイルを `Load` に渡す
-- **THEN** `org/app` の方式は `sdd`、`org/board` の方式は `label` である
-
-#### Scenario: mode と merge_method を同じ要素に書ける
-- **WHEN** `repos` の要素に `{name: org/board, mode: label, merge_method: rebase}` と書いたファイルを `Load` に渡す
-- **THEN** `org/board` の方式は `label`、`MergeMethod` は rebase である

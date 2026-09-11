@@ -243,12 +243,12 @@ TBD - created by archiving change s03-gh-client. Update Purpose after archive.
 
 既存の `Label { Name string }` とは別の型にする。`Label` は issue / PR に付いているラベルを表し、`gh issue view --json labels` と GraphQL の `labels{nodes{name}}` の両方から作られるので `description` と `color` は取れない（s03 が「`id` / `color` / `description` は読み捨てる」と定めている）。`Label` に 2 つの欄を足すと、経路によって空になる欄を持つ型になり、`Fake` と `Client` で埋まり方が変わる。リポジトリが持つラベルの一覧は用途も取得元も違うので、型を分ける。
 
-`Client` の `ListLabels` は `gh label list -R <repo> --json name,description,color --sort name --order asc --limit 100` を MUST 実行し、標準出力を `[]RepoLabel` にデコードして返す。`--sort name --order asc` を明示するのは、`gh` の既定が作成順であり、リポジトリごとに並びが変わると画面も fixture も非決定になるためである。並べ替えは `gh` に任せ、クライアント側では行わない。`--limit 100` を超えるラベルを持つリポジトリでは 100 件で切れるが、ページングは行わない。デコードに失敗したときは、コマンドと元のエラーを含むエラーを返す（s03「`gh` の失敗はコマンドと stderr を含むエラーになる」と同じ形）。
+`Client` の `ListLabels` は `gh label list -R <repo> --json name,description,color --sort name --order asc --limit 1000` を MUST 実行し、標準出力を `[]RepoLabel` にデコードして返す。`--sort name --order asc` を明示するのは、`gh` の既定が作成順であり、リポジトリごとに並びが変わると画面も fixture も非決定になるためである。並べ替えは `gh` に任せ、クライアント側では行わない。`--limit 1000` にするのは、この一覧が s30 で運用方式の判定にも使われるためである。上限で切れると名前昇順の後ろにある `stage:todo` が落ち、issue-driven-sdd のリポジトリを `label` と誤判定して `To Do` を書きに行く（`card-fetch`「Fetch はリポジトリごとにラベル一覧を取り運用方式を判定する」）。1000 件を超えるラベルを持つリポジトリでは切れるが、ページングは行わない。デコードに失敗したときは、コマンドと元のエラーを含むエラーを返す（s03「`gh` の失敗はコマンドと stderr を含むエラーになる」と同じ形）。
 
 #### Scenario: 実行するコマンドと引数
 
 - **WHEN** 実行を記録するスタブに差し替えた `Client` で `ListLabels(ctx, "org/app")` を呼ぶ
-- **THEN** 記録された引数は `label list -R org/app --json name,description,color --sort name --order asc --limit 100` である
+- **THEN** 記録された引数は `label list -R org/app --json name,description,color --sort name --order asc --limit 1000` である
 
 #### Scenario: 出力をデコードする
 

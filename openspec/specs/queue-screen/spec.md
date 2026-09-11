@@ -221,10 +221,10 @@ TBD - created by archiving change s08-queue-screen. Update Purpose after archive
 - **THEN** 表は 0 行、ヘッダは `↻ --:--`、フッタに error の文字列が含まれ、`取得中` は含まれない
 
 ### Requirement: 取得が成功して Card が 0 件のときは表の領域にヒントを出す
-キュー画面は、直近の取得が成功して `Cards` が 0 件（全タブが空）のとき、表の領域の代わりに次の 2 行を MUST 出す（mvp.md「初回起動（onboarding）」の文言。Markdown のバッククォートは付けない）。2 方式のどちらの利用者も設定を直せるように、両方の入口を示す。
+キュー画面は、直近の取得が成功して `Cards` が 0 件（全タブが空）のとき、表の領域の代わりに次の 2 行を MUST 出す（mvp.md「初回起動（onboarding）」の文言。Markdown のバッククォートは付けない）。2 方式のどちらの利用者も直せるように、両方の入口を示す。方式の判定材料はリポジトリのラベル一覧なので、2 行目はラベルを作る手立てを案内する。
 ```
 stage:* / To Do ラベルの無いリポジトリは何も出ません。
-issue-driven-sdd の routines-setup を回すか、repos に mode: label を設定してください
+issue-driven-sdd の routines-setup を回すか、issue-label-driven の To Do ラベルを作ってください
 ```
 2 行は表の領域（表の高さ）の縦中央に置き、各行を端末幅の横中央に置く（左に空白を置き、右には足さない）。端末幅より長い行は幅で切る。プレビューの領域は変えない。
 次のときは出さない。
@@ -235,7 +235,7 @@ issue-driven-sdd の routines-setup を回すか、repos に mode: label を設�
 
 #### Scenario: 取得成功で 0 件ならヒントが出る
 - **WHEN** `Cards` が空で `Errors` も空の `Result` を取得完了として渡し、`View` から ANSI エスケープを除いて読む
-- **THEN** `stage:* / To Do ラベルの無いリポジトリは何も出ません。` と `issue-driven-sdd の routines-setup を回すか、repos に mode: label を設定してください` の 2 行が含まれ、ヘッダの `[1]今やる 0` とフッタは従来どおり出る
+- **THEN** `stage:* / To Do ラベルの無いリポジトリは何も出ません。` と `issue-driven-sdd の routines-setup を回すか、issue-label-driven の To Do ラベルを作ってください` の 2 行が含まれ、ヘッダの `[1]今やる 0` とフッタは従来どおり出る
 
 #### Scenario: 取得中はヒントを出さない
 - **WHEN** `New` 直後（初回取得前）の `Model` の `View` から ANSI エスケープを除いて読む
@@ -256,35 +256,6 @@ issue-driven-sdd の routines-setup を回すか、repos に mode: label を設�
 #### Scenario: 幅 60 でもヒントは表の領域に出てプレビューも描かれる
 - **WHEN** `Cards` が空の `Result` を渡した `Model` に幅 60・高さ 40 のサイズメッセージを与え、`View` から ANSI エスケープを除いて読む
 - **THEN** `routines-setup` を含む行と、プレビュー領域の `（このタブにはカードがありません）` の両方が含まれる
-
-### Requirement: リポジトリごとの運用方式を設定から受け取る
-`internal/ui` の `Options` は `Modes map[string]model.Mode`（リポジトリ名 → 運用方式）を MUST 持ち、`Model` は方式が要るときに必ずこの表を引く。表に無いリポジトリは `model.Mode` のゼロ値（`sdd`）として扱う。`cmd/loop-cli` が `Config.Repos` から表を作って渡す（`MergeMethods` と同じ経路で、`internal/ui` は `internal/config` を import しない）。
-表示（カード詳細の段階行・バッジ・PR 一覧）と書き込み（`t` のラベル切り替え）は、どちらもこの表の方式を使う。`Cards` の中の値や前回のスナップショットから方式を決めない。スナップショットは前回の実行時の派生データであり、設定を変える前に保存された値が残るため、そこから方式を決めると設定と食い違ったラベルを書き込む経路ができる。
-
-#### Scenario: 表に無いリポジトリは sdd として扱う
-- **WHEN** `Options.Modes` が `org/board` だけを `label` にした `Model` で、`org/app` の issue の Card の詳細を開き、`View` を読む
-- **THEN** `org/app` の issue は sdd の語彙で表示される（`Labels` が `stage:propose` なら `段階: stage:propose`）
-
-#### Scenario: スナップショットの Card でも設定の方式で表示する
-- **WHEN** `Options.Snapshot` に前回の `Cards` を持たせ、`Options.Modes` が `org/board` を `label` にした `Model` を初回取得の前に描き、`org/board` の `In Progress` の issue の Card の詳細を開いて `View` を読む
-- **THEN** `段階: In Progress` が含まれる
-
-### Requirement: 方式の取り違えらしき状態をフッタで知らせる
-キュー画面は、取得が成功したとき、`sdd` として扱っているリポジトリに `To Do` または `In Progress` のラベルが付いた open issue が 1 件以上あれば、フッタのステータスに `<Repo> に To Do / In Progress の issue があります。mode: label の設定漏れかもしれません` を MUST 出す（複数のリポジトリが当たるときは、リポジトリ名の昇順で最初の 1 件だけ出す）。追加の `gh` 呼び出しはせず、取得済みの `Cards` のラベルだけで判定する。
-この知らせは、取得中・取得失敗・書き込みステータス・部分失敗のいずれかを出しているときは出さない（フッタのステータスは 1 つで、既存の表示を隠さない）。`label` として扱っているリポジトリについては何も出さない。
-方式を書き忘れた ILD リポジトリは、issue が段階ラベル無しに見えて局面 E（着手を承認する）に並び、`t` が `stage:todo` を書いてしまう。0 件のヒント（Requirement「取得が成功して Card が 0 件のときは表の領域にヒントを出す」）はカードが 1 件でもあれば出ないので、この状態を人に伝える経路が他に無い。
-
-#### Scenario: sdd 扱いのリポジトリに To Do があれば知らせる
-- **WHEN** `Options.Modes` が空の `Model` に、`org/board` の `Labels` が `To Do` の issue を持つ `Result` を取得完了として渡し、`View` から ANSI エスケープを除いて読む
-- **THEN** フッタに `org/board に To Do / In Progress の issue があります。mode: label の設定漏れかもしれません` が含まれる
-
-#### Scenario: label 扱いのリポジトリでは知らせない
-- **WHEN** `Options.Modes` が `org/board` を `label` にした `Model` に同じ `Result` を渡し、`View` を読む
-- **THEN** フッタに `設定漏れ` は含まれない
-
-#### Scenario: 部分失敗があればそちらを優先する
-- **WHEN** 同じ `Result` に `Errors` を 1 件持たせて取得完了として渡し、`View` を読む
-- **THEN** フッタに `詳細取得の失敗 1 件` が含まれ、`設定漏れ` は含まれない
 
 ### Requirement: ヘッダはタブ名と件数と最終更新時刻、フッタは close を含むキーヒントとステータスを出す
 画面の状態がキューのとき、`View` の 1 行目（ヘッダ）は、アプリ名 `loop-cli` と空白 2 列に続けて 4 タブを mvp.md の形式 `[1]今やる <n>  [2]バックログ <n>  [3]進行中 <n>  [4]異常 <n>`（タブ間は空白 2 列）で MUST 出す。`<n>` はそのタブの行数。現在のタブは太字で、他のタブは通常で描く。ヘッダの右端に右寄せで、左に最低 1 列の空白を置いて `↻ HH:MM`（最後に取得が完了した時刻。24 時間表記。完了時刻はメッセージが運ぶ `time.Time` をそのタイムゾーンのまま書く。`cmd/loop-cli` は `time.Now()` を渡すのでローカル時刻になる）を出し、初回取得の完了前は `↻ --:--` とする。s23 `self-update` の更新の確認が「新しい版がある」を返しているときは、`↻ HH:MM` の左に空白 2 列を空けて `↑ update` を MUST 出す。返していないとき・確認が失敗したとき・確認を行わないときは出さない。
@@ -337,3 +308,26 @@ s28 `label-picker` の `L ラベル` は `t todo` の次に置き、s26 `close-i
 #### Scenario: 幅 107 では取得中はステータスだけになる
 - **WHEN** `New` 直後の `Model` に幅 107・高さ 24 のサイズメッセージを与え、`View` から ANSI エスケープを除いて読む
 - **THEN** 最終行に `取得中` が含まれ、`Enter 開く` と `c close` は含まれない（1 列足りず、s08 のフッタの規則でステータスを優先する）
+
+### Requirement: 運用方式は取得のたびに判定した結果を持つ
+`internal/ui` の `Model` は「リポジトリ名 → 運用方式」の表を状態として MUST 持つ。表の中身は `internal/fetch` の `Result.Modes`（`card-fetch`「Fetch はリポジトリごとにラベル一覧を取り運用方式を判定する」）で、取得が成功したメッセージを受け取るたびに丸ごと差し替える。取得が失敗したメッセージでは触らず、前回の表を残す（D-002「失敗時は前回結果を維持する」）。`Options` は方式を受け取らず、`cmd/loop-cli` は方式を作らない。
+
+表は「そのリポジトリの方式が分かっているか」を区別できる形で持つ。次の 3 つはいずれも「分からない」であり、表に入らない。
+
+- 初回の取得がまだ終わっていない（スナップショットだけを描いている）
+- そのリポジトリの `ListLabels` が失敗した
+- そのリポジトリが `stage:todo` も `To Do` も持たない
+
+表示（カード詳細の段階行・バッジ・PR 一覧の段階）は表を引き、分からないリポジトリはゼロ値の `sdd` の語彙で描く。分類も同じで、`Card.Result` は必ず 1 つ決まる（`card-fetch`）。書き込み（`t`）だけは分からないリポジトリで止める（`todo-toggle`「t は画面の Card の Issue に対して、判定した方式で確認なしに承認ラベルを切り替える」）。`Cards` の中の値や前回のスナップショットから方式を決めない。スナップショットは前回の実行時の派生データなので、そこから方式を決めると、ラベルを変えた後も古い方式でラベルを書く経路ができる。
+
+#### Scenario: 取得の結果で方式の表が入れ替わる
+- **WHEN** `org/board` を `label` と判定した `Result` を取得完了として渡した `Model` に、次の取得で `org/board` を `sdd` と判定した `Result` を渡し、`org/board` の `Labels` が `stage:propose` の issue の Card の詳細を開いて `View` を読む
+- **THEN** `段階: stage:propose` が含まれる（前の取得の `label` は残らない）
+
+#### Scenario: 取得が失敗したら前回の表を残す
+- **WHEN** `org/board` を `label` と判定した `Result` を渡した `Model` に、取得失敗のメッセージを渡し、`org/board` の `Labels` が `In Progress` の issue の Card の詳細を開いて `View` を読む
+- **THEN** `段階: In Progress` が含まれる
+
+#### Scenario: 初回取得の前は方式が分からない
+- **WHEN** `Options.Snapshot` に `org/board` の `In Progress` の issue の Card を持たせた `Model` を初回取得の前に描き、その Card の詳細を開いて `View` を読む
+- **THEN** `段階なし` が含まれる（方式が分からないので `sdd` の語彙で描く）
