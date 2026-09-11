@@ -78,6 +78,7 @@ type Model struct {
 
 	answer         answerState
 	merge          mergeState
+	close          closeState
 	newIssue       newIssueState
 	route          editRoute // 今の編集を始めたキー。エディタを開くたびに記録する
 	mergeMethods   map[string]string
@@ -216,6 +217,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case mergedMsg:
 		return m.updateMerged(msg), nil
 
+	case closedMsg:
+		return m.updateClosed(msg), nil
+
 	case createdMsg:
 		return m.updateCreated(msg), nil
 
@@ -245,6 +249,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// merge の確認画面も a / t / m / o / ? / u より先に振り分ける（確認中に裏の対象を触らせない）。
 		if m.screen == screenMergeConfirm {
 			return m.updateMergeConfirmKey(key)
+		}
+		// close の確認画面も同じ理由で先に振り分ける。
+		if m.screen == screenCloseConfirm {
+			return m.updateCloseConfirmKey(key)
 		}
 		// 作成の確認画面も同じ理由で先に振り分ける。
 		if m.screen == screenNewConfirm {
@@ -283,6 +291,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// m の対象は常に PR で、キュー画面（主体が PR）と 2 つの詳細画面で効く。
 		if key == "m" {
 			return m.mergeKey()
+		}
+		// c の対象は画面が見せているもの（issue でも PR でもよい）で、3 画面すべてで効く。
+		if key == "c" {
+			return m.closeKey()
 		}
 		// n の作成先は画面が見せている対象のリポジトリで、3 画面すべてで効く。
 		if key == "n" {

@@ -30,6 +30,7 @@ const (
 	screenMergeConfirm
 	screenNewConfirm
 	screenLabels
+	screenCloseConfirm
 )
 
 // detailState は開いている詳細。Card は開いた時点のコピーで、取得完了では差し替えない。
@@ -434,11 +435,12 @@ func (m Model) reviewThreadLines(threads []gh.ReviewThread) []string {
 // detailHint は詳細画面のフッタ左。動くキーだけを出す。
 func (m Model) detailHint() string {
 	if m.screen == screenPR {
-		return "Esc 戻る  x 展開  g issue へ  ? ヘルプ  u URL  a 回答  L ラベル  m merge  n 新規  o ブラウザ  q 終了"
+		return "Esc 戻る  x 展開  g issue へ  ? ヘルプ  u URL  a 回答  L ラベル  m merge  c close  n 新規  o ブラウザ  q 終了"
 	}
-	// n は PR の有無によらず動くので、PR のキーと違って省かない。
+	// n と c は PR の有無によらず動くので、PR のキーと違って省かない
+	// （c の対象はカード詳細では Issue で、これは常にある）。
 	if len(m.detail.card.PRs) == 0 {
-		return "Esc 戻る  x 展開  ? ヘルプ  u URL  a 回答  t todo  L ラベル  n 新規  o ブラウザ  q 終了"
+		return "Esc 戻る  x 展開  ? ヘルプ  u URL  a 回答  t todo  L ラベル  c close  n 新規  o ブラウザ  q 終了"
 	}
-	return "Esc 戻る  Tab PR 選択  Enter PR を開く  x 展開  g PR へ  ? ヘルプ  u URL  a 回答  t todo  L ラベル  m merge  n 新規  o ブラウザ  q 終了"
+	return "Esc 戻る  Tab PR 選択  Enter PR を開く  x 展開  g PR へ  ? ヘルプ  u URL  a 回答  t todo  L ラベル  m merge  c close  n 新規  o ブラウザ  q 終了"
 }

@@ -187,8 +187,8 @@ func TestHelpListsImplementedKeys(t *testing.T) {
 	m, _ = send(m, tea.WindowSizeMsg{Width: 80, Height: 24}, questionKey)
 
 	body := helpBody(t, m)
-	if len(body) != 18 {
-		t.Fatalf("キーの行数 = %d, want 18:\n%s", len(body), strings.Join(body, "\n"))
+	if len(body) != 19 {
+		t.Fatalf("キーの行数 = %d, want 19:\n%s", len(body), strings.Join(body, "\n"))
 	}
 	if !strings.Contains(body[0], "j / k / ↑ / ↓") || !strings.Contains(body[0], "行移動（キュー）/ スクロール（詳細）") {
 		t.Errorf("1 行目 = %q", body[0])
@@ -198,6 +198,7 @@ func TestHelpListsImplementedKeys(t *testing.T) {
 		{"t", "stage:todo / To Do を付ける / 外す"},
 		{"L", "ラベルを一覧から付け外し"},
 		{"m", "PR を merge する（確認あり）"},
+		{"c", "issue / PR を close する（確認あり）"},
 		{"n", "選択中の repo に issue を作る（確認あり）"},
 		{"o", "ブラウザで開く"},
 		{"u", "URL 一覧を開く"},

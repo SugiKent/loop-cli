@@ -254,6 +254,41 @@ func TestMergePRUsesMethodFlag(t *testing.T) {
 	wantArgs(t, rec, "pr merge 151 -R org/app --squash")
 }
 
+func TestCloseIssueArgs(t *testing.T) {
+	rec := &recorder{}
+	if err := newTestClient(rec).CloseIssue(t.Context(), "org/app", 108); err != nil {
+		t.Fatalf("CloseIssue: %v", err)
+	}
+	wantArgs(t, rec, "issue close 108 -R org/app")
+	if rec.stdin[0] != "" {
+		t.Errorf("stdin = %q, want 空", rec.stdin[0])
+	}
+}
+
+func TestClosePRArgs(t *testing.T) {
+	rec := &recorder{}
+	if err := newTestClient(rec).ClosePR(t.Context(), "org/app", 131); err != nil {
+		t.Fatalf("ClosePR: %v", err)
+	}
+	wantArgs(t, rec, "pr close 131 -R org/app")
+}
+
+func TestCloseIssueNonZeroExitReturnsError(t *testing.T) {
+	const stderr = "could not close issue"
+	args := []string{"issue", "close", "108", "-R", "org/app"}
+	rec := &recorder{err: &Error{Args: args, ExitCode: 1, Stderr: stderr}}
+
+	err := newTestClient(rec).CloseIssue(t.Context(), "org/app", 108)
+	if err == nil {
+		t.Fatal("エラーが返らない")
+	}
+	for _, want := range []string{"issue close 108 -R org/app", "exit 1", stderr} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("Error() = %q, want %q を含む", err.Error(), want)
+		}
+	}
+}
+
 func TestCreateIssueReturnsURL(t *testing.T) {
 	rec := &recorder{outs: []string{"https://github.com/org/app/issues/200\n"}}
 	got, err := newTestClient(rec).CreateIssue(t.Context(), "org/app", "タイトル", "本文")

@@ -191,6 +191,16 @@ func (f *Fake) MergePR(_ context.Context, repo string, number int, method string
 	return nil
 }
 
+func (f *Fake) CloseIssue(_ context.Context, repo string, number int) error {
+	f.record(Call{Method: "CloseIssue", Repo: repo, Number: number})
+	return nil
+}
+
+func (f *Fake) ClosePR(_ context.Context, repo string, number int) error {
+	f.record(Call{Method: "ClosePR", Repo: repo, Number: number})
+	return nil
+}
+
 func (f *Fake) CreateIssue(_ context.Context, repo string, title string, body string) (string, error) {
 	f.record(Call{Method: "CreateIssue", Repo: repo, Title: title, Body: body})
 	return fmt.Sprintf("https://github.com/%s/issues/0", repo), nil

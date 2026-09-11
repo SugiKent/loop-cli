@@ -244,11 +244,11 @@ func TestTodoStatusIsReplacedByNextToggle(t *testing.T) {
 	}
 }
 
-// TestWritingBlocksTodoAndAnswer は書き込み中の t / a / m / n がどれも効かないことを検証する
+// TestWritingBlocksTodoAndAnswer は書き込み中の t / a / m / n / c がどれも効かないことを検証する
 // （s10 answer-question「投稿中は a を無視」をラベル切り替え中・s14 の merge 中・
-// s15 の issue 作成中にも広げたもの）。
+// s15 の issue 作成中・s26 の close 中にも広げたもの）。
 func TestWritingBlocksTodoAndAnswer(t *testing.T) {
-	t.Run("切り替え中の t と a と n", func(t *testing.T) {
+	t.Run("切り替え中の t と a と n と c", func(t *testing.T) {
 		fake := gh.NewFake(fixtureDir)
 		ed := &stubEditor{msg: editedMsg{text: "Q1: A"}}
 		m := todoModel(fake, exampleResult(t).Cards, ed)
@@ -266,6 +266,9 @@ func TestWritingBlocksTodoAndAnswer(t *testing.T) {
 		}
 		if _, created := send(m, nKey); created != nil {
 			t.Errorf("切り替え中の n が無視されていない: %T", created())
+		}
+		if got, closed := send(m, cKey); closed != nil || got.screen != screenQueue {
+			t.Errorf("切り替え中の c が無視されていない: screen = %d", got.screen)
 		}
 		if ed.calls != 0 {
 			t.Errorf("エディタが起動している: %d 回", ed.calls)
