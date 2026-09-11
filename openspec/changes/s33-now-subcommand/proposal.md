@@ -2,7 +2,7 @@ issue: #36
 
 ## Why
 
-`loop-cli` のサブコマンドは `version` と `update` の 2 つだけで（`cmd/loop-cli/main.go:49`）、
+`loop-cli` のサブコマンドは `version` と `update` の 2 つだけで（`cmd/loop-cli/main.go:57-68`）、
 「今やる」に何が並んでいるかは TUI を人が開かないと分からない。AI agent（Claude Code など）は
 TUI を操作できないので、同じ判定結果を使えず、人の出番を自分で拾えない。
 
@@ -15,8 +15,8 @@ TUI を操作できないので、同じ判定結果を使えず、人の出番�
   TUI と同じ優先度順で標準出力に出して終わる（TUI は起動しない）
 - 分類は `fetch.Fetch`（`internal/fetch/fetch.go:50`）と `classify.Card` をそのまま呼ぶ。判定は 1 行も書かない
 - サブコマンドが設定ファイルと `gh` を使うのは `now` が初めてなので、`tui-entrypoint` の
-  Requirement「引数はサブコマンドに振り分ける」を書き換える（`version` / `update` は今までどおり
-  設定ファイルを読まず `gh` も呼ばない）
+  Requirement「引数はサブコマンドに振り分ける」と「起動失敗は標準エラーに出て終了コード 1 になる」を書き換える
+  （`version` / `update` は今までどおり設定ファイルを読まず `gh` も呼ばない）
 - 使い方（`usage`）と README にも `now` の 1 行を足す
 
 ## 確定した判断
@@ -25,24 +25,44 @@ TUI を操作できないので、同じ判定結果を使えず、人の出番�
    検索して詳細を並行取得し、`classify.Card` が 4 タブへ振り分ける。「今やる」は `model.TabNow`
    （`internal/model/model.go:62`）。`now` はこの結果を `Card.Result.Tab == TabNow` で絞るだけで、
    新しい判定ルールを持たない。`docs/domain/issue-driven-sdd/human-turn-signals.md` が正本のまま変わらない。
-2. **並び順は TUI と同じ。** `internal/ui/rows.go` の `buildRows` は、カードを優先度の昇順で並べ、
+2. **並び順は TUI と同じ。** `internal/ui/rows.go:84-96` の `buildRows` は、カードを優先度の昇順で並べ、
    同じ優先度なら主体の `UpdatedAt` が新しいものを先に、それも同じならリポジトリ名の昇順、
    最後に番号の昇順で並べる。`now` はこの順をそのまま使い、並べ替えのキーを新しく決めない。
-3. **「いま人が何をすべきか」の 1 行は既にある。** `model.Result.Summary`（`internal/model/model.go:131`）に
-   `PR #131 の質問に答える` のような文字列が入っている（`internal/classify/classify.go`）。これをそのまま出す。
-4. **スナップショットは読まないし書かない。** `~/.cache/loop-cli/snapshot.json` は TUI が取得に成功するたびに
-   書くもので（`internal/snapshot/snapshot.go`）、TUI を起動していない環境では存在しないか古い。
-   agent が読む値としては当てにできないので、`now` は毎回 `gh` で取得する。TUI の起動直後表示を
-   壊さないよう、`now` の結果で上書きもしない。
+3. **「いま人が何をすべきか」の 1 行は既にある。** `model.Result.Summary`（`internal/model/model.go:130-136`）に
+   `PR #131 の質問に答える`（`internal/classify/classify.go:116`）のような文字列が入っている。これをそのまま出す。
+4. **スナップショットは読まないし書かない。** `~/.cache/loop-cli/snapshot.json` は TUI の `savingFetcher`
+   （`cmd/loop-cli/main.go:189-198`）だけが書くもので、TUI を起動していない環境では存在しないか古い。
+   agent が読む値としては当てにできないので、`now` は毎回 `gh` で取得し、結果で上書きもしない。
 5. **部分失敗は結果を捨てない。** `fetch.Fetch` は詳細取得 1 件の失敗を `Result.Errors`
-   （`internal/fetch/fetch.go:26`）に積んで一覧は返す。TUI がフッタに `詳細取得の失敗 N 件` を出すのと同じ扱いで、
+   （`internal/fetch/fetch.go:23-27`）に積んで一覧は返す。TUI がフッタに `詳細取得の失敗 N 件` を出すのと同じ扱いで、
    `now` も一覧を出したうえで失敗を伝え、終了コードは 0 にする。検索そのものの失敗（`Fetch` が error を返す）と
-   `gh` の未認証・不在は終了コード 1 で終わる。
-6. **`gh` の確認は TUI と同じ。** 実行の先頭で `gh.Client.Check` を呼び、`gh が見つかりません` /
-   `gh の認証に失敗しました` の 2 行を標準エラーに出して終了コード 1 で終わる
-   （`tui-entrypoint` の Requirement「起動失敗は標準エラーに出て終了コード 1 になる」と同じ文言）。
+   `gh` の未認証・不在は終了コード 1 で終わる。`Errors` にはリポジトリのラベル一覧の失敗も入り
+   （`internal/fetch/fetch.go:117-135`）、その場合は運用方式の判定が既定に倒れて分類がずれるので、
+   `errors` が空でなければ一覧が不完全であり得ることを spec と README に書く。
+6. **`gh` の確認と失敗の文言は TUI と同じ。** 実行の先頭で `gh.Client.Check` を呼び、`checkError`
+   （`cmd/loop-cli/main.go:224-233`）と同じ 2 行を標準エラーに出して終了コード 1 で終わる。文言の正本は
+   `tui-entrypoint` の Requirement「起動失敗は標準エラーに出て終了コード 1 になる」のままにし、
+   `now-command` 側では定義し直さずに参照する。
 7. **onboarding のフォームは出さない。** `now` は端末とは限らない場所（agent のサブプロセス）で走る。
    設定ファイルが無ければフォームに入らず、その場で終わる。
+8. **出す範囲は「今やる」だけ、名前は `now`。** 他のタブ（バックログ / 進行中 / 異常）を選べる
+   `--tab` は、要るようになってから別 issue で足す。issue #36 も「まずは『今やる』」と書いている
+   （CLAUDE.md「投機的な機能・将来の拡張に備えたコードは書かない」）。
+9. **リポジトリは設定ファイルからだけ引く。** `--repo owner/name` のような指定は足さない。
+   `repos` が空の設定は `config.Load` が弾く（`internal/config/config.go:139-141`）ので、
+   対象を書き忘れたまま GitHub 全体を検索する経路も生まれない。
+10. **`subject` は指し先の種別と番号だけにする。** タイトル・URL・ラベル・更新時刻は `issue` と `prs` に載せ、
+    `subject` は `{type, number}` でそこを指す。同じ値を二重に出さないため。主体の判定は
+    `internal/ui` の `Subject`（`internal/ui/rows.go:45-54`）を使い、`internal/ui` には手を入れない。
+11. **本文とコメントは出さない。** 出力が数百 KB になり、`gh` から取り直せる内容を二重に持つことになる。
+    agent は `url` を見れば本文を取れる。
+12. **`prs[].state` は出さない。** `Fetch` は open の検索結果からしか PR を作らないので
+    （`internal/model/model.go:277-289` が `State: "OPEN"` を固定で入れる）、この欄は常に `OPEN` になる。
+13. **余分な引数は黙って捨てず、エラーにする。** いまの `run` は `args[1:]` を見ないので
+    `loop-cli now --repo x` が素通りする。`loop-cli-dev` は余分な引数も未知フラグも拒否している
+    （`cmd/loop-cli-dev/classify_test.go:131-133`）ので、`now` もそちらに合わせる。
+14. **JSON は 2 スペースで整形し、末尾に改行を付ける。** `jq` はどちらでも読めるので、人が直接打ったときに
+    読める方を採る。
 
 ## 未確定の判断
 
@@ -56,25 +76,13 @@ TUI を操作できないので、同じ判定結果を使えず、人の出番�
   タイトルにタブや改行が入ると agent 側で壊れる
 - 依存: なし
 
-### Q2. サブコマンドの名前と、出す範囲
-- 選択肢 A（推奨）: **`loop-cli now`。今やるタブだけを出す。** 他のタブ（バックログ / 進行中 / 異常）が
-  必要になったら別 issue で足す
-- 選択肢 B: `loop-cli status --tab now|backlog|in-progress|abnormal`（既定は `now`）。4 タブすべてを
-  今回出せるようにする。実装は分岐 1 つ分増える
-- 依存: なし
-
-### Q3. 設定ファイルが無い環境で動かせるようにするか
-- 選択肢 A（推奨）: **設定ファイル必須。** `~/.config/loop-cli/config.yml` が無ければ
-  `設定ファイルがありません: <パス>` を標準エラーに出して終了コード 1。agent は人と同じ設定を使う
-- 選択肢 B: `--repo owner/name` を繰り返し指定でき、指定があれば設定ファイルを読まずにそのリポジトリだけを見る。
-  設定ファイルを置いていない CI や別マシンの agent からも呼べるようになる
-- 依存: なし
-
-### Q4. 1 件あたりどこまで出すか
-- 選択肢 A（推奨）: **一覧の 1 行分までを出す。** 1 件につき、優先度と種別（`質問` / `方針` / `merge` など）、局面（A〜G）、リポジトリ名と番号、issue か PR かの別、タイトルと URL、要約、最終更新時刻、ラベル、紐づく PR の番号とラベルを出す。
-  本文とコメントは出さない。agent は URL を見れば `gh` で本文を取れる
-- 選択肢 B: A に加えて、本文と会話コメントの全文も含める。agent が 1 回の実行で答えまで作れるが、
-  出力が数百 KB になり、`gh` から取り直せる内容を二重に持つ
+### Q2. 分類結果をどこまで機械が読む契約にするか
+- 選択肢 A（推奨）: **局面の記号（`situation`）と 1 行の要約（`summary`）と並び順だけを出す。**
+  画面の種別（`質問` / `方針` / `merge` などの日本語。`internal/model/model.go:109-128`）と、
+  内部の優先度の整数（同 `:69-90`）は出さない。agent は `situation` で分岐し、並び順で優先度を知る
+- 選択肢 B: 種別の日本語（`kind`）と優先度の整数（`priority`）も出す。`jq` で読んだときに人にも
+  分かりやすいが、画面の文言や内部の順位を変えると agent 側の分岐が壊れる。この 2 つは画面のために
+  作った値なので、機械契約として固定すると TUI 側の変更が制約を受ける
 - 依存: なし
 
 ## Capabilities
@@ -82,19 +90,22 @@ TUI を操作できないので、同じ判定結果を使えず、人の出番�
 ### New Capabilities
 
 - `now-command`: `loop-cli now` が設定のリポジトリを取得し、「今やる」のカードだけを機械が読める形で
-  標準出力に出して終わる。取得の失敗・部分失敗の扱いと終了コードを含む
+  標準出力に出して終わる。出力のキーと引数の扱いを定め、取得の失敗と部分失敗の扱い、終了コード、
+  スナップショットを触らないことまでを含む
 
 ### Modified Capabilities
 
 - `tui-entrypoint`: Requirement「引数はサブコマンドに振り分ける」に `now` を足し、
   「サブコマンドは設定ファイルを読まず `gh` も呼ばない」を `version` / `update` だけの規則に直す。
-  使い方（`unknown command` のときに出す文面）にも `now` の 1 行を足す
+  使い方（`unknown command` のときに出す文面）にも `now` の 1 行を足す。
+  Requirement「起動失敗は標準エラーに出て終了コード 1 になる」は、主語を TUI の起動に限定し、
+  設定ファイルと `Check` の文言をサブコマンドから参照できる正本として位置づけ直す
 
 ## Impact
 
-- `cmd/loop-cli/main.go`: `run` の `switch` に `now` を足し、設定の読み込み → `Check` → `Fetch` → 出力を行う関数を足す。
-  `usage` に 1 行足す
-- `cmd/loop-cli` の新しいファイル（出力の組み立てとその単体テスト）
+- `cmd/loop-cli/main.go`: `run` の `switch` に `now` を足し、依存を束ねて `runNow` に渡す。`usage` に 1 行足し、
+  `run` の doc コメント（`cmd/loop-cli/main.go:48`）を `version` / `update` に限定した文に直す
+- `cmd/loop-cli/now.go` と `cmd/loop-cli/now_test.go`: 出力の組み立て、`runNow`、そのテスト
 - `internal/fetch` / `internal/classify` / `internal/model` / `internal/ui`: 変更しない（読むだけ）
 - `README.md`: 「更新」の節の近くに `now` の説明を足す
 - `docs/mvp` と `docs/domain/issue-driven-sdd/human-turn-signals.md`: 変更しない（判定は変わらない）
