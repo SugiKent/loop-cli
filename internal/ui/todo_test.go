@@ -16,11 +16,14 @@ import (
 
 var tKey = runeKey('t')
 
+// sddModes は org/app を sdd と判定した取得結果の方式の表。
+var sddModes = map[string]model.Mode{"org/app": model.ModeSDD}
+
 // todoModel は t のテスト用の Model。client は Result を作った Fake とは別に渡す。
 func todoModel(client gh.GHClient, cards []model.Card, ed *stubEditor) Model {
 	m, _ := send(New(nil, client, ed.Editor, Options{}),
 		tea.WindowSizeMsg{Width: 120, Height: 40},
-		fetchedMsg{res: &fetch.Result{Cards: cards}, at: at})
+		fetchedMsg{res: &fetch.Result{Cards: cards, Modes: sddModes}, at: at})
 	return m
 }
 

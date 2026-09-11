@@ -178,7 +178,7 @@ func (m Model) cardHeaderLines() ([]string, int) {
 		lines = append(lines, card.Result.Summary)
 	}
 
-	mode := m.repoMode(issue.Repo)
+	mode, _ := m.repoMode(issue.Repo)
 	stage := "段階なし"
 	if st := model.IssueStages(mode, issue.Labels); len(st) > 0 {
 		stage = "段階: " + strings.Join(st, " ")
@@ -238,10 +238,12 @@ func (m Model) prListLines() []string {
 func (m Model) detailMode() model.Mode {
 	card := m.detail.card
 	if card.Issue != nil {
-		return m.repoMode(card.Issue.Repo)
+		mode, _ := m.repoMode(card.Issue.Repo)
+		return mode
 	}
 	if len(card.PRs) > 0 {
-		return m.repoMode(card.PRs[0].Repo)
+		mode, _ := m.repoMode(card.PRs[0].Repo)
+		return mode
 	}
 	return ""
 }
@@ -355,7 +357,8 @@ func (m Model) currentPR() model.PR { return m.detail.card.PRs[m.detail.prIdx] }
 func (m Model) prHeaderLines() ([]string, int) {
 	pr := m.currentPR()
 	stage := "-"
-	if st := model.PRStages(m.repoMode(pr.Repo), pr.Labels); len(st) > 0 {
+	prMode, _ := m.repoMode(pr.Repo)
+	if st := model.PRStages(prMode, pr.Labels); len(st) > 0 {
 		stage = st[0]
 	}
 	title := wrapTitle(fmt.Sprintf("%s PR#%d  ", pr.Repo, pr.Number), pr.Title, m.width)

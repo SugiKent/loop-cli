@@ -414,7 +414,7 @@ func TestPDoesNothing(t *testing.T) {
 // hintLine1 / hintLine2 は空キューのヒントの 2 行。既定幅 80 には収まらないので幅 120 で確かめる。
 const hintLine1 = "stage:* / To Do ラベルの無いリポジトリは何も出ません。"
 
-const hintLine2 = "issue-driven-sdd の routines-setup を回すか、repos に mode: label を設定してください"
+const hintLine2 = "issue-driven-sdd の routines-setup を回すか、issue-label-driven の To Do ラベルを作ってください"
 
 func TestEmptyQueueShowsHint(t *testing.T) {
 	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: 120, Height: 40}, fetchedMsg{res: &fetch.Result{}, at: at})

@@ -20,7 +20,7 @@ type toggledMsg struct {
 
 // todoKey は `t`（承認ラベルの切り替え）を扱う。対象は「画面に出ている Card の Issue」の 1 規則。
 // 確認は出さない（取り消しはもう一度 `t`）。付けるか外すかは action.ToggleTodo が読み直して決める。
-// 書くラベルは設定由来の方式で決める（Card のラベルやスナップショットからは決めない）。
+// 書くラベルは取得のたびに判定した方式で決める（Card のラベルやスナップショットからは決めない）。
 func (m Model) todoKey() (tea.Model, tea.Cmd) {
 	if m.writing {
 		return m, nil
@@ -29,8 +29,15 @@ func (m Model) todoKey() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
+	// 方式が分からないリポジトリ（初回取得の前・ListLabels の失敗・どちらのラベルも無い）では
+	// 推測したラベルを書かない。書くと worker が起動しないか、方式の違う worker を起動する。
+	mode, ok := m.repoMode(issue.Repo)
+	if !ok {
+		m.writeStatus, m.writeStatusErr =
+			issue.Repo+" の運用方式が分かりません（stage:todo / To Do のラベルがありません）", true
+		return m, nil
+	}
 	label := issueLabel(issue)
-	mode := m.repoMode(issue.Repo)
 	todo := model.TodoLabel(mode)
 	m.writing = true
 	m.writeStatus, m.writeStatusErr = label+" の "+todo+" を切り替え中", false

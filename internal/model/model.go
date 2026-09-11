@@ -32,7 +32,7 @@ const (
 )
 
 // Mode はリポジトリの運用方式。ゼロ値 "" は ModeSDD として扱う。
-// 設定（internal/config）が正本で、Issue / PR には持たせず引数で配る。
+// リポジトリのラベル一覧が正本で、Issue / PR には持たせず引数で配る。
 type Mode string
 
 const (
@@ -223,6 +223,26 @@ func PRStages(mode Mode, labels []string) []string {
 		return nil
 	}
 	return stages(labels, prStageOrder)
+}
+
+// ModeFromLabels はリポジトリのラベル一覧から運用方式を判定する。
+// stage:todo を先に見るのは、両方のラベルを持つリポジトリを sdd に倒すため
+// （To Do は Projects のカンバンの名前として sdd のリポジトリにも付くことがある）。
+// どちらも無ければ判定できず、ゼロ値と false を返す。
+func ModeFromLabels(labels []gh.RepoLabel) (Mode, bool) {
+	hasToDo := false
+	for _, l := range labels {
+		if l.Name == LabelStageTodo {
+			return ModeSDD, true
+		}
+		if l.Name == LabelToDo {
+			hasToDo = true
+		}
+	}
+	if hasToDo {
+		return ModeLabel, true
+	}
+	return "", false
 }
 
 // TodoLabel は人が着手を承認するときに付けるラベルを返す。

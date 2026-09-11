@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,7 +26,7 @@ var repos = []string{"org/app"}
 
 func fetchDir(t *testing.T, dir string) *Result {
 	t.Helper()
-	res, err := Fetch(t.Context(), gh.NewFake(dir), repos, nil)
+	res, err := Fetch(t.Context(), gh.NewFake(dir), repos)
 	if err != nil {
 		t.Fatalf("Fetch(%s): %v", dir, err)
 	}
@@ -77,7 +79,7 @@ func equalInts(a, b []int) bool {
 
 func TestFetchExample(t *testing.T) {
 	fake := gh.NewFake(exampleDir)
-	res, err := Fetch(t.Context(), fake, repos, nil)
+	res, err := Fetch(t.Context(), fake, repos)
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
@@ -147,41 +149,161 @@ func TestFetchExample(t *testing.T) {
 
 const boardDir = "../gh/testdata/fixtures/board"
 
-// modes で指定した方式が Card ごとの分類に使われる。
-func TestFetchUsesModes(t *testing.T) {
-	res, err := Fetch(t.Context(), gh.NewFake(boardDir), []string{"org/board"},
-		map[string]model.Mode{"org/board": model.ModeLabel})
+var (
+	sddLabels   = []gh.RepoLabel{{Name: "bug"}, {Name: model.LabelStageTodo}}
+	labelLabels = []gh.RepoLabel{{Name: model.LabelToDo}, {Name: model.LabelInProgress}}
+	noModeLabel = []gh.RepoLabel{{Name: "bug"}, {Name: "enhancement"}}
+)
+
+// labelStub は board の fixture を読みつつ、ラベル一覧だけをリポジトリごとに差し替える。
+// Fake は repo 引数でファイルを探さないので、リポジトリごとに違う方式を返す経路はここで作る。
+type labelStub struct {
+	*gh.Fake
+	labels map[string][]gh.RepoLabel
+	err    map[string]error
+	mu     sync.Mutex
+	calls  []string
+}
+
+func (s *labelStub) ListLabels(_ context.Context, repo string) ([]gh.RepoLabel, error) {
+	s.mu.Lock()
+	s.calls = append(s.calls, repo)
+	s.mu.Unlock()
+	if err := s.err[repo]; err != nil {
+		return nil, err
+	}
+	return s.labels[repo], nil
+}
+
+func newLabelStub(dir string, labels map[string][]gh.RepoLabel) *labelStub {
+	return &labelStub{Fake: gh.NewFake(dir), labels: labels}
+}
+
+// board は To Do を持ち stage:todo を持たないので label と判定され、In Progress が段階になる。
+func TestFetchClassifiesWithDetectedMode(t *testing.T) {
+	res, err := Fetch(t.Context(), gh.NewFake(boardDir), []string{"org/board"})
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
+	}
+	if got := res.Modes["org/board"]; got != model.ModeLabel {
+		t.Fatalf("Modes[org/board] = %q, want label", got)
 	}
 	got := issueCard(t, res, "org/board", 61).Issue.Result
 	if got.Situation != model.SituationInProgress || got.Summary != "#61 は AI が作業中" {
 		t.Errorf("issue 61 の Result = %+v, want in-progress / #61 は AI が作業中", got)
 	}
+	// label 方式の PR は段階ラベルを持たないので番号順に並ぶ。
+	if prs := issueCard(t, res, "org/board", 61).PRs; len(prs) != 1 || prs[0].Number != 71 {
+		t.Errorf("issue 61 の PRs = %+v, want [71]", prs)
+	}
 }
 
-// modes に無いリポジトリは sdd として分類する（In Progress は sdd の段階ラベルではない）。
-func TestFetchDefaultsToSDDMode(t *testing.T) {
-	res, err := Fetch(t.Context(), gh.NewFake(boardDir), []string{"org/board"}, map[string]model.Mode{})
+// 判定できないリポジトリは表に入らず、カードはゼロ値（sdd）の語彙で分類される。
+func TestFetchUndetectedRepoClassifiesAsSDD(t *testing.T) {
+	stub := newLabelStub(boardDir, map[string][]gh.RepoLabel{"org/board": noModeLabel})
+	res, err := Fetch(t.Context(), stub, []string{"org/board"})
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
+	if len(res.Modes) != 0 {
+		t.Errorf("Modes = %v, want 空", res.Modes)
+	}
+	if len(res.Errors) != 0 {
+		t.Errorf("Errors = %v, want 空（判定できないことは失敗ではない）", res.Errors)
+	}
+	// In Progress は sdd の段階ラベルではないので、段階ラベルの無い issue として E になる。
 	if got := issueCard(t, res, "org/board", 61).Issue.Result.Situation; got != model.SituationE {
 		t.Errorf("issue 61 の Situation = %q, want E", got)
 	}
 }
 
-// label 方式の PR は段階ラベルを持たないので番号順に並ぶ。
-func TestFetchLabelModeSortsPRsByNumber(t *testing.T) {
-	res, err := Fetch(t.Context(), gh.NewFake(boardDir), []string{"org/board"},
-		map[string]model.Mode{"org/board": model.ModeLabel})
+func TestFetchListsLabelsOncePerRepo(t *testing.T) {
+	stub := newLabelStub("testdata/multirepo", map[string][]gh.RepoLabel{
+		"org/app": sddLabels, "org/web": sddLabels,
+	})
+	if _, err := Fetch(t.Context(), stub, []string{"org/app", "org/web"}); err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	got := append([]string(nil), stub.calls...)
+	sort.Strings(got)
+	if len(got) != 2 || got[0] != "org/app" || got[1] != "org/web" {
+		t.Errorf("ListLabels の呼び出し = %v, want [org/app org/web] を 1 回ずつ", stub.calls)
+	}
+}
+
+// リポジトリごとに違う一覧を返すと、方式もリポジトリごとに分かれる。
+func TestFetchDetectsModePerRepo(t *testing.T) {
+	stub := newLabelStub(boardDir, map[string][]gh.RepoLabel{
+		"org/app": sddLabels, "org/board": labelLabels,
+	})
+	res, err := Fetch(t.Context(), stub, []string{"org/app", "org/board"})
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
-	prs := issueCard(t, res, "org/board", 61).PRs
-	if len(prs) != 1 || prs[0].Number != 71 {
-		t.Errorf("issue 61 の PRs = %+v, want [71]", prs)
+	want := map[string]model.Mode{"org/app": model.ModeSDD, "org/board": model.ModeLabel}
+	if !maps.Equal(res.Modes, want) {
+		t.Fatalf("Modes = %v, want %v", res.Modes, want)
 	}
+	if got := issueCard(t, res, "org/board", 61).Issue.Result.Situation; got != model.SituationInProgress {
+		t.Errorf("org/board の issue 61 の Situation = %q, want in-progress", got)
+	}
+}
+
+// ListLabels が失敗したリポジトリは表に入らないが、Card も他のリポジトリの方式も落ちない。
+func TestFetchListLabelsFailureKeepsCards(t *testing.T) {
+	stub := newLabelStub(boardDir, map[string][]gh.RepoLabel{"org/board": labelLabels})
+	stub.err = map[string]error{"org/app": errors.New("gh label list: exit 1")}
+	res, err := Fetch(t.Context(), stub, []string{"org/app", "org/board"})
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if len(res.Cards) == 0 {
+		t.Fatal("Cards = 空, want 落ちていない")
+	}
+	if _, ok := res.Modes["org/app"]; ok {
+		t.Errorf("Modes に org/app がある: %v", res.Modes)
+	}
+	if got := res.Modes["org/board"]; got != model.ModeLabel {
+		t.Errorf("Modes[org/board] = %q, want label", got)
+	}
+	if len(res.Errors) != 1 {
+		t.Fatalf("Errors = %v, want 1 件", res.Errors)
+	}
+	for _, want := range []string{"ListLabels", "org/app"} {
+		if !strings.Contains(res.Errors[0].Error(), want) {
+			t.Errorf("Errors[0] = %q, %q を含まない", res.Errors[0], want)
+		}
+	}
+}
+
+// リポジトリのエラーは番号を持つエラーより前に並ぶ。
+func TestFetchRepoErrorSortsBeforeNumberedErrors(t *testing.T) {
+	// partial は issue-108.json を持つが、ここではさらに ViewIssue も失敗させる。
+	stub := &labelStub{
+		Fake:   gh.NewFake("testdata/partial"),
+		labels: map[string][]gh.RepoLabel{},
+		err:    map[string]error{"org/app": errors.New("gh label list: exit 1")},
+	}
+	res, err := Fetch(t.Context(), &viewIssueFailure{labelStub: stub}, repos)
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if len(res.Errors) < 2 {
+		t.Fatalf("Errors = %v, want 2 件以上", res.Errors)
+	}
+	if !strings.HasPrefix(res.Errors[0].Error(), "ListLabels ") {
+		t.Errorf("Errors[0] = %q, want ListLabels で始まる", res.Errors[0])
+	}
+	if !strings.HasPrefix(res.Errors[1].Error(), "ViewIssue ") {
+		t.Errorf("Errors[1] = %q, want ViewIssue で始まる", res.Errors[1])
+	}
+}
+
+// viewIssueFailure は ViewIssue だけを必ず失敗させる包み。
+type viewIssueFailure struct{ *labelStub }
+
+func (v *viewIssueFailure) ViewIssue(context.Context, string, int) (*gh.IssueDetail, error) {
+	return nil, errors.New("gh issue view: exit 1")
 }
 
 func TestFetchLink(t *testing.T) {
@@ -277,7 +399,7 @@ func TestFetchLink(t *testing.T) {
 }
 
 func TestFetchMultiRepo(t *testing.T) {
-	res, err := Fetch(t.Context(), gh.NewFake("testdata/multirepo"), []string{"org/app", "org/web"}, nil)
+	res, err := Fetch(t.Context(), gh.NewFake("testdata/multirepo"), []string{"org/app", "org/web"})
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
@@ -352,7 +474,7 @@ func TestFetchPartialFailure(t *testing.T) {
 }
 
 func TestFetchSearchIssuesFailure(t *testing.T) {
-	res, err := Fetch(t.Context(), gh.NewFake("testdata/nosearch"), repos, nil)
+	res, err := Fetch(t.Context(), gh.NewFake("testdata/nosearch"), repos)
 	if err == nil {
 		t.Fatalf("エラーを期待したが nil（Result = %+v）", res)
 	}
@@ -386,13 +508,16 @@ func (s *stub) ViewIssue(ctx context.Context, repo string, number int) (*gh.Issu
 	return s.viewIssue(ctx, repo, number)
 }
 
+// 方式を見ないテストのために、ラベル一覧は既定で空（どちらのラベルも無い＝判定できない）を返す。
+func (s *stub) ListLabels(context.Context, string) ([]gh.RepoLabel, error) { return nil, nil }
+
 func TestFetchSearchCalledOnce(t *testing.T) {
 	var issues, prs int
 	c := &stub{
 		searchIssues: func(context.Context, []string) ([]gh.SearchIssue, error) { issues++; return nil, nil },
 		searchPRs:    func(context.Context, []string) ([]gh.SearchPR, error) { prs++; return nil, nil },
 	}
-	if _, err := Fetch(t.Context(), c, repos, nil); err != nil {
+	if _, err := Fetch(t.Context(), c, repos); err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
 	if issues != 1 || prs != 1 {
@@ -411,7 +536,7 @@ func TestFetchParentDeadline(t *testing.T) {
 	defer cancel()
 
 	start := time.Now()
-	res, err := Fetch(ctx, c, repos, nil)
+	res, err := Fetch(ctx, c, repos)
 	if err == nil {
 		t.Fatalf("エラーを期待したが nil（Result = %+v）", res)
 	}
@@ -446,7 +571,7 @@ func TestFetchCanceledReturnsNoPartialResult(t *testing.T) {
 		},
 	}
 
-	res, err := Fetch(ctx, c, repos, nil)
+	res, err := Fetch(ctx, c, repos)
 	if err == nil {
 		t.Fatalf("エラーを期待したが nil（Result = %+v）", res)
 	}

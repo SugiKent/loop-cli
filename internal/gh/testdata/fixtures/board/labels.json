@@ -1,0 +1,1 @@
+[{"name":"Done","description":"完了","color":"0e8a16"},{"name":"In Progress","description":"AI が作業中","color":"fbca04"},{"name":"To Do","description":"承認済み。着手の順番待ち","color":"c2e0c6"},{"name":"blocked","description":"ブロッカーが解けるまで着手しない","color":"b60205"},{"name":"question","description":"人の入力待ち","color":"d876e3"}]

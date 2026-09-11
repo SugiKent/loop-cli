@@ -113,9 +113,10 @@ func argsPRView(repo string, number int, fields string) []string {
 
 // argsListLabels は --sort name --order asc を明示する。gh の既定は作成順で、
 // リポジトリごとに並びが変わると画面も fixture も非決定になる。
+// --limit が小さいと名前昇順の後ろにある stage:todo が切れ、運用方式を label と誤判定する。
 func argsListLabels(repo string) []string {
 	return []string{"label", "list", "-R", repo, "--json", "name,description,color",
-		"--sort", "name", "--order", "asc", "--limit", "100"}
+		"--sort", "name", "--order", "asc", "--limit", "1000"}
 }
 
 func argsReviewThreads(repo string, number int) []string {

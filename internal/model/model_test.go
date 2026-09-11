@@ -61,6 +61,54 @@ func TestTodoLabelPerMode(t *testing.T) {
 	}
 }
 
+func TestModeFromLabels(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		labels []gh.RepoLabel
+		want   Mode
+		wantOK bool
+	}{
+		{
+			name:   "stage:todo があれば sdd",
+			labels: []gh.RepoLabel{{Name: "bug"}, {Name: "stage:todo"}, {Name: "wip"}},
+			want:   ModeSDD,
+			wantOK: true,
+		},
+		{
+			name:   "To Do だけがあれば label",
+			labels: []gh.RepoLabel{{Name: "Done"}, {Name: "In Progress"}, {Name: "To Do"}},
+			want:   ModeLabel,
+			wantOK: true,
+		},
+		{
+			name:   "両方あれば sdd に倒す",
+			labels: []gh.RepoLabel{{Name: "To Do"}, {Name: "stage:todo"}},
+			want:   ModeSDD,
+			wantOK: true,
+		},
+		{
+			// 小文字の todo と to do は To Do と一致しない（ラベル名は完全一致で比べる）。
+			name:   "どちらも無ければ判定できない",
+			labels: []gh.RepoLabel{{Name: "bug"}, {Name: "todo"}, {Name: "to do"}},
+			want:   "",
+			wantOK: false,
+		},
+		{
+			name:   "空の一覧は判定できない",
+			labels: nil,
+			want:   "",
+			wantOK: false,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := ModeFromLabels(tt.labels)
+			if got != tt.want || ok != tt.wantOK {
+				t.Errorf("ModeFromLabels = (%q, %v), want (%q, %v)", got, ok, tt.want, tt.wantOK)
+			}
+		})
+	}
+}
+
 func TestIssueFromSearch(t *testing.T) {
 	is := IssueFromSearch(gh.SearchIssue{
 		Repository: gh.Repository{Name: "app", NameWithOwner: "org/app"},

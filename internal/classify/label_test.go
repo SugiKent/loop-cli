@@ -122,19 +122,57 @@ func TestLabelModePR(t *testing.T) {
 		}
 	})
 
-	t.Run("紐づく issue の無い PR は merge 行に出さない", func(t *testing.T) {
+	t.Run("紐づく issue の無い緑の PR も merge 行に出る", func(t *testing.T) {
 		pr := closesPR(61)
 		pr.Body = "依存を更新する"
-		if got := PR(pr, model.ModeLabel).Situation; got != model.SituationOther {
-			t.Errorf("Situation = %q, want other", got)
+		if got := PR(pr, model.ModeLabel).Situation; got != model.SituationC {
+			t.Errorf("Situation = %q, want C（label の行 C は Closes #n を見ない）", got)
 		}
 	})
 
-	t.Run("Refs だけの PR は routine の PR と見なさない", func(t *testing.T) {
+	t.Run("Closes の無い PR でも未 resolve の AI thread はレビュー質問になる", func(t *testing.T) {
 		pr := closesPR(61)
-		pr.Body = "Refs #12"
-		if got := PR(pr, model.ModeLabel).Situation; got != model.SituationOther {
-			t.Errorf("Situation = %q, want other", got)
+		pr.Body = "依存を更新する"
+		pr.ReviewThreads = []gh.ReviewThread{{Comments: []gh.ReviewComment{{Body: "<!-- routine -->\nこの分岐は残しますか"}}}}
+
+		got := PR(pr, model.ModeLabel)
+		if got.Situation != model.SituationD || got.Priority != 1 {
+			t.Errorf("Result = %+v, want D / 1", got)
+		}
+	})
+
+	t.Run("最新コメントが人の PR も今やるに出る", func(t *testing.T) {
+		pr := closesPR(61)
+		pr.Comments = []model.Comment{{Body: "この分岐を消してください"}}
+
+		got := PR(pr, model.ModeLabel)
+		if got.Situation != model.SituationC || got.Tab != model.TabNow {
+			t.Errorf("Result = %+v, want C / 今やる（進行中の規則 2 を適用しない）", got)
+		}
+	})
+
+	t.Run("question の PR に人が答えても質問のまま今やるに出る", func(t *testing.T) {
+		pr := closesPR(62, model.LabelQuestion)
+		pr.Comments = []model.Comment{aiComment(), humanComment()}
+
+		got := PR(pr, model.ModeLabel)
+		if got.Situation != model.SituationA || got.Priority != 1 || got.Tab != model.TabNow {
+			t.Errorf("Result = %+v, want A / 1 / 今やる（進行中の規則 3 を適用しない）", got)
+		}
+	})
+
+	t.Run("merge できない PR はその他に出る", func(t *testing.T) {
+		pr := closesPR(61)
+		pr.Body = "依存を更新する"
+		pr.Comments = nil
+		pr.MergeState = &gh.PRMergeState{
+			Mergeable:         "MERGEABLE",
+			StatusCheckRollup: []gh.StatusCheck{{Typename: "CheckRun", Conclusion: "FAILURE"}},
+		}
+
+		got := PR(pr, model.ModeLabel)
+		if got.Situation != model.SituationOther || got.Priority != 6 || got.Tab != model.TabNow {
+			t.Errorf("Result = %+v, want other / 6 / 今やる", got)
 		}
 	})
 

@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/SugiKent/loop-cli/internal/config"
-	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // writeConfig は一時ディレクトリに config.yml を書き、そのパスを返す。
@@ -36,8 +35,8 @@ notify: true
 		t.Fatalf("Load が失敗した: %v", err)
 	}
 	want := []config.Repo{
-		{Name: "org/app", MergeMethod: config.MergeSquash, Mode: model.ModeSDD},
-		{Name: "org/web", MergeMethod: config.MergeSquash, Mode: model.ModeSDD},
+		{Name: "org/app", MergeMethod: config.MergeSquash},
+		{Name: "org/web", MergeMethod: config.MergeSquash},
 	}
 	if len(cfg.Repos) != len(want) {
 		t.Fatalf("Repos の件数が違う: %v", cfg.Repos)
@@ -167,59 +166,21 @@ func TestLoadPerRepoMergeMethod(t *testing.T) {
 	}
 }
 
-func TestLoadPerRepoMode(t *testing.T) {
-	tests := []struct {
-		name string
-		body string
-		want map[string]model.Mode
-	}{
-		{
-			name: "mode を書かないリポジトリは sdd",
-			body: "repos:\n  - org/app\n  - name: org/web\n    merge_method: rebase\n",
-			want: map[string]model.Mode{"org/app": model.ModeSDD, "org/web": model.ModeSDD},
-		},
-		{
-			name: "mode: label を書いたリポジトリだけ label",
-			body: "repos:\n  - org/app\n  - name: org/board\n    mode: label\n",
-			want: map[string]model.Mode{"org/app": model.ModeSDD, "org/board": model.ModeLabel},
-		},
-		{
-			name: "空文字列の明示は未指定扱い",
-			body: "repos:\n  - name: org/board\n    mode: \"\"\n",
-			want: map[string]model.Mode{"org/board": model.ModeSDD},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := config.Load(writeConfig(t, tt.body))
-			if err != nil {
-				t.Fatalf("Load が失敗した: %v", err)
+// mode は s30 で廃止した。値が正しくても専用の文言で止める。
+func TestLoadRejectsRemovedModeKey(t *testing.T) {
+	for _, body := range []string{
+		"repos:\n  - name: org/board\n    mode: label\n",
+		"repos:\n  - name: org/board\n    mode: kanban\n",
+	} {
+		_, err := config.Load(writeConfig(t, body))
+		if err == nil {
+			t.Fatalf("%q でエラーを期待したが nil", body)
+		}
+		for _, want := range []string{"mode は廃止しました", "削除してください"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("%q の err = %q, %q を含まない", body, err, want)
 			}
-			got := map[string]model.Mode{}
-			for _, r := range cfg.Repos {
-				got[r.Name] = r.Mode
-			}
-			if len(got) != len(tt.want) {
-				t.Fatalf("Repos = %v, want %v", got, tt.want)
-			}
-			for name, want := range tt.want {
-				if got[name] != want {
-					t.Errorf("%s の Mode = %q, want %q", name, got[name], want)
-				}
-			}
-		})
-	}
-}
-
-// mode と merge_method は同じ要素に書ける（別々のキーとして読む）。
-func TestLoadModeAndMergeMethodTogether(t *testing.T) {
-	cfg, err := config.Load(writeConfig(t, "repos:\n  - name: org/board\n    mode: label\n    merge_method: rebase\n"))
-	if err != nil {
-		t.Fatalf("Load が失敗した: %v", err)
-	}
-	want := config.Repo{Name: "org/board", MergeMethod: config.MergeRebase, Mode: model.ModeLabel}
-	if len(cfg.Repos) != 1 || cfg.Repos[0] != want {
-		t.Errorf("Repos = %+v, want [%+v]", cfg.Repos, want)
+		}
 	}
 }
 
@@ -239,7 +200,6 @@ func TestLoadInvalidConfig(t *testing.T) {
 		{name: "空白を含む", body: "repos:\n  - \"org/ app\"\n", contains: []string{"org/ app"}},
 		{name: "merge_method が不正", body: "repos:\n  - org/app\nmerge_method: fast-forward\n", contains: []string{"merge_method", "fast-forward"}},
 		{name: "リポジトリ別 merge_method が不正", body: "repos:\n  - name: org/web\n    merge_method: ff\n", contains: []string{"org/web", "ff"}},
-		{name: "mode が不正", body: "repos:\n  - name: org/board\n    mode: kanban\n", contains: []string{"org/board", "kanban"}},
 		{name: "refresh_interval_sec が 0", body: "repos:\n  - org/app\nrefresh_interval_sec: 0\n", contains: []string{"refresh_interval_sec"}},
 		{name: "未知のトップレベルキー", body: "repos:\n  - org/app\nrefresh_interval: 60\n", contains: []string{"refresh_interval"}},
 		{name: "repos 要素の未知のキー", body: "repos:\n  - name: org/web\n    merge_methd: rebase\n", contains: []string{"merge_methd"}},
