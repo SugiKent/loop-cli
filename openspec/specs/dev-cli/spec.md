@@ -2,9 +2,7 @@
 
 ## Purpose
 TBD - created by archiving change s06-dev-cli. Update Purpose after archive.
-
 ## Requirements
-
 ### Requirement: help は classify と notify test の使い方も出す
 `help` / `-h` / `--help` / 引数なしで出す使い方には、s04 の 2 行に加えて `classify --fixture <alias>` と `notify test` の 1 行説明を MUST 含める。`classify` の説明には、出力する列の順（優先 / 種別 / リポジトリ / 番号 / タイトル / 経過）を書く。
 第 1 引数が `classify` なら `classify` サブコマンド、`notify` なら第 2 引数が `test` のときだけ `notify test` サブコマンドに振り分ける。`notify` の後に `test` 以外（無しを含む）が続く場合は、s04 の `fixture` と同じく `unknown command: notify` と使い方を標準エラーに書き、終了コード 1 で終わる。振り分けは s04 の `run(args []string, stdout, stderr io.Writer) int` にケースを足して行い、サブコマンドの失敗は s04 の Requirement「サブコマンドの失敗は標準エラーに出て終了コード 1 になる」に従う。
@@ -32,6 +30,7 @@ TBD - created by archiving change s06-dev-cli. Update Purpose after archive.
 ### Requirement: classify は fixture を分類してキューを 4 タブ別にプレーンテキストで出す
 `loop-cli-dev classify --fixture <alias> [--mode sdd|label]` は、カレントディレクトリからの相対パス `internal/gh/testdata/fixtures/<alias>` を s03 の `gh.NewFake` で読み、全 open issue / open PR を s05 の `classify.Issue` / `classify.PR` で分類し、結果を標準出力に MUST 書く。live の `gh` は実行しない。
 - `--mode` は分類に使う運用方式で、既定は `sdd`。`sdd` / `label` 以外の値は、その値を含むエラーを返し、出力を書かない。`classify.Issue` / `classify.PR` の呼び出しにこの値を渡す（fixture は 1 リポジトリ 1 方式で採る）
+- `classify.PR` の `now` には、経過の列の計算に使うのと同じ現在時刻を渡す（画面の分類と同じ見え方にする。採取から 3 時間を超えた fixture の PR は、進行中の規則 2 / 3 / 7 の時間切れとして分類される）
 - `internal/gh/testdata/fixtures` が存在しなければ、s04 `fixture capture` と同じくリポジトリのルートで実行するよう促すエラーを返す。`<alias>` ディレクトリが無ければ、そのパスを含むエラーを返す（どちらも `Fake` を呼ぶ前に確認する）
 - 入力の組み立ては s05 `human-turn-classify`「fixture と期待値表で分類器をテストする」と同じ: 各 issue は `model.IssueFromSearch` に `ViewIssue` の `Comments` を `model.CommentFrom` で入れ、各 PR は `model.PRFromSearch` に `ViewPR` の `Comments`、`ViewPRMergeState`、`ReviewThreads` を入れる。D-001 の遅延取得による絞り込みはしない（fixture は全詳細を持つ）。`Fake` の読み取りが 1 つでも失敗したら、そのエラーを返し、出力を書かない
 - Issue と PR の紐づけ（`classify.Card`）は行わない。行は issue 1 件または PR 1 件である
@@ -110,3 +109,4 @@ TBD - created by archiving change s06-dev-cli. Update Purpose after archive.
 #### Scenario: fixture の後が capture 以外
 - **WHEN** 引数 `fixture foo` で実行する
 - **THEN** 標準エラーに `unknown command: fixture` と使い方が出て、終了コードは 1 である
+

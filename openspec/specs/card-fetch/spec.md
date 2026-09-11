@@ -2,9 +2,7 @@
 
 ## Purpose
 TBD - created by archiving change s07-fetch-cards. Update Purpose after archive.
-
 ## Requirements
-
 ### Requirement: PR は title と本文のパースで同一リポジトリの Issue に紐づく
 `internal/fetch` は `LinkedIssue(title, body string) (n int, ok bool)` を MUST 提供し、D-001「Issue と PR の紐づけ」の 1（PR 側）を実装する。search 結果の title / body だけで済み、追加呼び出しをしない。
 1. title の先頭（空白を除く）が `[propose]` / `[apply]` / `[archive]` のいずれかで、その直後（空白 0 個以上）に `#<n>`（`<n>` は 10 進整数）が続けば `n, true`
@@ -135,8 +133,8 @@ search 結果の `Labels` / `Body` / `IsDraft` は詳細で上書きしない。
 - **THEN** issue 140 の `Comments` は埋まっており、`Result.Situation` は `E` である（`question` が無いので規則 4 の分岐に入らない）
 
 ### Requirement: Fetch は search を 2 回だけ実行し、方式を判定して分類済みの Card 群を返す
-`internal/fetch` は `Result { Cards []model.Card; Modes map[string]model.Mode; Errors []error }` と、関数 `Fetch(ctx context.Context, client gh.GHClient, repos []string) (*Result, error)` を MUST 提供する。`repos` は `owner/name` の列（s02 の `Config.Repos[].Name`。`Fetch` は `internal/config` を import しない）。運用方式は引数で受け取らず、Requirement「Fetch はリポジトリごとにラベル一覧を取り運用方式を判定する」のとおり `Fetch` が判定する。
-`Fetch` は 1 回の呼び出しで `client.SearchIssues(ctx, repos)` を 1 回、`client.SearchPRs(ctx, repos)` を 1 回だけ実行し（D-001「1 回の更新で行う呼び出し」）、得た open issue / open PR を `model.IssueFromSearch` / `model.PRFromSearch` で `model` の型に写し、Requirement「Fetch は open の全 issue / 全 PR の詳細を取得する」の詳細を入れ、Requirement「PR は title と本文のパースで同一リポジトリの Issue に紐づく」で `model.Card` を組み立て、各 Card にそのカードのリポジトリの方式（`Result.Modes` を引き、無ければ `model.Mode` のゼロ値）を添えて s05 の `classify.Card` に通し、結果を `Result.Cards` に入れる。`Result.Cards` の各要素は `Card.Result` / `Issue.Result` / `PRs[i].Result` が埋まった状態で返る（s08 は分類を呼び直さない）。
+`internal/fetch` は `Result { Cards []model.Card; Modes map[string]model.Mode; Errors []error }` と、関数 `Fetch(ctx context.Context, client gh.GHClient, repos []string, now time.Time) (*Result, error)` を MUST 提供する。`repos` は `owner/name` の列（s02 の `Config.Repos[].Name`。`Fetch` は `internal/config` を import しない）。運用方式は引数で受け取らず、Requirement「Fetch はリポジトリごとにラベル一覧を取り運用方式を判定する」のとおり `Fetch` が判定する。`now` は分類の基準時刻で、`Fetch` は壁時計を読まずにこの値を `classify.Card` へそのまま渡す（`cmd/loop-cli` は更新のたびに現在時刻を渡す）。
+`Fetch` は 1 回の呼び出しで `client.SearchIssues(ctx, repos)` を 1 回、`client.SearchPRs(ctx, repos)` を 1 回だけ実行し（D-001「1 回の更新で行う呼び出し」）、得た open issue / open PR を `model.IssueFromSearch` / `model.PRFromSearch` で `model` の型に写し、Requirement「Fetch は open の全 issue / 全 PR の詳細を取得する」の詳細を入れ、Requirement「PR は title と本文のパースで同一リポジトリの Issue に紐づく」で `model.Card` を組み立て、各 Card にそのカードのリポジトリの方式（`Result.Modes` を引き、無ければ `model.Mode` のゼロ値）と `now` を添えて s05 の `classify.Card` に通し、結果を `Result.Cards` に入れる。`Result.Cards` の各要素は `Card.Result` / `Issue.Result` / `PRs[i].Result` が埋まった状態で返る（s08 は分類を呼び直さない）。
 `Cards` の並びは、issue を持つカードを `SearchIssues` の返却順、続けて PR 単独カードを `SearchPRs` の返却順とする。タブ内の並び替えは s08 が `Card.Result.Tab` / `Priority` で行う。
 search 結果の全 issue と全 PR は、それぞれちょうど 1 枚の Card に含まれる。`Fetch` は issue / PR を黙って落とさない。
 
@@ -151,6 +149,10 @@ search 結果の全 issue と全 PR は、それぞれちょうど 1 枚の Card
 #### Scenario: 方式を判定できないリポジトリは sdd として分類される
 - **WHEN** 同じ fixture の issue に対して、`stage:todo` も `To Do` も含まないラベル一覧を返す `GHClient` で `Fetch` を呼ぶ
 - **THEN** `Result.Modes` は空で、`In Progress` の issue の `Issue.Result.Situation` は `E` である（sdd の段階ラベルが 1 つも付いていないため）
+
+#### Scenario: now が分類に渡る
+- **WHEN** `apply` ラベルで最新コメントが人の open PR（`UpdatedAt` が `2026-09-04T10:00:00Z`）を持つ fixture で、`now` を `2026-09-04T10:30:00Z` と `2026-09-05T10:00:00Z` にしてそれぞれ `Fetch` を呼ぶ
+- **THEN** 前者ではその PR の `Result.Summary` は `PR #<n> は auto-fix が受け取り中`（`in-progress`）、後者では `PR #<n> は人のコメントに AI が応答していない`（`other`）である
 
 #### Scenario: search は 1 回ずつしか呼ばれない
 - **WHEN** `SearchIssues` / `SearchPRs` の呼び出し回数を数える `GHClient` で `Fetch` を呼ぶ
@@ -178,3 +180,4 @@ search 結果の全 issue と全 PR は、それぞれちょうど 1 枚の Card
 #### Scenario: 判定できないリポジトリは表に入らない
 - **WHEN** `stage:todo` も `To Do` も含まないラベル一覧を返す `GHClient` で、`repos` に `org/app` を渡して `Fetch` を呼ぶ
 - **THEN** `Result.Modes` は空で、`Errors` も空である（判定できないことは失敗ではない）
+
