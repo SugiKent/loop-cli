@@ -29,8 +29,12 @@
 - **THEN** 本文の `起動時に設定ファイルが無いと落ちる` と `コメント: なし` が含まれ、`コメント: 取得失敗` と `▌` は含まれない
 
 #### Scenario: blocked-by とコメントの手前に見出し行が出る
-- **WHEN** 幅 100・高さ 40 のサイズメッセージを与えた後、`Comments` が AI の 1 件（`Body` が `<!-- routine -->\nblocked-by: human\nunblock-when: comment\n方針を教えてください`）である issue の Card の詳細を開き、`View` から ANSI エスケープを除いて読む
-- **THEN** `── blocked-by ` で始まる行、`blocked-by: human` の行、`── コメント ` で始まる行がこの順で含まれ、`── blocked-by ` の行と `── コメント ` の行の表示幅はどちらも 100 である
+- **WHEN** 幅 100・高さ 40 のサイズメッセージを与えた後、`Body` が `方針。`、`Comments` が AI の 1 件（`Body` が `<!-- routine -->\nblocked-by: human\nunblock-when: comment\n方針を教えてください`）である issue の Card の詳細を開き、`View` から ANSI エスケープを除いて読む
+- **THEN** `── blocked-by ` で始まる行、`blocked-by: human` の行、`── コメント ` で始まる行がこの順で含まれる
+
+#### Scenario: Issue 本文が空なら blocked-by の見出しを出さない
+- **WHEN** 幅 100・高さ 40 のサイズメッセージを与えた後、`Body` が空文字列で、`Comments` が上の Scenario と同じ AI の 1 件である issue の Card の詳細を開き、`View` から ANSI エスケープを除いて読む
+- **THEN** 本文領域の 1 行目は `blocked-by: human` であり、`── blocked-by ` で始まる行は含まれず、`── コメント ` で始まる行は含まれる
 
 ### Requirement: PR 詳細は 1 行目判定・紐づけ・本文・会話・review thread・checks を出す
 PR 詳細画面の `View` は、対象の `model.PR` について MUST 次を上から順に出す。ヘッダ領域は 1〜2、本文領域は 3〜8（Requirement「詳細の本文領域はスクロールし、ヘッダ領域は固定する」）。
@@ -76,8 +80,8 @@ PR 詳細画面で `g` は、カードに `Issue` があればカード詳細画
 - **THEN** `checks: 緑` が含まれ、`checks: 緑以外` は含まれない
 
 #### Scenario: 詳細の取得に失敗した PR
-- **WHEN** `MergeState` と `Comments` と `ReviewThreads` がいずれも nil である手書きの open PR の詳細を開き、`View` を読む
-- **THEN** `checks: 取得失敗`、`コメント: 取得失敗`、`review thread: 取得失敗` がこの順で含まれ、`checks: なし` と `コメント: なし` と `review thread: なし` は含まれない
+- **WHEN** `MergeState` と `Comments` と `ReviewThreads` がいずれも nil で、`Body` が空文字列である手書きの open PR の詳細を開き、`View` から ANSI エスケープを除いて読む
+- **THEN** `checks: 取得失敗`、`── コメント `、`コメント: 取得失敗`、`── review thread `、`review thread: 取得失敗` がこの順で含まれ、`checks: なし` と `コメント: なし` と `review thread: なし` と `── 本文 ` は含まれない（`Body` が空でレンダリング結果が 0 行なので、本文のセクションは見出しごと出ない）
 
 #### Scenario: g で issue と PR を行き来する
 - **WHEN** `example` の issue 108 のカード詳細を開いた `Model` に `g`、`g`、`Enter`、`Esc` の順で与える
@@ -95,20 +99,26 @@ PR 詳細画面で `g` は、カードに `Issue` があればカード詳細画
 定める左ペインの幅）に達するまで `─` を継ぎ足した 1 行とする。`── <名前> ` がその幅に収まらないときは、
 表示幅で切って `…` を付けない（切った跡が線の一部に見えるようにする）。
 
-見出し行は、そのセクションより上に本文領域の行が 1 行以上あるときにだけ出す。本文領域の 1 行目が見出し行になると、
-直上にあるヘッダとの区切り線と 2 行続いて、どちらがどの境目か読めなくなるためである。
+見出し行を出す条件は 2 つあり、どちらも満たすときだけ出す。
 
-セクションの名前は、カード詳細が `blocked-by` / `コメント`、PR 詳細が `本文` / `コメント` / `review thread` とする
-（各セクションの中身は上の 2 つの Requirement が定める）。1 つ目のセクションには名前を与えない。1 つ目のセクションとは、
-カード詳細では Issue 本文を指し、PR 詳細では 1 行目判定から checks までを指す。見出し行に色は付けない。
+1. そのセクションの中身が 1 行以上ある。中身が 0 行のセクション（`Body` が空でレンダリング結果が 0 行になる場合など）は、
+   見出し行ごと出さない。中身の無い見出しは、直後の見出しと 2 行続いて何の境目かを分からなくする
+2. そのセクションより上に本文領域の行が 1 行以上ある。本文領域の 1 行目が見出し行になると、直上にあるヘッダとの
+   区切り線と 2 行続いて、どちらがどの境目か読めなくなる
+
+見出しを持つセクションは、カード詳細が `blocked-by` / `コメント`、PR 詳細が `本文` / `コメント` / `review thread` とする
+（各セクションの中身は上の 2 つの Requirement が定める）。カード詳細の Issue 本文と、PR 詳細の 1 行目判定から checks までは
+見出しを持たない。見出し行に色は付けない。
+
+本文領域の幅が 0 以下のとき（サイズメッセージが届く前）は、見出し行を空文字列の 1 行として出す。
 
 #### Scenario: PR 詳細の見出し行は本文領域の幅いっぱいに引かれる
 - **WHEN** 幅 100・高さ 40 のサイズメッセージを与えた後（幅 100 は 120 未満なので 1 ペインである）、`example` の issue 108 のカード詳細から PR 131 の詳細を開き、`View` から ANSI エスケープを除いて読む
-- **THEN** `── 本文 ` で始まる行、`── コメント ` で始まる行、`── review thread ` で始まる行がこの順で含まれ、どの行も表示幅が 100 で、`── ` と名前の後は `─` だけが並ぶ
+- **THEN** `── 本文 ` で始まる行、`── コメント ` で始まる行、`── review thread ` で始まる行がこの順で含まれ、各行の末尾の空白を落とした文字列は表示幅が 100 で `─` で終わり、`── ` と名前の後は `─` だけが並ぶ（本文領域の各行は幅まで空白で埋められて描かれるので、末尾の空白を落とさずに幅を測ると、`─` を継ぎ足さない実装でも 100 になってしまう）
 
-#### Scenario: 2 ペインの見出し行は左ペインの幅に収まる
+#### Scenario: 2 ペインの見出し行は左ペインの幅で引かれる
 - **WHEN** 幅 140・高さ 40 のサイズメッセージを与えた後（幅 140 は 120 以上なので 2 ペインで、左ペインの幅は 99 である）、`example` の issue 108 のカード詳細から PR 131 の詳細を開き、`View` から ANSI エスケープを除いて読む
-- **THEN** `── 本文 ` で始まる行の、縦の区切り線 `│` より左の部分の表示幅は 99 である
+- **THEN** `── 本文 ` で始まる行の、末尾の空白を落とした文字列は表示幅が 99 で `─` で終わる
 
 #### Scenario: 本文領域の 1 行目には見出し行を出さない
 - **WHEN** 幅 100・高さ 40 のサイズメッセージを与えた後、`Body` が空文字列で `Comments` が長さ 0、`blocked-by:` を持つコメントが無い issue の Card の詳細を開き、`View` から ANSI エスケープを除いて読む
@@ -119,20 +129,25 @@ PR 詳細画面の本文領域が出す `StatusCheckRollup` の各要素の行�
 `Conclusion` が空なら `Status`。`StatusContext` なら `State`）に応じて MUST 行全体に次の色を付ける。
 キューの表が種別ごとの色を行全体に付けているのと同じ形にする（mvp.md「行の色は種別で固定」）。
 
-| 区分 | 状態 | 色 |
-| --- | --- | --- |
-| 成功 | `SUCCESS` / `SKIPPED` / `NEUTRAL` | 緑 `#0E8A16` |
-| 失敗 | `FAILURE` / `TIMED_OUT` / `CANCELLED` / `ACTION_REQUIRED` / `STARTUP_FAILURE` / `ERROR` | 赤 `#B60205` |
-| それ以外 | 上のどちらにも無い状態（`QUEUED` / `IN_PROGRESS` / `PENDING` / `EXPECTED` / 空 など） | 色を付けない |
+| 区分 | `CheckRun` の状態 | `StatusContext` の `State` | 色 |
+| --- | --- | --- | --- |
+| 成功 | `SUCCESS` / `SKIPPED` / `NEUTRAL` | `SUCCESS` | 緑 `#0E8A16` |
+| 失敗 | `FAILURE` / `TIMED_OUT` / `CANCELLED` / `ACTION_REQUIRED` / `STARTUP_FAILURE` | `FAILURE` / `ERROR` | 赤 `#B60205` |
+| それ以外 | 上のどちらにも無い状態（`QUEUED` / `IN_PROGRESS` / 空 など） | 上のどちらにも無い状態（`PENDING` / `EXPECTED` など） | 色を付けない |
 
-成功の 3 つは s02 `human-turn-classify` の `ChecksGreen` が緑とみなす集合と同じにする。表に無い状態に色を付けないのは、
-GitHub が状態を増やしたときに、その状態を黙って成功や失敗に見せないためである。色は状態の文字を読まなくても
-赤を見つけられるようにする補助であり、状態の語は今までどおり文字で出す。
+緑にする集合は、`Typename` ごとに s02 `human-turn-classify` の `ChecksGreen` が緑とみなす集合と一致させる
+（`CheckRun` は 3 語、`StatusContext` は `SUCCESS` だけ）。ここをずらすと、緑の行しか無いのに見出しが `checks: 緑以外` になる。
+表に無い状態に色を付けないのは、GitHub が状態を増やしたときに、その状態を黙って成功や失敗に見せないためである。
+色は状態の文字を読まなくても赤を見つけられるようにする補助であり、状態の語は今までどおり文字で出す。
 
 #### Scenario: 失敗した check の行だけが赤になる
 - **WHEN** `MergeState` が `{Mergeable: MERGEABLE, MergeStateStatus: UNSTABLE, StatusCheckRollup: [CheckRun static SUCCESS, CheckRun tests FAILURE, CheckRun image (Conclusion 空、Status IN_PROGRESS)]}` の PR の詳細を開き、`View` を ANSI エスケープごと読む
 - **THEN** `static: SUCCESS` の行には緑 `#0E8A16` の指定があり、`tests: FAILURE` の行には赤 `#B60205` の指定があり、`image: IN_PROGRESS` の行には色の指定が無い
 
+#### Scenario: StatusContext の SKIPPED は緑にしない
+- **WHEN** `MergeState` が `{Mergeable: MERGEABLE, MergeStateStatus: UNSTABLE, StatusCheckRollup: [StatusContext ci/legacy SKIPPED]}` の PR の詳細を開き、`View` を ANSI エスケープごと読む
+- **THEN** `ci/legacy: SKIPPED` の行には色の指定が無く、ANSI エスケープを除いた `View` は `checks: 緑以外` を含む（`ChecksGreen` は `StatusContext` の `SKIPPED` を緑とみなさないので、行の色と見出しが食い違わない）
+
 #### Scenario: 色を落としても状態の語は読める
-- **WHEN** 上と同じ PR の詳細を開き、`View` から ANSI エスケープを除いて読む
+- **WHEN** 「失敗した check の行だけが赤になる」と同じ PR の詳細を開き、`View` から ANSI エスケープを除いて読む
 - **THEN** `static: SUCCESS`、`tests: FAILURE`、`image: IN_PROGRESS` がこの順で含まれる

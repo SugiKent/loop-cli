@@ -37,8 +37,11 @@ PR 本文へ、区切りなく地続きで流れる。checks の各行は 2 文�
 ## Impact
 
 - `internal/ui/detail.go`: `prBodyLines` / `cardBodyLines` / `checkLines`
+- `internal/ui/view.go`: 色の定義を置く場所
 - `internal/ui/detail_test.go`: 上の 3 つを読む既存テスト
-- `internal/gh/testdata/fixtures/example`: 手元で状態の混ざった checks を見るための PR fixture
+- `internal/ui/testdata/`: 状態の混ざった checks を持つ PR fixture を 1 つ足す。
+  `internal/gh/testdata/fixtures/example` は 10 以上のテストが共有しているので触らない
+- `README.md`: 「PR 詳細」の節
 - `openspec/specs/card-detail/spec.md`: 上の 2 Requirement
 
 ## 確定した判断
@@ -71,7 +74,9 @@ PR 詳細で `mergeable` と checks の後に PR 本文が始まる、その境�
 
 - **選択肢 A（推奨）: 見出し付きの区切り線**。各セクションの先頭に `── 本文 ─────…` `── コメント ─────…`
   `── review thread ─────…` を左ペイン幅いっぱいで入れる。ヘッダと本文の間にある無地の `─` と見分けが付き、
-  スクロールで流れてきても今どのセクションを読んでいるかが分かる。1 セクションにつき 1 行使う
+  スクロールで流れてきても今どのセクションを読んでいるかが分かる。1 セクションにつき 1 行使うので、
+  縦に狭い端末では見える本文が減る（高さ 12 の PR 詳細ではスクロールするまで PR 本文が見えなくなる。
+  design.md の Risks に計算がある）
 - 選択肢 B: 無地の `─` の区切り線だけを入れる。merge の確認画面と同じ記法になるが、ヘッダの区切り線と
   見た目が同じなので、読み手はスクロールした後にどちらの線を見ているのか判断できない
 - 選択肢 C: 区切り線を入れず、checks の字下げを深くする（2 文字 → 4 文字など）。行を消費しないが、
