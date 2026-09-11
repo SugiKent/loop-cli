@@ -46,7 +46,8 @@ type detailError struct {
 // Fetch は repos の open issue / open PR を取得し、分類済みの Card 群を返す。
 // 運用方式はリポジトリごとのラベル一覧から取得のたびに判定し、Result.Modes に入れる。
 // search の失敗と ctx の中断は (nil, error)、詳細取得 1 件の失敗は Result.Errors に積む。
-func Fetch(ctx context.Context, client gh.GHClient, repos []string) (*Result, error) {
+// now は分類の基準時刻で、そのまま classify.Card に渡す。
+func Fetch(ctx context.Context, client gh.GHClient, repos []string, now time.Time) (*Result, error) {
 	searchIssues, err := call(ctx, func(ctx context.Context) ([]gh.SearchIssue, error) {
 		return client.SearchIssues(ctx, repos)
 	})
@@ -74,7 +75,7 @@ func Fetch(ctx context.Context, client gh.GHClient, repos []string) (*Result, er
 		return nil, fmt.Errorf("fetch: %w", ctx.Err())
 	}
 
-	return &Result{Cards: buildCards(issues, prs, modes), Modes: modes, Errors: sortErrors(errs)}, nil
+	return &Result{Cards: buildCards(issues, prs, modes, now), Modes: modes, Errors: sortErrors(errs)}, nil
 }
 
 // call は 1 回の gh 呼び出しに CallTimeout の子 ctx を付ける。
@@ -198,7 +199,7 @@ func comments(cs []gh.Comment) []model.Comment {
 }
 
 // buildCards は PR を紐づけ先の issue に集め、紐づかない PR を単独 Card にする。
-func buildCards(issues []model.Issue, prs []model.PR, modes map[string]model.Mode) []model.Card {
+func buildCards(issues []model.Issue, prs []model.PR, modes map[string]model.Mode, now time.Time) []model.Card {
 	cards := make([]model.Card, len(issues))
 	index := map[string]map[int]int{}
 	for i := range issues {
@@ -224,7 +225,7 @@ func buildCards(issues []model.Issue, prs []model.PR, modes map[string]model.Mod
 	for i := range cards {
 		mode := modes[cardRepo(cards[i])]
 		sortPRs(cards[i].PRs, mode)
-		cards[i] = classify.Card(cards[i], mode)
+		cards[i] = classify.Card(cards[i], mode, now)
 	}
 	return cards
 }

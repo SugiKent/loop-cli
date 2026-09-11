@@ -21,7 +21,7 @@ loop-cli の分類器（`internal/classify`）と action 層はこの文書を�
 | --- | --- | --- | --- | --- |
 | A | **質問に答える**（grill） | open PR、`question` ラベル、最新コメントが routine のもの | PR 会話コメントで `Q1: A` 形式の返信。作った worker が同じセッションで受け取る | 1 |
 | B | **方針を決める** | open issue、`question` ラベル（`blocked` に重ねて付く。`blocked-by: human` の印）、最新コメントが routine のもの | issue に会話コメントで答える。**ラベルは触らない**。次の sweep が `question` / `blocked` を外して worker を起動し直す | 2 |
-| C | **merge する** | open PR、`propose` / `apply` / `archive` ラベル、本文 1 行目が `未確定の判断: 0 件`、`question` なし、`ai-assess:requested` なし、checks 緑、mergeable | `gh pr merge`（確認ダイアログ必須） | 3 |
+| C | **merge する** | open PR、`propose` / `apply` / `archive` ラベル、本文 1 行目が `未確定の判断: 0 件`、`question` なし、`ai-assess:requested` なし（付いたまま 3 時間動いていない PR は付いていても当たる）、checks 緑、mergeable | `gh pr merge`（確認ダイアログ必須） | 3 |
 | D | **レビュー質問に答える** | `apply` PR、未 resolve の review thread、thread 最終コメントが routine のもの | thread への返信（REST replies エンドポイント） | 1 |
 | E | **着手を承認する** | open issue、`stage:*` ラベルなし、`blocked` なし | `stage:todo` を付与 | 4（バックログ） |
 | F | **壊れた状態を直す** | 段階ラベルが 2 つ以上 | 表示して警告、ブラウザで開く。TUI から自動修復はしない | 0（最上位・件数は少ない） |
@@ -38,7 +38,8 @@ dispatcher が回収する残骸なので、異常扱いせず進行中に置く
 **キューに入れないもの（進行中タブに出す）**:
 
 - `stage:propose` / `stage:apply` / `stage:archive` が付き `wip` が付いている issue。AI が動いている最中。
-- `question` の付いていない open PR で最新コメントが人のもの。auto-fix が受け取り中。
+- `question` も `ai-assess:requested` も付いていない open PR で最新コメントが人のもの。auto-fix が受け取り中。
+  `ai-assess:requested` は worker が人の回答を反映し終えてから付けるので、付いていれば下の「AI 評価待ち」で扱う。
 - `question` の issue で最新コメントが人のもの。回答済みで、sweep が `question` を外して worker を起動し直すのを待っている。
   PR の回答は同一セッションが即座に拾うが、issue の回答は sweep 間隔でしか拾われない（Routines に issue コメントのトリガーが無い）。
 - 段階ラベルも `blocked` も無く、最新の routine コメントが `release:` / `restart:` / `advance:` の issue。上流はブロック解除と
@@ -46,6 +47,10 @@ dispatcher が回収する残骸なので、異常扱いせず進行中に置く
   sweep がこのコメントを目印に続きを書くので、E（着手を承認する）に出して人に `stage:todo` を付けさせると段階が巻き戻る。
 - `ai-assess:requested` が付いた open PR。未確定 0 件になった PR の AI リスク評価が走っている最中で、評価を終えた assess がラベルを外す。
   評価前に merge させないため、外れるまでは C に出さない。`question` も付いている壊れた状態では、人の質問（A）を先に出す。
+- 上の PR の規則（最新コメントが人・AI 評価待ち）は、PR が最後に動いてから（`updatedAt`）3 時間以内に限る。どちらも AI が次に動く前提で
+  人の目から外す規則なので、Routine が止まるとその PR は永久に見えなくなる。3 時間は sweep が「最新コメントが人のまま routine の返信が無い PR」を
+  止まったとみなす時間に揃えた。時間切れのうち、最新コメントが人の PR は「その他」に「人のコメントに AI が応答していない」と出す
+  （判定表に流すと、反映されていない依頼が C に見えるため）。AI 評価待ちの PR は判定表で分類し、C に出す。
 
 ### issue-label-driven のシグナル対応表
 
@@ -142,6 +147,7 @@ issue-driven-sdd を運用しているリポジトリを 1 つ読んで確認し
 
 | 日時 | 変更内容 | 理由 |
 | --- | --- | --- |
+| 2026-09-12-0030 | PR の進行中の規則（最新コメントが人・AI 評価待ち）を `updatedAt` から 3 時間以内に限り、時間切れの扱いと、`ai-assess:requested` 付き PR を「最新コメントが人」の規則から外すことを足した。行 C の `ai-assess:requested` なしの条件に時間切れの例外を足した | ca-ai-role-play で assess Routine が止まり `ai-assess:requested` が外れなくなり、open PR が全件進行中に隠れたため（s32-stale-in-progress-pr） |
 | 2026-09-10-0900 | 冒頭の `ai-assess:requested` の一文と不変条件 1・2 を `L`（ラベル一覧）に合わせて改訂。不変条件 1 を「ラベル集合の置換は行わない」に狭め、まとめ送信が原子的でないことと Routine の起動順の帰結を追記 | `L` が任意のラベルを 1 回の書き込みでまとめて変えるようになり、「1 ラベルずつ」「書くラベルは 2 つに限る」が事実と合わなくなったため（#3・s28-label-picker） |
 | 2026-09-11-1030 | ILD の方式の正本をラベル一覧に変え、行 C / 行 D から `Closes #n` を外し、PR の「最新コメントが人」の 2 規則を ILD で適用しないことにした | ILD の open PR を全件「今やる」に出し、方式の書き忘れという状態を無くすため（#24） |
 | 2026-09-10-0700 | issue-label-driven（`mode: label`）のシグナル対応表と、その方式でキューに入れないものを追加した | `To Do` / `In Progress` / `Done` の 3 ラベルで進むリポジトリを同じキューに載せるため（#5） |

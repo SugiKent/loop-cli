@@ -106,7 +106,7 @@ func TestLabelModeIssue(t *testing.T) {
 
 func TestLabelModePR(t *testing.T) {
 	t.Run("Closes を持つ緑の PR は 1 行目が無くても merge 行", func(t *testing.T) {
-		got := PR(closesPR(61), model.ModeLabel)
+		got := PR(closesPR(61), model.ModeLabel, updatedNow)
 		if got.Situation != model.SituationC || got.Priority != 3 || got.Tab != model.TabNow {
 			t.Errorf("Result = %+v, want C / 3 / 今やる", got)
 		}
@@ -116,7 +116,7 @@ func TestLabelModePR(t *testing.T) {
 		pr := closesPR(61)
 		pr.ReviewThreads = []gh.ReviewThread{{Comments: []gh.ReviewComment{{Body: "<!-- routine -->\nこの分岐は残しますか"}}}}
 
-		got := PR(pr, model.ModeLabel)
+		got := PR(pr, model.ModeLabel, updatedNow)
 		if got.Situation != model.SituationD || got.Priority != 1 {
 			t.Errorf("Result = %+v, want D / 1", got)
 		}
@@ -125,7 +125,7 @@ func TestLabelModePR(t *testing.T) {
 	t.Run("紐づく issue の無い緑の PR も merge 行に出る", func(t *testing.T) {
 		pr := closesPR(61)
 		pr.Body = "依存を更新する"
-		if got := PR(pr, model.ModeLabel).Situation; got != model.SituationC {
+		if got := PR(pr, model.ModeLabel, updatedNow).Situation; got != model.SituationC {
 			t.Errorf("Situation = %q, want C（label の行 C は Closes #n を見ない）", got)
 		}
 	})
@@ -135,7 +135,7 @@ func TestLabelModePR(t *testing.T) {
 		pr.Body = "依存を更新する"
 		pr.ReviewThreads = []gh.ReviewThread{{Comments: []gh.ReviewComment{{Body: "<!-- routine -->\nこの分岐は残しますか"}}}}
 
-		got := PR(pr, model.ModeLabel)
+		got := PR(pr, model.ModeLabel, updatedNow)
 		if got.Situation != model.SituationD || got.Priority != 1 {
 			t.Errorf("Result = %+v, want D / 1", got)
 		}
@@ -145,7 +145,7 @@ func TestLabelModePR(t *testing.T) {
 		pr := closesPR(61)
 		pr.Comments = []model.Comment{{Body: "この分岐を消してください"}}
 
-		got := PR(pr, model.ModeLabel)
+		got := PR(pr, model.ModeLabel, updatedNow)
 		if got.Situation != model.SituationC || got.Tab != model.TabNow {
 			t.Errorf("Result = %+v, want C / 今やる（進行中の規則 2 を適用しない）", got)
 		}
@@ -155,7 +155,7 @@ func TestLabelModePR(t *testing.T) {
 		pr := closesPR(62, model.LabelQuestion)
 		pr.Comments = []model.Comment{aiComment(), humanComment()}
 
-		got := PR(pr, model.ModeLabel)
+		got := PR(pr, model.ModeLabel, updatedNow)
 		if got.Situation != model.SituationA || got.Priority != 1 || got.Tab != model.TabNow {
 			t.Errorf("Result = %+v, want A / 1 / 今やる（進行中の規則 3 を適用しない）", got)
 		}
@@ -170,14 +170,14 @@ func TestLabelModePR(t *testing.T) {
 			StatusCheckRollup: []gh.StatusCheck{{Typename: "CheckRun", Conclusion: "FAILURE"}},
 		}
 
-		got := PR(pr, model.ModeLabel)
+		got := PR(pr, model.ModeLabel, updatedNow)
 		if got.Situation != model.SituationOther || got.Priority != 6 || got.Tab != model.TabNow {
 			t.Errorf("Result = %+v, want other / 6 / 今やる", got)
 		}
 	})
 
 	t.Run("question の PR は質問が先", func(t *testing.T) {
-		got := PR(closesPR(62, model.LabelQuestion), model.ModeLabel)
+		got := PR(closesPR(62, model.LabelQuestion), model.ModeLabel, updatedNow)
 		if got.Situation != model.SituationA || got.Priority != 1 {
 			t.Errorf("Result = %+v, want A / 1", got)
 		}
@@ -185,13 +185,13 @@ func TestLabelModePR(t *testing.T) {
 
 	t.Run("docs ラベルは merge 行を作らない", func(t *testing.T) {
 		pr := model.PR{Repo: "org/board", Number: 63, State: "OPEN", Labels: []string{model.LabelDocs}, Body: "README を直す"}
-		if got := PR(pr, model.ModeLabel).Situation; got != model.SituationOther {
+		if got := PR(pr, model.ModeLabel, updatedNow).Situation; got != model.SituationOther {
 			t.Errorf("Situation = %q, want other", got)
 		}
 	})
 
 	t.Run("ai-assess:requested は見ない", func(t *testing.T) {
-		if got := PR(closesPR(61, model.LabelAIAssess), model.ModeLabel).Situation; got != model.SituationC {
+		if got := PR(closesPR(61, model.LabelAIAssess), model.ModeLabel, updatedNow).Situation; got != model.SituationC {
 			t.Errorf("Situation = %q, want C", got)
 		}
 	})
@@ -200,7 +200,7 @@ func TestLabelModePR(t *testing.T) {
 func TestLabelModeCard(t *testing.T) {
 	t.Run("カードの全要素が同じ方式で分類される", func(t *testing.T) {
 		is := labelIssue(12, model.LabelInProgress)
-		got := Card(model.Card{Issue: &is, PRs: []model.PR{closesPR(61)}}, model.ModeLabel)
+		got := Card(model.Card{Issue: &is, PRs: []model.PR{closesPR(61)}}, model.ModeLabel, updatedNow)
 
 		if got.Issue.Result.Situation != model.SituationInProgress {
 			t.Errorf("Issue.Result = %+v, want in-progress", got.Issue.Result)
@@ -215,7 +215,7 @@ func TestLabelModeCard(t *testing.T) {
 
 	t.Run("Canonical は立たない", func(t *testing.T) {
 		merged := model.PR{Repo: "org/board", Number: 61, State: "MERGED"}
-		got := Card(model.Card{PRs: []model.PR{merged}}, model.ModeLabel)
+		got := Card(model.Card{PRs: []model.PR{merged}}, model.ModeLabel, updatedNow)
 		if got.PRs[0].Canonical {
 			t.Error("label 方式で Canonical が立っている")
 		}

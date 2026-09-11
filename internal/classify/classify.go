@@ -5,10 +5,15 @@ package classify
 import (
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/SugiKent/loop-cli/internal/gh"
 	"github.com/SugiKent/loop-cli/internal/model"
 )
+
+// StaleAfter は、AI が次に動く前提で進行中にした PR（規則 2 / 3 / 7）を人に戻すまでの時間。
+// sweep が「最新コメントが人のまま 3 時間 routine の返信が無い PR」を止まったとみなすのに合わせる。
+const StaleAfter = 3 * time.Hour
 
 func result(s model.Situation, summary string) model.Result {
 	return model.Result{Situation: s, Priority: s.Priority(), Tab: s.Tab(), Summary: summary}
@@ -79,18 +84,26 @@ func isWorking(mode model.Mode, stages []string, labels []string, question bool)
 }
 
 // PR は open PR 1 件の局面を返す。OPEN 以外はゼロ値の Result を返す（分類対象は open だけ）。
-// mode はそのリポジトリの運用方式（設定が正本。ゼロ値は sdd）。
-func PR(pr model.PR, mode model.Mode) model.Result {
+// mode はそのリポジトリの運用方式（設定が正本。ゼロ値は sdd）。now は規則 2 / 3 / 7 の時間切れの基準。
+func PR(pr model.PR, mode model.Mode, now time.Time) model.Result {
 	if pr.State != "OPEN" {
 		return model.Result{}
 	}
 	stages := model.PRStages(mode, pr.Labels)
 	question := model.HasLabel(pr.Labels, model.LabelQuestion)
 	aiLatest, hasComments := latestIsAI(pr.Comments)
+	// 規則 2 / 3 / 7 は AI が次に動く前提なので、StaleAfter 動かない PR は進行中に留めない。
+	fresh := now.Sub(pr.UpdatedAt) < StaleAfter
+	assess := model.HasLabel(pr.Labels, model.LabelAIAssess)
 
 	// 規則 2 / 3: 最新コメントが人。question の有無で文言だけ変える。
 	// label では適用しない（1 issue = 1 PR を人が捌く方式なので、キューから外すと人の出番が見えなくなる）。
-	if mode != model.ModeLabel && hasComments && !aiLatest {
+	// ai-assess:requested は worker が人の回答を反映し終えてから付けるので、付いていれば規則 7 に任せる。
+	if mode != model.ModeLabel && !assess && hasComments && !aiLatest {
+		if !fresh {
+			// 判定表に流すと未反映の依頼が merge 候補に見えるので、その他に出す。
+			return result(model.SituationOther, fmt.Sprintf("PR #%d は人のコメントに AI が応答していない", pr.Number))
+		}
 		if question {
 			return result(model.SituationInProgress, fmt.Sprintf("PR #%d は回答済み。worker が受け取り中", pr.Number))
 		}
@@ -104,7 +117,7 @@ func PR(pr model.PR, mode model.Mode) model.Result {
 	}
 	// 規則 7: AI リスク評価が走っている最中。assess がラベルを外すまで merge 待ちにしない。
 	// 行 A の後に置くのは、質問が残っている PR では人の番が先だから。label にこのラベルは無い。
-	if mode != model.ModeLabel && model.HasLabel(pr.Labels, model.LabelAIAssess) {
+	if mode != model.ModeLabel && fresh && assess {
 		return result(model.SituationInProgress, fmt.Sprintf("PR #%d は AI 評価待ち", pr.Number))
 	}
 	// label の行 C には本文 1 行目のゲートが無いので、先に C を見るとレビュー質問が緑の PR に埋もれる。

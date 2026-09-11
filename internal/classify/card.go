@@ -1,13 +1,15 @@
 package classify
 
 import (
+	"time"
+
 	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // Card は Issue と open PR 群を分類し、最上位の局面を Card.Result に置いたコピーを返す。
-// 1 枚の Card は 1 リポジトリ分なので、mode はカード全体で 1 つに決まる。
+// 1 枚の Card は 1 リポジトリ分なので、mode はカード全体で 1 つに決まる。now は PR() へ渡す。
 // 入力は変更しない（呼び出し側がスナップショットを保持したまま再分類できるようにするため）。
-func Card(c model.Card, mode model.Mode) model.Card {
+func Card(c model.Card, mode model.Mode, now time.Time) model.Card {
 	out := model.Card{PRs: append([]model.PR(nil), c.PRs...)}
 	if c.Issue != nil {
 		is := *c.Issue
@@ -16,7 +18,7 @@ func Card(c model.Card, mode model.Mode) model.Card {
 	}
 	for i := range out.PRs {
 		out.PRs[i].Canonical = false
-		out.PRs[i].Result = PR(out.PRs[i], mode)
+		out.PRs[i].Result = PR(out.PRs[i], mode, now)
 	}
 	markCanonical(out.PRs, mode)
 

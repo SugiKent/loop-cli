@@ -128,7 +128,7 @@ func classifyFixture(t *testing.T, dir string, mode model.Mode) map[string]model
 		if pr.ReviewThreads, err = f.ReviewThreads(ctx, pr.Repo, pr.Number); err != nil {
 			t.Fatalf("ReviewThreads(%d): %v", pr.Number, err)
 		}
-		out[fmt.Sprintf("pr-%d", pr.Number)] = PR(pr, mode).Situation
+		out[fmt.Sprintf("pr-%d", pr.Number)] = PR(pr, mode, pr.UpdatedAt).Situation
 	}
 	return out
 }

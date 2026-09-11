@@ -15,7 +15,7 @@ func TestCardPicksHighestSituation(t *testing.T) {
 	pr := openPR(131, model.LabelPropose, model.LabelQuestion)
 	pr.Comments = []model.Comment{aiComment()}
 
-	got := Card(model.Card{Issue: &is, PRs: []model.PR{pr}}, model.ModeSDD)
+	got := Card(model.Card{Issue: &is, PRs: []model.PR{pr}}, model.ModeSDD, updatedNow)
 
 	if got.Result.Situation != model.SituationA || got.Result.Tab != model.TabNow {
 		t.Errorf("Card.Result = %+v, want A / 今やる", got.Result)
@@ -35,7 +35,7 @@ func TestCardPrefersIssueOnTie(t *testing.T) {
 	is := issue(108, model.LabelStagePropose, model.LabelStageApply)
 	pr := openPR(131, model.LabelPropose, model.LabelApply)
 
-	got := Card(model.Card{Issue: &is, PRs: []model.PR{pr}}, model.ModeSDD)
+	got := Card(model.Card{Issue: &is, PRs: []model.PR{pr}}, model.ModeSDD, updatedNow)
 
 	if got.Result.Summary != "#108 に段階ラベルが 2 つ以上ある" {
 		t.Errorf("Summary = %q, want issue のもの（同点は issue 優先）", got.Result.Summary)
@@ -47,7 +47,7 @@ func TestCardAllInProgressUsesOpenPRSummary(t *testing.T) {
 	pr := openPR(151, model.LabelApply)
 	pr.Comments = []model.Comment{humanComment()}
 
-	got := Card(model.Card{Issue: &is, PRs: []model.PR{pr}}, model.ModeSDD)
+	got := Card(model.Card{Issue: &is, PRs: []model.PR{pr}}, model.ModeSDD, updatedNow)
 
 	if got.Result.Situation != model.SituationInProgress || got.Result.Tab != model.TabInProgress {
 		t.Errorf("Card.Result = %+v, want in-progress / 進行中", got.Result)
@@ -60,7 +60,7 @@ func TestCardAllInProgressUsesOpenPRSummary(t *testing.T) {
 func TestCardWithoutOpenPRUsesIssueSummary(t *testing.T) {
 	is := issue(108, model.LabelStageApply, model.LabelWip)
 
-	got := Card(model.Card{Issue: &is, PRs: []model.PR{mergedPR(131, model.LabelPropose)}}, model.ModeSDD)
+	got := Card(model.Card{Issue: &is, PRs: []model.PR{mergedPR(131, model.LabelPropose)}}, model.ModeSDD, updatedNow)
 
 	if got.Result.Summary != "#108 は AI が作業中" {
 		t.Errorf("Summary = %q, want issue のもの", got.Result.Summary)
@@ -68,7 +68,7 @@ func TestCardWithoutOpenPRUsesIssueSummary(t *testing.T) {
 }
 
 func TestCardWithoutIssue(t *testing.T) {
-	got := Card(model.Card{PRs: []model.PR{openPR(160, model.LabelDocs)}}, model.ModeSDD)
+	got := Card(model.Card{PRs: []model.PR{openPR(160, model.LabelDocs)}}, model.ModeSDD, updatedNow)
 
 	if got.Result.Situation != model.SituationG {
 		t.Errorf("Card.Result.Situation = %q, want G", got.Result.Situation)
@@ -79,7 +79,7 @@ func TestCardDoesNotMutateInput(t *testing.T) {
 	is := issue(108, model.LabelStagePropose)
 	in := model.Card{Issue: &is, PRs: []model.PR{mergedPR(131, model.LabelPropose), openPR(151, model.LabelApply)}}
 
-	Card(in, model.ModeSDD)
+	Card(in, model.ModeSDD, updatedNow)
 
 	if is.Result != (model.Result{}) {
 		t.Errorf("入力の Issue.Result が変わっています: %+v", is.Result)
@@ -101,7 +101,7 @@ func TestCardCanonicalIgnoresOlderMergedPR(t *testing.T) {
 	open := openPR(151, model.LabelApply)
 	open.Comments = []model.Comment{humanComment()}
 
-	got := Card(model.Card{Issue: &is, PRs: []model.PR{old, latest, open}}, model.ModeSDD)
+	got := Card(model.Card{Issue: &is, PRs: []model.PR{old, latest, open}}, model.ModeSDD, updatedNow)
 
 	if got.PRs[0].Canonical {
 		t.Error("古い merge 済み PR #131 が Canonical になっています")
@@ -121,7 +121,7 @@ func TestCardCanonicalPerStage(t *testing.T) {
 	got := Card(model.Card{PRs: []model.PR{
 		mergedPR(131, model.LabelPropose),
 		mergedPR(151, model.LabelApply),
-	}}, model.ModeSDD)
+	}}, model.ModeSDD, updatedNow)
 
 	if !got.PRs[0].Canonical || !got.PRs[1].Canonical {
 		t.Errorf("段階が違えば両方 Canonical であるべき: %v / %v", got.PRs[0].Canonical, got.PRs[1].Canonical)

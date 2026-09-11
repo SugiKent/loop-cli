@@ -54,15 +54,17 @@ func classifyFixture(args []string, stdout, stderr io.Writer) error {
 		return fmt.Errorf("fixture がありません: %w", err)
 	}
 
-	rows, err := classifyRows(context.Background(), dir, model.Mode(*mode))
+	now := time.Now()
+	rows, err := classifyRows(context.Background(), dir, model.Mode(*mode), now)
 	if err != nil {
 		return err
 	}
-	return writeQueue(stdout, rows, time.Now())
+	return writeQueue(stdout, rows, now)
 }
 
 // classifyRows は fixture の全 open issue / PR を分類して行にする。Card 化はしない（s07 の担当）。
-func classifyRows(ctx context.Context, dir string, mode model.Mode) ([]row, error) {
+// now は PR の時間切れの基準で、経過の列と同じ時刻を渡す。
+func classifyRows(ctx context.Context, dir string, mode model.Mode, now time.Time) ([]row, error) {
 	f := gh.NewFake(dir)
 	var rows []row
 
@@ -97,7 +99,7 @@ func classifyRows(ctx context.Context, dir string, mode model.Mode) ([]row, erro
 		if pr.ReviewThreads, err = f.ReviewThreads(ctx, pr.Repo, pr.Number); err != nil {
 			return nil, err
 		}
-		rows = append(rows, newRow(classify.PR(pr, mode), pr.Repo, true, pr.Number, pr.Title, pr.UpdatedAt))
+		rows = append(rows, newRow(classify.PR(pr, mode, now), pr.Repo, true, pr.Number, pr.Title, pr.UpdatedAt))
 	}
 	return rows, nil
 }
