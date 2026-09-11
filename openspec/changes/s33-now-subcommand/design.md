@@ -101,8 +101,9 @@ JSON でも `err.Error()` の文字列をそのまま並べる。`gh` の失敗�
 
 ## Risks / Trade-offs
 
-- **[人が `loop-cli now` を打つと JSON が流れる]** → 未確定の判断 Q1 で人に選んでもらう。
-  推奨案（JSON だけ）を採る場合、README に「人が読む画面は `loop-cli`、agent が読むのは `loop-cli now`」と書き分ける
+- **[人が `loop-cli now` を打つと JSON が流れる]** → JSON だけを出すことは PR #39 のコメントで決まった。
+  README に「人が読む画面は `loop-cli`、agent が読むのは `loop-cli now`」と書き分け、2 スペースの整形で
+  人が直接打っても読める形にする（D9）
 - **[出力のキー名が後から変わると agent 側が壊れる]** → 単体テストで JSON のキーを固定する。
   変えるときは spec の Requirement を MODIFIED することになるので、気付かずに変わることはない
 - **[`situation` の記号は `internal/model` の change で増減し得る]** → `situation` は局面を表す記号をそのまま
