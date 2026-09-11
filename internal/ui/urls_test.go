@@ -457,3 +457,45 @@ func indexOfLine(t *testing.T, lines []string, sub string) int {
 	t.Fatalf("%q を含む行が無い:\n%s", sub, strings.Join(lines, "\n"))
 	return -1
 }
+
+// TestURLListPutsSessionFirst はセッションの URL が出典 session で先頭に出ることを検証する。
+func TestURLListPutsSessionFirst(t *testing.T) {
+	body := "https://claude.ai/code/session_01ABC で進めています。設計は https://example.com/design"
+	m, _ := prDetailWithURLs(t, urlPRCard(body, nil, nil), 80, 24)
+
+	wantURLs(t, m.urls.items, []urlItem{
+		{source: "session", url: "https://claude.ai/code/session_01ABC"},
+		{source: "本文", url: "https://example.com/design"},
+	})
+}
+
+// TestURLListSessionFromRoutineComment は issue の routine コメントの session 行から
+// 作った URL が一覧に出ることを検証する。
+func TestURLListSessionFromRoutineComment(t *testing.T) {
+	card := urlPRCard("", nil, nil)
+	card.Issue = &model.Issue{
+		Repo: "org/app", Number: 108, Title: "手書き", UpdatedAt: at, Result: card.Result,
+		Comments: []model.Comment{{Body: "<!-- routine -->\nsession: session_01BBB", AI: true}},
+	}
+	m, _ := urlModel([]model.Card{card}, 80, 24)
+	m, _ = send(m, codeKey(tea.KeyEnter))
+	if m.screen != screenCard {
+		t.Fatalf("カード詳細に移っていない: screen = %d", m.screen)
+	}
+	m, _ = send(m, uKey)
+
+	wantURLs(t, m.urls.items, []urlItem{{source: "session", url: "https://claude.ai/code/session_01BBB"}})
+}
+
+// TestURLListViewShowsSessionSource は session の出典が行に出ることを検証する。
+func TestURLListViewShowsSessionSource(t *testing.T) {
+	m, _ := prDetailWithURLs(t, urlPRCard("https://claude.ai/code/session_01ABC", nil, nil), 80, 24)
+
+	line, ok := lineWith(plain(m), "https://claude.ai/code/session_01ABC")
+	if !ok {
+		t.Fatalf("セッションの URL の行が無い:\n%s", plainText(m))
+	}
+	if !strings.HasPrefix(line, "▶ [session]") {
+		t.Errorf("行 = %q, want ▶ [session] で始まる", line)
+	}
+}

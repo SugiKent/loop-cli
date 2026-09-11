@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/gen2brain/beeep"
 
+	"github.com/SugiKent/loop-cli/internal/claude"
 	"github.com/SugiKent/loop-cli/internal/config"
 	"github.com/SugiKent/loop-cli/internal/fetch"
 	"github.com/SugiKent/loop-cli/internal/gh"
@@ -137,10 +138,13 @@ func runTUI() error {
 	var fetcher ui.Fetcher = func(ctx context.Context) (*fetch.Result, error) {
 		return fetch.Fetch(ctx, client, repos)
 	}
+	claudeClient := claude.NewClient()
 	opts := ui.Options{
-		RefreshInterval: time.Duration(cfg.RefreshIntervalSec) * time.Second,
-		CheckUpdate:     updateChecker(version.NewClient()),
-		MergeMethods:    mergeMethods(cfg),
+		RefreshInterval:  time.Duration(cfg.RefreshIntervalSec) * time.Second,
+		CheckUpdate:      updateChecker(version.NewClient()),
+		MergeMethods:     mergeMethods(cfg),
+		ClaudeConfigDirs: claudeConfigDirs(cfg),
+		SessionLog:       claudeClient.RunLog,
 	}
 	if cfg.Notify {
 		// icon は string か []byte でなければならない。空文字列でアイコンなし（s06 と同じ）。
@@ -166,6 +170,16 @@ func mergeMethods(cfg *config.Config) map[string]string {
 	out := make(map[string]string, len(cfg.Repos))
 	for _, r := range cfg.Repos {
 		out[r.Name] = string(r.MergeMethod)
+	}
+	return out
+}
+
+// claudeConfigDirs は リポジトリ名 -> Claude のプロファイルのパス の対応表を作る
+// （s31 session-pane）。設定に書いていないリポジトリのセッションは取得しない。
+func claudeConfigDirs(cfg *config.Config) map[string]string {
+	out := make(map[string]string, len(cfg.Repos))
+	for _, r := range cfg.Repos {
+		out[r.Name] = r.ClaudeConfigDir
 	}
 	return out
 }

@@ -139,3 +139,79 @@ func TestInitStartsFetchWithAndWithoutInterval(t *testing.T) {
 		})
 	}
 }
+
+// TestDetailRefreshDoesNotRefetchGitHub は詳細画面の R が GitHub を取り直さず、
+// セッションだけを取り直すことを検証する（s31 manual-refresh の MODIFIED）。
+func TestDetailRefreshDoesNotRefetchGitHub(t *testing.T) {
+	calls := 0
+	stub := &sessionStub{entries: runningEntries()}
+	card := sessionIssueCard([]model.Comment{{Body: "<!-- routine -->\nsession: " + testSessionID, AI: true}})
+	m, _ := send(
+		newModelOpts(countingFetcher(&fetch.Result{Cards: []model.Card{card}}, &calls),
+			Options{ClaudeConfigDirs: appDirs(), SessionLog: stub.log}),
+		tea.WindowSizeMsg{Width: 120, Height: 40},
+		fetchedMsg{res: &fetch.Result{Cards: []model.Card{card}}, at: at})
+
+	m, cmd := send(m, enterKey)
+	if cmd == nil {
+		t.Fatal("カード詳細を開いても取得のコマンドが返らない")
+	}
+	m, _ = send(m, cmd())
+
+	m, cmd = send(m, runeKey('R'))
+	if cmd == nil {
+		t.Fatal("詳細の R でコマンドが返らない")
+	}
+	m, _ = send(m, cmd())
+
+	if calls != 0 {
+		t.Errorf("Fetcher の呼び出し回数 = %d, want 0", calls)
+	}
+	if m.fetching {
+		t.Error("fetching が true になった")
+	}
+	if !m.at.Equal(at) {
+		t.Errorf("最終更新時刻が変わった: %v", m.at)
+	}
+	if m.screen != screenCard {
+		t.Errorf("画面 = %d, want カード詳細", m.screen)
+	}
+	if stub.calls != 2 {
+		t.Errorf("claude の呼び出し回数 = %d, want 2", stub.calls)
+	}
+}
+
+// TestRefreshDoesNothingOnNarrowDetailAndOverlays は右ペインを出さない幅の詳細画面と
+// 確認画面 / ヘルプ画面で R が何もしないことを検証する。
+func TestRefreshDoesNothingOnNarrowDetailAndOverlays(t *testing.T) {
+	calls := 0
+	stub := &sessionStub{entries: runningEntries()}
+	res := exampleResult(t)
+	m, _ := send(
+		newModelOpts(countingFetcher(res, &calls), Options{ClaudeConfigDirs: appDirs(), SessionLog: stub.log}),
+		tea.WindowSizeMsg{Width: 80, Height: 40}, fetchedMsg{res: res, at: at})
+
+	card, _ := send(m, enterKey)
+	pr, _ := send(card, enterKey)
+	help, _ := send(m, runeKey('?'))
+	confirm, _ := confirmModel(t)
+
+	for name, target := range map[string]Model{"カード詳細": card, "PR 詳細": pr, "ヘルプ": help, "確認": confirm} {
+		next, cmd := send(target, runeKey('R'))
+		if cmd != nil {
+			t.Errorf("%s で R がコマンドを返した: %T", name, cmd())
+		}
+		if next.screen != target.screen {
+			t.Errorf("%s で R が画面を変えた: %d -> %d", name, target.screen, next.screen)
+		}
+		if next.fetching {
+			t.Errorf("%s で fetching が true になった", name)
+		}
+	}
+	if calls != 0 {
+		t.Errorf("Fetcher の呼び出し回数 = %d, want 0", calls)
+	}
+	if stub.calls != 0 {
+		t.Errorf("claude の呼び出し回数 = %d, want 0", stub.calls)
+	}
+}

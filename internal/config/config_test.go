@@ -278,3 +278,66 @@ func TestIsRepoName(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadClaudeConfigDirExpandsHome(t *testing.T) {
+	t.Setenv("HOME", "/Users/alice")
+	path := writeConfig(t, `repos:
+  - {name: org/app, claude_config_dir: ~/.claude-personal}
+`)
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load が失敗した: %v", err)
+	}
+	if want := "/Users/alice/.claude-personal"; cfg.Repos[0].ClaudeConfigDir != want {
+		t.Errorf("ClaudeConfigDir = %q, want %q", cfg.Repos[0].ClaudeConfigDir, want)
+	}
+}
+
+func TestLoadClaudeConfigDirExpandsEnv(t *testing.T) {
+	t.Setenv("CC_PROFILE", "/opt/profiles/max")
+	path := writeConfig(t, `repos:
+  - {name: org/app, claude_config_dir: $CC_PROFILE}
+`)
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load が失敗した: %v", err)
+	}
+	if want := "/opt/profiles/max"; cfg.Repos[0].ClaudeConfigDir != want {
+		t.Errorf("ClaudeConfigDir = %q, want %q", cfg.Repos[0].ClaudeConfigDir, want)
+	}
+}
+
+func TestLoadClaudeConfigDirOmittedIsEmpty(t *testing.T) {
+	t.Setenv("HOME", "/Users/alice")
+	path := writeConfig(t, `repos:
+  - org/web
+  - {name: org/app, claude_config_dir: ~/.claude-max}
+`)
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load が失敗した: %v", err)
+	}
+	if cfg.Repos[0].ClaudeConfigDir != "" {
+		t.Errorf("省略したリポジトリの ClaudeConfigDir = %q, want 空", cfg.Repos[0].ClaudeConfigDir)
+	}
+	if want := "/Users/alice/.claude-max"; cfg.Repos[1].ClaudeConfigDir != want {
+		t.Errorf("ClaudeConfigDir = %q, want %q", cfg.Repos[1].ClaudeConfigDir, want)
+	}
+}
+
+func TestLoadClaudeConfigDirMissingPathSucceeds(t *testing.T) {
+	path := writeConfig(t, `repos:
+  - {name: org/app, claude_config_dir: /nowhere/.claude}
+`)
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("存在しないパスで Load が失敗した: %v", err)
+	}
+	if want := "/nowhere/.claude"; cfg.Repos[0].ClaudeConfigDir != want {
+		t.Errorf("ClaudeConfigDir = %q, want %q", cfg.Repos[0].ClaudeConfigDir, want)
+	}
+}

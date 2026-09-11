@@ -24,9 +24,12 @@ const (
 )
 
 // Repo は監視対象リポジトリ。MergeMethod は Load が必ず埋める。
+// ClaudeConfigDir はそのリポジトリの Routine を回している Claude のプロファイルのパス
+// （CLAUDE_CONFIG_DIR に渡す値）。省略できて、既定値は持たない。
 type Repo struct {
-	Name        string
-	MergeMethod MergeMethod
+	Name            string
+	MergeMethod     MergeMethod
+	ClaudeConfigDir string
 }
 
 // Config は設定ファイルの内容。
@@ -47,7 +50,8 @@ func DefaultPath() (string, error) {
 	return filepath.Join(home, ".config", "loop-cli", "config.yml"), nil
 }
 
-// UnmarshalYAML は repos の要素を「文字列」または「{name, merge_method} のマッピング」として読む。
+// UnmarshalYAML は repos の要素を「文字列」または
+// 「{name, merge_method, claude_config_dir} のマッピング」として読む。
 func (r *Repo) UnmarshalYAML(node *yaml.Node) error {
 	switch node.Kind {
 	case yaml.ScalarNode:
@@ -63,6 +67,8 @@ func (r *Repo) UnmarshalYAML(node *yaml.Node) error {
 				r.Name = value
 			case "merge_method":
 				r.MergeMethod = MergeMethod(value)
+			case "claude_config_dir":
+				r.ClaudeConfigDir = value
 			case "mode":
 				// s30 で廃止。値が正しくても止める（汎用の未知キーの文言では理由が読み取れない）。
 				return errors.New("repos の mode は廃止しました。運用方式はリポジトリのラベル一覧から判定するので、この行を削除してください")
@@ -75,7 +81,7 @@ func (r *Repo) UnmarshalYAML(node *yaml.Node) error {
 		}
 		return nil
 	default:
-		return errors.New("repos の要素は文字列か {name, merge_method} のマッピングで書いてください")
+		return errors.New("repos の要素は文字列か {name, merge_method, claude_config_dir} のマッピングで書いてください")
 	}
 }
 
@@ -109,8 +115,24 @@ func Load(path string) (*Config, error) {
 		if cfg.Repos[i].MergeMethod == "" {
 			cfg.Repos[i].MergeMethod = cfg.MergeMethod
 		}
+		cfg.Repos[i].ClaudeConfigDir = expandPath(cfg.Repos[i].ClaudeConfigDir)
 	}
 	return &cfg, nil
+}
+
+// expandPath は環境変数と先頭の ~ を展開する。パスが存在するかは確かめない
+// （設定ファイルを別のマシンから持ってきたときに起動できなくなるため）。
+// ~alice のような他人のホームの書き方は展開しない。
+func expandPath(path string) string {
+	path = os.ExpandEnv(path)
+	if path != "~" && !strings.HasPrefix(path, "~/") {
+		return path
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	return filepath.Join(home, strings.TrimPrefix(path, "~"))
 }
 
 func validate(cfg *Config) error {

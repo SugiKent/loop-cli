@@ -22,6 +22,11 @@ type Options struct {
 	Notify          Notifier           // デスクトップ通知。nil なら通知しない
 	CheckUpdate     UpdateChecker      // 起動時の更新確認。nil なら確認しない
 	MergeMethods    map[string]string  // リポジトリ名 -> merge 方式。無いリポジトリは squash
+	// ClaudeConfigDirs はリポジトリ名 -> Claude のプロファイルのパス（s31 session-pane）。
+	// 無いリポジトリのセッションは取得しない。
+	ClaudeConfigDirs map[string]string
+	// SessionLog はセッションのログの取得。nil なら取得しない。
+	SessionLog SessionLogger
 }
 
 // UpdateChecker は新しい版があるかどうかを返す（s23 self-update）。
@@ -88,6 +93,13 @@ type Model struct {
 	refreshInterval time.Duration
 	notify          Notifier
 
+	// セッションの稼働状況（s31 session-pane）。どれもプロセスの中だけに持つ。
+	sessionLog     SessionLogger
+	claudeDirs     map[string]string        // リポジトリ名 -> claude_config_dir
+	sessions       map[string]sessionResult // セッション ID -> 取得結果
+	sessionBusy    map[string]bool          // claude_config_dir -> 取得中
+	sessionLimited map[string]string        // claude_config_dir -> 利用上限の解除の時刻
+
 	checkUpdate     UpdateChecker
 	updateAvailable bool
 
@@ -111,6 +123,11 @@ func New(fetcher Fetcher, client gh.GHClient, editor Editor, opts Options) Model
 		checkUpdate:     opts.CheckUpdate,
 		mergeMethods:    opts.MergeMethods,
 		spinner:         spinner.New(spinner.WithSpinner(spinner.MiniDot)),
+		sessionLog:      opts.SessionLog,
+		claudeDirs:      opts.ClaudeConfigDirs,
+		sessions:        map[string]sessionResult{},
+		sessionBusy:     map[string]bool{},
+		sessionLimited:  map[string]string{},
 	}
 	// スナップショットがあれば前回の表と保存時刻から始める（D-002「起動直後は stale 表示」）。
 	if opts.Snapshot != nil {
@@ -235,6 +252,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case labelsEditedMsg:
 		return m.updateLabelsEdited(msg), nil
 
+	case sessionFetchedMsg:
+		return m.updateSessionFetched(msg), nil
+
 	case refreshTickMsg:
 		return m.updateTick()
 
@@ -309,8 +329,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screen = screenHelp
 			return m, nil
 		}
+		// 詳細画面の R はセッションを取得する（キュー画面の R は updateKey が扱う）。
+		// updateDetailKey は Cmd を返せないので o / ? と同じ位置に置く。
+		if key == "R" && (m.screen == screenCard || m.screen == screenPR) {
+			return m.sessionRefreshKey()
+		}
 		if m.screen != screenQueue {
-			return m.updateDetailKey(key), nil
+			return m.updateDetailKey(key)
 		}
 		return m.updateKey(key)
 	}
@@ -335,7 +360,9 @@ func (m Model) updateKey(key string) (tea.Model, tea.Cmd) {
 		m.tab = tabOrder[(m.tabIndex()+1)%len(tabOrder)]
 		m.clampCursor()
 	case "enter":
-		return m.openDetail(), nil
+		m = m.openDetail()
+		cmd := m.sessionOnOpenCmd()
+		return m, cmd
 	case "R":
 		if m.fetching {
 			return m, nil

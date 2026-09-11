@@ -171,6 +171,39 @@ func ParseQuestions(body string) []Question {
 	return out
 }
 
+// sessionURLRe は PR 本文に書かれる Claude Code セッションの URL。
+// sessionLineRe は routine コメントの `session: <ID>` 行。ID は cse_ / session_ のどちらもある。
+var (
+	sessionURLRe  = regexp.MustCompile(`https://claude\.ai/code/(session_[A-Za-z0-9]+)`)
+	sessionLineRe = regexp.MustCompile(`^session:\s*(\S+)`)
+)
+
+// SessionURLID は本文に最初に現れる https://claude.ai/code/session_<ID> の ID を返す。
+func SessionURLID(body string) (string, bool) {
+	m := sessionURLRe.FindStringSubmatch(body)
+	if m == nil {
+		return "", false
+	}
+	return m[1], true
+}
+
+// LatestSessionID は routine コメントの `session: <ID>` 行のうち最も新しいものを返す。
+// 人のコメントに同じ行があっても採らない（routine のマーカーで始まるものだけを見る）。
+func LatestSessionID(comments []Comment) (string, bool) {
+	for i := len(comments) - 1; i >= 0; i-- {
+		body := comments[i].Body
+		if !strings.HasPrefix(body, routineMarker) && !strings.HasPrefix(body, routineMarkerEscaped) {
+			continue
+		}
+		for _, line := range strings.Split(body, "\n") {
+			if m := sessionLineRe.FindStringSubmatch(strings.TrimSpace(line)); m != nil {
+				return m[1], true
+			}
+		}
+	}
+	return "", false
+}
+
 // Link は本文から取り出した URL 1 件。Text は Markdown リンクのときだけ入る。
 type Link struct {
 	Text string
