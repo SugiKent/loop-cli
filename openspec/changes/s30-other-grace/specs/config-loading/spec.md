@@ -1,14 +1,14 @@
 ## MODIFIED Requirements
 
 ### Requirement: 設定ファイルを読み込んで Config 型を返す
-`internal/config` はパスを受け取り `Config` 型を返す関数 `Load` を MUST 提供する。`Config` は 6 項目
-`repos` / `refresh_interval_sec` / `merge_method` / `editor` / `notify` / `other_grace_min` だけを持ち、`repos` の各要素はリポジトリ名 `owner/name` と
+`internal/config` はパスを受け取り `Config` 型を返す関数 `Load` を MUST 提供する。`Config` は mvp.md「設定ファイル」節の 5 項目
+`repos` / `refresh_interval_sec` / `merge_method` / `editor` / `notify` と、s30-other-grace で足した `other_grace_min` の 6 項目だけを持ち、`repos` の各要素はリポジトリ名 `owner/name` と
 そのリポジトリで使う merge 方式、そのリポジトリの Routine を回している Claude のプロファイルのパス（s31 の `claude_config_dir`。Requirement「repos の要素は claude_config_dir を持てる」が定める）を持つ。`merge_method` の値は `squash` / `merge` / `rebase` の 3 つで、`gh pr merge` のフラグ名と一致する型付き定数として公開する。
-`other_grace_min` は「その他」を進行中に置く猶予を分で表す整数で、`Config.OtherGraceMin` に入る（消費側は `cmd/loop-cli` が分から `time.Duration` に変えて s07 `Fetch` に渡す）。利用者向けの説明は README を正本にする（`docs/mvp` は MVP を定義した時点の記録として凍結してあり、`other_grace_min` は例に入らない。CLAUDE.md「docs/mvp はこれ以降更新しない」）。
+`other_grace_min` は「その他」の PR を進行中に置く猶予を分で表す整数で、`Config.OtherGraceMin` に入る（消費側は `cmd/loop-cli` が分から `time.Duration` に変えて s07 `Fetch` に渡す）。mvp.md は凍結されているので例に載せず、利用者向けの説明は README の設定表に書く。
 
 #### Scenario: mvp.md の例をそのまま読む
 - **WHEN** mvp.md「設定ファイル」節の YAML 例（`repos` に `org/app` と `org/web`、`refresh_interval_sec: 120`、`merge_method: squash`、`editor: $EDITOR`、`notify: true`）を `Load` に渡す
-- **THEN** `Repos` は `org/app` と `org/web` の 2 件がこの順で入り、`RefreshIntervalSec` は 120、`MergeMethod` は squash、`Notify` は true、`Editor` は環境変数 `EDITOR` の値、`OtherGraceMin` は既定の 30 になる
+- **THEN** `Repos` は `org/app` と `org/web` の 2 件がこの順で入り、`RefreshIntervalSec` は 120、`MergeMethod` は squash、`Notify` は true、`OtherGraceMin` は 30、`Editor` は環境変数 `EDITOR` の値になる
 
 #### Scenario: YAML の構文が壊れている
 - **WHEN** YAML として解析できない内容のファイルを `Load` に渡す
