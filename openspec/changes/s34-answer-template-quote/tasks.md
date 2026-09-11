@@ -1,36 +1,56 @@
-## 1. テンプレートの引用
+## 1. 質問のパースを実物の書式に合わせる
 
-- [ ] 1.1 `internal/action/template.go`: 選んだ routine コメントの本文を引用ブロックに写す非公開関数を足す
-  （マーカー（`<!-- routine -->` とエスケープ済みの形）を含む行を落とし、残った各行の行末の空白を落として、
-  空になった行は `>`、それ以外は `> ` を前に付ける。末尾に連なる `>` だけの行は出さない）。
-  `model.ParseQuestions` が 0 件で `BlockedByLines` も 0 行のコメントは引用しない条件を同じ関数に入れ、
-  `AnswerTemplate` の戻り値を「引用ブロック + 空行 1 行 + 回答行」に組み替える（どちらかが空なら片方だけ、
-  両方空なら空文字列）。`go build ./internal/action` が通ることで確認する
-- [ ] 1.2 `internal/action/template_test.go` に `answer-action` の MODIFIED Requirement の Scenario 9 件を足し、
-  戻り値の完全一致で検証する。9 件は、推奨を既定値にした 2 問・推奨が無ければ先頭と選択肢が無ければ空・
-  最新の routine コメントを採る・blocked-by は引用だけ・末尾の空行を出さない・見出しの無いコメント・
-  作業印のコメント・エスケープ済みのマーカー・コメントが無い、の各 Scenario。
-  引用付きのテンプレートを `HasRoutineMarker` に渡して false になることも同じテストで見る（マーカーが残ると
-  回答を 1 件も投稿できなくなるため）
+- [ ] 1.1 `internal/model/parse.go` の `questionRe` を「行頭の `#` が 1 つ以上」に、`optionRe` を「`選択肢` の前・
+  `<Letter>` の直後・`（推奨）` の直後の `**` を読み飛ばす」形に広げる。`Text` の中の `*` は落とさない
+- [ ] 1.2 `internal/model/parse_test.go` に `card-model` の MODIFIED Requirement の Scenario 4 件を足す。
+  4 件は、mvp.md 形式の 2 問・上流の質問コメントの書式・見出しの記号が無い質問・見出しの無い本文である。
+  上流の書式のケースは、PR #37 のコメント（`### Q1.` の見出し、`- **選択肢 A（推奨）**: …`、`- 依存: なし` の行、
+  `---` の区切り、太字の段落）を写した本文を入力にして、`Question` 2 件と各 `Options` の `Letter` /
+  `Recommended` / `Text` を検証する
+- [ ] 1.3 `internal/ui` の詳細画面のテストが通ることを確認する。パースが広がると `questionLines`
+  （`internal/ui/detail.go:311-322`）が blocked-by 要約に質問を出すようになるので、`### Q<n>.` 形式のコメントを
+  持つ Card で「質問と選択肢の行が出る」ことを 1 件足す
 
-## 2. エディタに渡る初期テキスト
+## 2. テンプレートの引用
 
-- [ ] 2.1 `internal/ui` の `a` のテスト: `answer-question` の MODIFIED Requirement の Scenario 4 件を通す。
-  キュー画面のスタブ `Editor` が受け取る `initial` の期待値を引用付き（`> ## Q1. 分けるか` から `Q1: A` まで）に
-  直し、`example` の issue 108 のカード詳細・PR 131 の PR 詳細・issue 140 のバックログでは空文字列のままで
-  あることを検証する
-- [ ] 2.2 `internal/ui` の投稿・確認画面の既存テストが、テンプレートの変更後も通ることを確認する
-  （スタブ `Editor` が固定文字列を返す Scenario はテンプレートに依存しないので、期待値の書き換えが要らないことを
-  `go test ./internal/ui` で確かめる）
+- [ ] 2.1 `internal/action/template.go` に引用ブロックを作る非公開関数を足す。マーカーだけの行・`blocked-by:` 行・
+  `unblock-when:` 行を落とし、残った行のマーカーを `[routine マーカー]` に置き換え、各行の行末の空白を落として
+  `> ` を前に付け（空行は `>` の 1 文字）、末尾に連なる `>` だけの行を落とす。マーカーの文字列は
+  `internal/action/action.go` の定数を使い、この関数で定義し直さない
+- [ ] 2.2 `AnswerTemplate` を「引用ブロック + 空行 1 行 + 回答行」に組み替え、引用する条件（末尾のコメントが `AI`・
+  質問がパースできるか `blocked-by:` 行を持つ・写して残る行が 1 行以上）を入れる。回答行の作り方と、
+  最新の `AI` コメントを選ぶ規則は変えない
+- [ ] 2.3 `internal/action/template_test.go` に `answer-action`「回答テンプレートは…」の Scenario 10 件を足す。
+  上流の書式・mvp.md の書式・blocked-by だけ・行の途中のマーカーの 4 件は戻り値の完全一致で、
+  残りは性質（`HasRoutineMarker` が false / 引用ブロックと回答行の間の空行が 1 行 / 引用が付かない）で検証する
+  （完全一致だけで書くと、区切りの 1 行を間違えたときに全件が同時に落ちて原因が読めない）
 
-## 3. 利用者向けの説明
+## 3. 引用だけの本文を投稿しない
 
-- [ ] 3.1 `README.md` の「回答（`a`）」の節（`README.md:158-160`）に、質問文と選択肢が `>` 付きの引用として
-  テンプレートの先頭に入ること、引用が入るのは `## Q1.` 形式の質問コメントと `blocked-by:` 行を持つコメントだけで
-  あること、引用を消さずに投稿すると引用もコメントの一部として GitHub に出ることを足す
+- [ ] 3.1 `internal/action/action.go` に `IsBlankAnswer(body string) bool` を足し（前後の空白を除いて空でも `>` 始まりでも
+  ない行が 1 つも無ければ真）、`Comment` の空判定をこれに差し替える。`internal/action/action_test.go` に
+  `answer-action`「空の本文は投稿しない」の Scenario 3 件（空白だけ / 引用行だけ / 引用に書き足した本文）を足す
+- [ ] 3.2 `internal/ui/answer.go` の編集完了の検査（手順 2）を `action.IsBlankAnswer` に差し替え、前後の空白を除いて
+  空なら `回答を中止しました（本文が空）`、引用行が残っているなら `回答を中止しました（引用だけです）` を出す。
+  `internal/ui` のテストに `answer-question`「編集結果を検査してから投稿する」の Scenario 2 件
+  （引用だけの本文は投稿されない / 引用に書き足した本文は投稿される）を足す
 
-## 4. 確認
+## 4. エディタに渡る初期テキスト
 
-- [ ] 4.1 `gofmt -l .` の出力が空で、`go build ./... && go vet ./... && go test ./...` が通ることを確認する
-- [ ] 4.2 `golangci-lint run` が通ることを確認する
-- [ ] 4.3 `openspec validate s34-answer-template-quote --strict` が通ることを確認する
+- [ ] 4.1 `internal/ui` の `a` のテストで、`answer-question`「`a` は画面の対象を決めて…」の Scenario 5 件を通す。
+  キュー画面のスタブ `Editor` が受け取る `initial` を上流の書式の引用付き（`> ### Q1. 分けるか` から `Q1: A` まで）で
+  検証し、対象の検証は別の Scenario に分ける。`example` の issue 108・PR 131・issue 140 では空文字列のままで
+  あることも検証する
+
+## 5. 利用者向けの説明
+
+- [ ] 5.1 `README.md` の「回答（`a`）」の節（`README.md:158-160`）を書き直す。質問文と選択肢が `>` 付きの引用として
+  テンプレートの先頭に入ること、引用が入るのは最新のコメントが routine の問い（`Q<n>.` の見出し、または
+  `blocked-by:` 行を持つ）のときだけであること、引用を消さずに投稿すると引用もコメントの一部として GitHub に
+  出ること、引用だけのまま閉じると投稿されないことを書く
+
+## 6. 確認
+
+- [ ] 6.1 `gofmt -l .` の出力が空で、`go build ./... && go vet ./... && go test ./...` が通ることを確認する
+- [ ] 6.2 `golangci-lint run` が通ることを確認する
+- [ ] 6.3 `openspec validate s34-answer-template-quote --strict` が通ることを確認する
