@@ -6,11 +6,13 @@ Refs #43
 
 分類は `internal/classify` の純粋関数 3 つで行う。`Issue()` / `PR()` が human-turn-signals.md の判定表を要素 1 件に当て、`Card()` が Issue と open PR 群の結果から最上位の局面を `Card.Result` に置く。`Card()` は `in-progress` を候補から外すので、要素が `in-progress` になればカードはそれに引っ張られない。
 
-分類は `fetch.Fetch` が 1 回の取得の最後に呼ぶ。`Fetch` は `time` を import しているが（`CallTimeout`）、壁時計は読まない。取得の完了時刻は `internal/ui` の `fetchCmd` が `time.Now()` で記録し、ヘッダの `↻ HH:MM` と経過列 `Elapsed(at, updatedAt)` の基準にしている。`internal/ui` の `Model` は壁時計を読まない（`refresh.go`、`model.go` のコメント）。
+分類は `fetch.Fetch` が 1 回の取得の最後に呼ぶ。s32 以降、`Fetch(ctx, client, repos, now)` と `Card(c, mode, now)` と `PR(pr, mode, now)` は取得時刻 `now` を引数で受け取り、`PR()` が進行中の規則 2 / 3 / 7 の時間切れ（3 時間）に使う。`Fetch` も `Card()` も壁時計は読まず、`cmd/loop-cli` の `Fetcher` の閉包が呼ぶたびに `time.Now()` を渡す。運用方式は s30-mode-from-labels 以降 `Fetch` がラベル一覧から判定し、`Result.Modes` に入れる。
 
 「その他」（`other`）は判定表のフォールバックで、open PR がどの行にも当たらないとき、および issue に `question` と `blocked` があるのに B に当たらないときに出る。優先度 6・今やるタブ・種別「その他」で、色は付かない。
 
-`config.yml` は `internal/config` が読む。`repos` 以外は省略でき、既定値は `Load` が埋める。未知のキーはエラー。onboarding の `Marshal` は 5 キーを固定順で書き、`refresh_interval_sec` は聞かずに `120` を書く。
+`config.yml` は `internal/config` が読む。`repos` 以外は省略でき、既定値は `Load` が埋める。未知のキーはエラー。onboarding の `Marshal` は 5 キーを固定順で書き、`refresh_interval_sec` は聞かずに `120` を書く。`docs/mvp` は凍結されており（CLAUDE.md）、設定ファイルの例は更新しない。利用者向けの説明は README が持つ。
+
+`label` 方式では、s30-mode-from-labels が「open PR は全件今やるに出し、進行中には 1 件も入れない」と決めている（human-turn-classify「方式が label の入力は…open PR を全件今やるに出す」）。
 
 ## Goals / Non-Goals
 
@@ -24,6 +26,8 @@ Refs #43
 **Non-Goals:**
 
 - 「その他になった時刻」をローカルに記録すること（proposal「経過時間の起点」）
+- `label` 方式の PR に猶予を当てること（全件今やるに出す決定を覆さない）
+- `docs/mvp` の更新（凍結）
 - `other` に落ちる理由（checks 待ち・未確定 N 件・ラベル無し）を要約に書き分けること。判断材料として有用だが、この change の目的（一過性のその他を人の目から外す）とは別の改善で、`Issue()` / `PR()` の変更を伴う
 - 取得と取得の間に、時間経過だけで行をタブ間で動かすこと（分類は取得のたびに行う。下記 Risks）
 - onboarding のフォームで `other_grace_min` を聞くこと
@@ -32,10 +36,10 @@ Refs #43
 
 ### D1. 猶予は `Card()` が要素の結果に対して適用し、`Issue()` / `PR()` は変えない
 
-`Card(c model.Card, mode model.Mode, now time.Time, grace time.Duration) model.Card` にする。`Card()` は今までどおり `Issue()` / `PR()` で各要素の `Result` を埋めたあと、`State` が `OPEN` の PR ごとに次を当てる。
+`Card(c model.Card, mode model.Mode, now time.Time, grace time.Duration) model.Card` にする（`now` は s32 で既にある。`grace` を足す）。`Card()` は今までどおり `Issue()` / `PR()` で各要素の `Result` を埋めたあと、`mode` が `sdd` のとき、`State` が `OPEN` の PR ごとに次を当てる。
 
 - `Result.Situation` が `other`、かつ `grace > 0`、かつ PR の `UpdatedAt` が取得できていて（ゼロ値以外）、かつ `now.Sub(UpdatedAt) < grace` なら、その PR の `Result` を `in-progress` に置き換える。要約は `PR #<n> はどの局面にも当たらない（更新から <M>m は様子見）`。`<M>` は `grace` を分に切り捨てた整数
-- それ以外の PR と、`Issue` は触らない
+- それ以外の PR と、`Issue` は触らない。`mode` が `label` なら何も当てない
 
 issue の `other` を対象にしない理由: issue が `other` になるのは `question` と `blocked` があるのに `Comments` が nil または空のときだけで、`Comments` が nil になるのは詳細取得に失敗したときだけ（human-turn-classify「入力の前提」）。これは取得の欠損であり、本来は B（人待ち・優先度 2）の取りこぼしである。routine の途中という本 change の動機に当たらない。既存の spec も「進行中に落とすと人待ちの issue が見えなくなる」と MUST の根拠に書いている。隠す根拠が無い。
 
@@ -43,21 +47,19 @@ issue の `other` を対象にしない理由: issue が `other` になるのは
 
 判定表の関数を変えない理由は 2 つある。`Issue()` / `PR()` は「GitHub の状態だけで決まる」判定表そのもので、時間を入れると fixture の期待値表（V-1）が取得時刻に依存する。もう 1 つは、人が `other` の意味（どの行にも当たらない）を読むとき、時間の条件が混ざっていない方が追いやすい。
 
-- 代替案: `Issue()` / `PR()` に `now` / `grace` を渡す。シグネチャの変更が 3 関数に広がり、fixture テストが `now` を固定する必要が出る。得るものが無い
+- 代替案: `PR()` に `grace` も渡し、フォールバックの手前で猶予を見る。`PR()` は s32 で `now` を持つので技術的には可能だが、`PR()` の `other` は「どの行にも当たらない」という判定表の結論であり、そこに表示の都合を混ぜると fixture の期待値表（`PR()` を直接呼ぶ）が猶予にも依存する。`Card()` に置けば `PR()` の結論は変わらない
 - 代替案: `internal/ui` の `buildRows` でタブを振り分け直す。`Card.Result.Tab` と実際のタブが食い違い、`addedNow`（`Card.Result.Tab` を見る）と表示がずれる。分類の結果はすべて `Result` に閉じるという s05 / s07 の形を崩す
 - 代替案: 新しい `Situation`（例 `settling`）を足す。`Priority()` / `Tab()` / `Kind()` と s08 の色表・優先記号の表に 1 行ずつ足すことになるが、表示は `in-progress` と同じ（進行中タブ・色なし・記号なし）なので、区別する値を持つ理由が無い。要約で区別できる
 
 カードの要約への影響: `fallbackSummary` は候補が無いとき先頭の open PR の要約を採るので、「`wip` の issue + 猶予中の PR」のカードは進行中タブで `PR #<n> はどの局面にも当たらない（更新から 30m は様子見）` が見出しになる。この change の前は同じカードが `other` として今やるタブに出ていたので、見出しの変化は今やるから外す判断の帰結である。要約が PR 番号と理由を含むので、カード詳細で issue の状態は読める。この帰結は Scenario で固定する。
 
-### D2. 取得時刻と猶予は `Fetch` の引数で受け取り、`Fetch` は壁時計を読まない
+### D2. 猶予は `Fetch` の引数で受け取り、`now` と一緒に `classify.Card` へ渡す
 
-`Fetch(ctx context.Context, client gh.GHClient, repos []string, modes map[string]model.Mode, now time.Time, grace time.Duration) (*Result, error)` にし、`classify.Card` の呼び出しへそのまま渡す。`cmd/loop-cli` の `Fetcher` の閉包が呼ぶたびに `time.Now()` を渡す。
-
-`Fetch` が自分で `time.Now()` を読むと、`fetch_test.go` で猶予内の挙動を検証するには fixture の `UpdatedAt` を実行時刻に合わせて書き直す必要が出る。引数なら fixture の `UpdatedAt` に近い `now` を渡すだけでよい。
+`Fetch(ctx context.Context, client gh.GHClient, repos []string, now time.Time, grace time.Duration) (*Result, error)` にし、`classify.Card` の呼び出しへそのまま渡す。`now` は s32 が既に引数にしているので、`grace` を隣に足すだけである。`Fetch` は壁時計を読まない（s32 と同じ）。
 
 `grace` は `time.Duration` で受け取る。`internal/fetch` / `internal/classify` は `internal/config` を import しない（既存の方針）ので、分から `Duration` への変換は `cmd/loop-cli` が行う（`RefreshInterval` と同じ）。
 
-- 代替案: `Fetch` の引数を struct にまとめる。`modes` を含めて呼び出し側と spec の書き換えが増える。引数 2 つの追加で足りる
+- 代替案: `Fetch` の引数を struct にまとめる。呼び出し側と spec の書き換えが増える。引数 1 つの追加で足りる
 - 代替案: `now` と `grace` を 1 つの `cutoff time.Time`（`UpdatedAt.After(cutoff)` なら猶予内）にまとめる。判定は 1 式になるが、猶予なし（`grace` 0）を表す `cutoff` が無い（ゼロ値は「すべて猶予内」、`now` は「未来の `UpdatedAt` だけ猶予内」になる）ので、結局 `grace` 0 の分岐が要る。要約の `<M>` も出せなくなる
 
 ### D3. 猶予の起点は要素の `UpdatedAt`
@@ -84,10 +86,9 @@ onboarding の `Marshal` は書かない。`Load` が既定を埋めるので、
 
 ### D6. docs の更新
 
-- `human-turn-signals.md`「その他」バケットの段落に、猶予の規則（`UpdatedAt` から `other_grace_min` 分未満は進行中に出す。超えたら今やるに出す。`0` で無効）を足し、変更履歴に 1 行足す。この文書は分類器の正本なので、コードより先に直す
-- `mvp.md` 設定ファイルの例に `other_grace_min: 30` を足し、変更履歴に 1 行足す
-- `decisions.md` に D-005 として「その他の PR に最終更新からの時間猶予を入れる。起点は GitHub の `updatedAt` で、ローカルに履歴を持たない」を足す。D-001（GitHub の状態だけで分類する）の性格を変える判断なので、決定として残す
+- `human-turn-signals.md`「その他」バケットの段落に、猶予の規則（sdd の PR で `UpdatedAt` から `other_grace_min` 分未満は進行中に出す。以上なら今やるに出す。`0` で無効。label には当てない）を足し、変更履歴に 1 行足す。この文書は分類器の正本なので、コードより先に直す
 - `README.md` の設定表と例に `other_grace_min` を足す
+- `docs/mvp` は凍結されているので触らない（CLAUDE.md）。起点を `updatedAt` にする判断の記録は proposal と human-turn-signals.md が持つ
 
 ## Risks / Trade-offs
 
@@ -106,7 +107,7 @@ docs/mvp と docs/domain が沈黙している点。実装者が選ぶ既定値�
 - **`UpdatedAt` がゼロ値のとき**: 既定値は猶予を当てず `other` のまま（D3）
 - **`now` が `UpdatedAt` より前のとき**: 既定値は猶予内（D3）
 - **`other_grace_min` の型と境界**: 既定値は整数の分、`0` 以上、既定 30（D4）
-- **`Card()` / `Fetch` の引数の形**: 既定値は位置引数 `now time.Time, grace time.Duration` の追加（D1 / D2）
+- **`Card()` / `Fetch` の引数の形**: 既定値は既存の `now time.Time` の隣に位置引数 `grace time.Duration` を足す（D1 / D2）
 
 ## Open Questions
 
