@@ -36,7 +36,7 @@
 ## 7. ドキュメント
 
 - [ ] 7.1 README の設定ファイルの表に `claude_config_dir` を足し、設定例に 1 行足す。「再取得（`R`）」の節を詳細画面の振る舞いで書き直し、カード詳細 / PR 詳細の節に右ペインの説明を足す。前の版に戻すときは `claude_config_dir` の行を消す必要があることも書く
-- [ ] 7.2 `docs/mvp/mvp.md` のキーバインド表の `R` の行、「設定ファイル」節、カード詳細 / PR 詳細の画面の説明を直し、変更履歴の先頭に `#18・s31-session-pane` の 1 行を足す
+- [ ] 7.2 `docs/mvp` を触っていないことを `git diff origin/main --stat` で確認する（CLAUDE.md「`docs/mvp` はこれ以降更新しない」。キーバインド表と設定ファイルの記述は README と `openspec/specs/` だけで保つ）
 
 ## 8. 通し確認
 
