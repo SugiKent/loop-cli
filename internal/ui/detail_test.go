@@ -381,7 +381,8 @@ func TestHeaderWithTwoStagesAndBadges(t *testing.T) {
 }
 
 func TestPRListOfIssue108(t *testing.T) {
-	m, _ := send(detailModel(120, 40, exampleResult(t).Cards), enterKey)
+	// 幅 161 は左ペインが 120 列になる幅（s31 で幅 120 以上は 2 ペインになった）。
+	m, _ := send(detailModel(161, 40, exampleResult(t).Cards), enterKey)
 	lines := linesOf(m)
 
 	row, ok := lineWith(lines, "[propose] PR#131")
@@ -522,7 +523,7 @@ func TestCommentsFetchFailed(t *testing.T) {
 func TestPRListFetchFailed(t *testing.T) {
 	issue := &model.Issue{Number: 501, Title: "PR の詳細が取れないカード", UpdatedAt: at}
 	card := issueCard(issue, []model.PR{prOf(131, "OPEN", []string{model.LabelPropose})}, "確認する")
-	m, _ := send(detailModel(120, 40, []model.Card{card}), enterKey)
+	m, _ := send(detailModel(161, 40, []model.Card{card}), enterKey)
 
 	row, ok := lineWith(linesOf(m), "[propose] PR#131")
 	if !ok {
@@ -532,7 +533,7 @@ func TestPRListFetchFailed(t *testing.T) {
 }
 
 func TestAICommentIsCollapsedAndExpandedByX(t *testing.T) {
-	m, _ := send(detailModel(120, 40, exampleResult(t).Cards), enterKey)
+	m, _ := send(detailModel(161, 40, exampleResult(t).Cards), enterKey)
 
 	lines := linesOf(m)
 	if _, ok := lineWith(lines, "▌AI  18:00  Q1: セッションの寿命は何日にしますか。  (+1 行)"); !ok {
@@ -835,5 +836,48 @@ func TestShortTerminalDropsPRList(t *testing.T) {
 	}
 	if len(lines) != 7 {
 		t.Errorf("行数 = %d, want 7", len(lines))
+	}
+}
+
+func TestWideTerminalShowsSessionPane(t *testing.T) {
+	m, _ := send(detailModel(120, 40, exampleResult(t).Cards), enterKey)
+	lines := plain(m)
+
+	head, ok := lineWith(lines, "org/app #108")
+	if !ok {
+		t.Fatalf("ヘッダ行が無い:\n%s", strings.Join(lines, "\n"))
+	}
+	if n := strings.Count(head, "│"); n != 1 {
+		t.Fatalf("ヘッダ行の縦の区切り線が %d 本: %q", n, head)
+	}
+	if _, right, _ := strings.Cut(head, "│"); !strings.Contains(right, "Claude セッション") {
+		t.Errorf("縦の区切り線の右に Claude セッションが無い: %q", head)
+	}
+
+	sep, ok := lineWith(lines, "──")
+	if !ok {
+		t.Fatal("横の区切り線が無い")
+	}
+	if w := ansi.StringWidth(sep); w != 79 {
+		t.Errorf("横の区切り線の行の表示幅 = %d, want 79", w)
+	}
+	if w := ansi.StringWidth(lines[len(lines)-1]); w != 120 {
+		t.Errorf("フッタの行の表示幅 = %d, want 120", w)
+	}
+}
+
+func TestWidth119HidesSessionPane(t *testing.T) {
+	m, _ := send(detailModel(119, 40, exampleResult(t).Cards), enterKey)
+	lines := plain(m)
+
+	if strings.Contains(strings.Join(lines, "\n"), "Claude セッション") {
+		t.Error("幅 119 で右ペインが出ている")
+	}
+	sep, ok := lineWith(lines, "──")
+	if !ok {
+		t.Fatal("横の区切り線が無い")
+	}
+	if w := ansi.StringWidth(sep); w != 119 {
+		t.Errorf("横の区切り線の行の表示幅 = %d, want 119", w)
 	}
 }

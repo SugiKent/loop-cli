@@ -11,7 +11,7 @@ import (
 	"github.com/SugiKent/loop-cli/internal/model"
 )
 
-// urlItem は一覧の 1 件。source は出典の語（本文 / コメント / thread）。
+// urlItem は一覧の 1 件。source は出典の語（session / 本文 / コメント / thread）。
 type urlItem struct {
 	source string
 	text   string
@@ -38,7 +38,9 @@ func (m Model) urlKey() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	items := collectURLs(issue, pr)
+	// 右ペインのセッションが決まっていれば先頭に置く（キュー画面では sessionID が決まらない）。
+	sessionID, _ := m.sessionID()
+	items := collectURLs(sessionID, issue, pr)
 	if len(items) == 0 {
 		m.writeStatus, m.writeStatusErr = "URL がありません", false
 		return m, nil
@@ -65,19 +67,27 @@ func (m Model) urlTarget() (*model.Issue, *model.PR, bool) {
 	return issue, pr, true
 }
 
-// collectURLs は対象から 本文 → コメント → review thread の順に URL を集め、重複を初出だけ残す。
+// collectURLs はセッションの URL（あれば）を先頭に置き、続けて対象から
+// 本文 → コメント → review thread の順に URL を集め、重複を初出だけ残す。
+// セッションを先頭に置くので、PR 本文に同じ URL があっても出典は session になる。
 // Comments / ReviewThreads が nil（詳細の取得失敗）のときは、その収集元を飛ばす。
-func collectURLs(issue *model.Issue, pr *model.PR) []urlItem {
+func collectURLs(sessionID string, issue *model.Issue, pr *model.PR) []urlItem {
 	var items []urlItem
 	seen := map[string]bool{}
+	addOne := func(source, text, url string) {
+		if seen[url] {
+			return
+		}
+		seen[url] = true
+		items = append(items, urlItem{source: source, text: text, url: url})
+	}
 	add := func(source, body string) {
 		for _, l := range model.ParseLinks(body) {
-			if seen[l.URL] {
-				continue
-			}
-			seen[l.URL] = true
-			items = append(items, urlItem{source: source, text: l.Text, url: l.URL})
+			addOne(source, l.Text, l.URL)
 		}
+	}
+	if sessionID != "" {
+		addOne("session", "", sessionURL(sessionID))
 	}
 	switch {
 	case issue != nil:

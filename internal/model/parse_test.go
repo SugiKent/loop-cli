@@ -257,3 +257,32 @@ func TestUnblockWhen(t *testing.T) {
 		t.Errorf("UnblockWhen = %q, %v; want \"\", false", got, ok)
 	}
 }
+
+func TestSessionURLID(t *testing.T) {
+	body := "進行中です。\nhttps://claude.ai/code/session_01N9YWTYcwFdwhLD38CdASgA で見られます。\n" +
+		"前の回は https://claude.ai/code/session_01OLD でした。"
+	if got, ok := SessionURLID(body); !ok || got != "session_01N9YWTYcwFdwhLD38CdASgA" {
+		t.Errorf("SessionURLID = %q, %v; want session_01N9YWTYcwFdwhLD38CdASgA, true", got, ok)
+	}
+	if got, ok := SessionURLID("URL の無い本文"); ok || got != "" {
+		t.Errorf("SessionURLID = %q, %v; want \"\", false", got, ok)
+	}
+}
+
+func TestLatestSessionID(t *testing.T) {
+	comments := []Comment{
+		{Body: "<!-- routine -->\nstarted: 2026-09-11T06:24:00Z\nsession: session_01AAA"},
+		{Body: "人のコメント"},
+		{Body: "&lt;!-- routine --&gt;\nsession: session_01BBB"},
+	}
+	if got, ok := LatestSessionID(comments); !ok || got != "session_01BBB" {
+		t.Errorf("LatestSessionID = %q, %v; want session_01BBB, true", got, ok)
+	}
+}
+
+func TestLatestSessionIDIgnoresHumanComment(t *testing.T) {
+	comments := []Comment{{Body: "session: session_01CCC と書いてあるだけの人のコメント"}}
+	if got, ok := LatestSessionID(comments); ok || got != "" {
+		t.Errorf("LatestSessionID = %q, %v; want \"\", false", got, ok)
+	}
+}

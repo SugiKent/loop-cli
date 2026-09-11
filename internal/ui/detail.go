@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/SugiKent/loop-cli/internal/classify"
@@ -83,7 +84,9 @@ func (m Model) openDetail() Model {
 }
 
 // updateDetailKey は詳細画面のキーを扱う（q / Ctrl+C は Update が先に処理する）。
-func (m Model) updateDetailKey(key string) Model {
+// 詳細から詳細へ移る enter / g だけが、移った先のセッションの取得のコマンドを返す。
+func (m Model) updateDetailKey(key string) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 	switch key {
 	case "j", "down":
 		m.detail.vp.ScrollDown(1)
@@ -124,14 +127,15 @@ func (m Model) updateDetailKey(key string) Model {
 		}
 		m.refreshDetail()
 		m.detail.vp.GotoTop()
+		cmd = m.sessionOnOpenCmd()
 	}
-	return m
+	return m, cmd
 }
 
 // refreshDetail は本文領域の内容と大きさを作り直す。View では作らない（Glamour を毎フレーム呼ばない）。
 func (m *Model) refreshDetail() {
 	_, bodyH := m.detailHeader()
-	m.detail.vp.SetWidth(max(m.width, 0))
+	m.detail.vp.SetWidth(m.leftWidth())
 	m.detail.vp.SetHeight(bodyH)
 	if m.screen == screenPR {
 		m.detail.vp.SetContentLines(m.prBodyLines())
@@ -162,7 +166,7 @@ func (m Model) detailHeader() ([]string, int) {
 		header = append(header[:titleLines-drop], header[titleLines:]...)
 		// 折り返し済みの行は幅以下なので Truncate は … を付けない。1 列空けて明示的に付ける。
 		last := titleLines - drop - 1
-		header[last] = ansi.Truncate(header[last], max(m.width-1, 0), "") + "…"
+		header[last] = ansi.Truncate(header[last], max(m.leftWidth()-1, 0), "") + "…"
 	}
 	return header, max(m.height-2-len(header), 1)
 }
@@ -172,7 +176,7 @@ func (m Model) detailHeader() ([]string, int) {
 func (m Model) cardHeaderLines() ([]string, int) {
 	card := m.detail.card
 	issue := card.Issue
-	title := wrapTitle(fmt.Sprintf("%s #%d  ", issue.Repo, issue.Number), issue.Title, m.width)
+	title := wrapTitle(fmt.Sprintf("%s #%d  ", issue.Repo, issue.Number), issue.Title, m.leftWidth())
 	lines := title
 	if card.Result.Summary != "" {
 		lines = append(lines, card.Result.Summary)
@@ -291,7 +295,7 @@ func prState(state string) string {
 // cardBodyLines は Issue 本文・最新 blocked-by の要約・コメント時系列を並べる。
 func (m Model) cardBodyLines() []string {
 	issue := m.detail.card.Issue
-	lines := renderMarkdown(issue.Body, m.width)
+	lines := renderMarkdown(issue.Body, m.leftWidth())
 	if c, value, ok := model.LatestBlockedBy(issue.Comments); ok {
 		lines = append(lines, "blocked-by: "+value)
 		if value == "human" {
@@ -344,7 +348,7 @@ func (m Model) commentSection(comments []model.Comment) []string {
 	}
 	var lines []string
 	for _, c := range comments {
-		lines = append(lines, commentBlock(c.Author, c.Body, c.CreatedAt, c.AI, m.location(), m.width, m.detail.expanded)...)
+		lines = append(lines, commentBlock(c.Author, c.Body, c.CreatedAt, c.AI, m.location(), m.leftWidth(), m.detail.expanded)...)
 	}
 	return lines
 }
@@ -361,7 +365,7 @@ func (m Model) prHeaderLines() ([]string, int) {
 	if st := model.PRStages(prMode, pr.Labels); len(st) > 0 {
 		stage = st[0]
 	}
-	title := wrapTitle(fmt.Sprintf("%s PR#%d  ", pr.Repo, pr.Number), pr.Title, m.width)
+	title := wrapTitle(fmt.Sprintf("%s PR#%d  ", pr.Repo, pr.Number), pr.Title, m.leftWidth())
 	labels := fmt.Sprintf("[%s] %s  labels: %s", stage, prState(pr.State), strings.Join(pr.Labels, " "))
 	return append(title, labels), len(title)
 }
@@ -381,7 +385,7 @@ func (m Model) prBodyLines() []string {
 		lines = append(lines, "紐づく issue: なし")
 	}
 	lines = append(lines, checkLines(pr.MergeState)...)
-	lines = append(lines, renderMarkdown(pr.Body, m.width)...)
+	lines = append(lines, renderMarkdown(pr.Body, m.leftWidth())...)
 	lines = append(lines, m.commentSection(pr.Comments)...)
 	return append(lines, m.reviewThreadLines(pr.ReviewThreads)...)
 }
@@ -429,7 +433,7 @@ func (m Model) reviewThreadLines(threads []gh.ReviewThread) []string {
 		}
 		lines = append(lines, head)
 		for _, c := range th.Comments {
-			lines = append(lines, commentBlock(c.Author.Login, c.Body, c.CreatedAt, model.IsAI(c.Body), m.location(), m.width, true)...)
+			lines = append(lines, commentBlock(c.Author.Login, c.Body, c.CreatedAt, model.IsAI(c.Body), m.location(), m.leftWidth(), true)...)
 		}
 	}
 	return lines

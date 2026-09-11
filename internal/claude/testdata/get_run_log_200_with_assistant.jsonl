@@ -1,0 +1,6 @@
+{"type": "system", "subtype": "init", "session_id": "loc_01XXXX", "model": "claude-haiku-4-5-20251001", "tools": ["RemoteTrigger"]}
+{"type": "assistant", "message": {"id": "msg_01XXXX", "role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01XXXX", "name": "RemoteTrigger", "input": {"action": "get_run_log", "session_id": "session_01XXXXXXXXXXXXXXXXXXXXXX"}}]}}
+{"type": "assistant", "message": {"id": "msg_02XXXX", "role": "assistant", "content": [{"type": "text", "text": "RemoteTrigger を呼びます。無視すべき地の文がここに入ります"}]}}
+{"type": "user", "message": {"role": "user", "content": [{"tool_use_id": "toolu_01XXXX", "type": "tool_result", "content": "HTTP 200\n{\"session_id\": \"session_01XXXXXXXXXXXXXXXXXXXXXX\", \"events_fetched\": 200, \"events_shown\": 200, \"next_cursor\": \"evt_01XXXX\"}\n[2026-09-10T12:05:00Z] result: success is_error=false turns=110 duration=1168s — CI が緑になりました\n[2026-09-10T12:04:00Z] tool_use Bash: go test ./...\n[2026-09-10T12:00:00Z] env[info]: 環境を起動しました"}]}}
+{"type": "assistant", "message": {"id": "msg_02XXXX", "role": "assistant", "content": [{"type": "text", "text": "done"}]}}
+{"type": "result", "subtype": "success", "is_error": false, "duration_ms": 4712, "num_turns": 2, "total_cost_usd": 0.0151, "result": "done"}

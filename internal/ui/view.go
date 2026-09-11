@@ -76,15 +76,38 @@ func (m Model) render() string {
 }
 
 // renderDetail は詳細画面を ヘッダ領域 / 区切り線 / 本文領域 / フッタ の順に描く。
+// 端末幅が 120 以上なら左右 2 ペインにし、右にセッションの稼働状況を出す（s31 card-detail）。
 func (m Model) renderDetail() string {
+	leftW := m.leftWidth()
 	header, _ := m.detailHeader()
-	lines := make([]string, 0, len(header)+2)
+	left := make([]string, 0, len(header)+2)
 	for _, l := range header {
-		lines = append(lines, ansi.Truncate(l, m.width, "…"))
+		left = append(left, ansi.Truncate(l, leftW, "…"))
 	}
-	lines = append(lines, strings.Repeat("─", max(m.width, 0)))
-	lines = append(lines, strings.Split(m.detail.vp.View(), "\n")...)
+	left = append(left, strings.Repeat("─", max(leftW, 0)))
+	left = append(left, strings.Split(m.detail.vp.View(), "\n")...)
+
+	lines := left
+	if m.twoPane() {
+		lines = joinPanes(left, m.sessionPaneLines(len(left)), leftW)
+	}
+	// フッタは 2 ペインでも 1 行で端末の幅の全体を使う（ヒントとステータスは画面に 1 組しかない）。
 	return strings.Join(append(lines, m.footer(m.detailHint())), "\n")
+}
+
+// joinPanes は左ペインの各行の右に縦の区切り線と右ペインの行を並べる。
+// 右ペインの行が尽きた後は左ペインの行だけを出す（横の区切り線がそこに当たれば、
+// その行は左ペインの幅でちょうど閉じる）。
+func joinPanes(left, right []string, leftW int) []string {
+	out := make([]string, len(left))
+	for i, l := range left {
+		if i >= len(right) {
+			out[i] = l
+			continue
+		}
+		out[i] = pad(l, leftW) + "│" + right[i]
+	}
+	return out
 }
 
 // queueHint はキュー画面のフッタ左。
