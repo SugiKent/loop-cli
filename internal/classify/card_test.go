@@ -235,3 +235,11 @@ func TestCardWipIssueWithSettlingPRUsesPRSummary(t *testing.T) {
 		t.Errorf("Summary = %q, want %q（候補が無いので先頭 open PR の要約）", got.Result.Summary, want)
 	}
 }
+
+func TestCardSettlesPRWhenNowIsBeforeUpdatedAt(t *testing.T) {
+	got := Card(model.Card{PRs: []model.PR{otherPR(61, -time.Minute)}}, model.ModeSDD, graceNow, 30*time.Minute)
+
+	if got.Result.Situation != model.SituationInProgress {
+		t.Errorf("Card.Result.Situation = %q, want in-progress（now が UpdatedAt より前なら猶予内）", got.Result.Situation)
+	}
+}

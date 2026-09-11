@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/SugiKent/loop-cli/internal/classify"
 	"github.com/SugiKent/loop-cli/internal/fetch"
 	"github.com/SugiKent/loop-cli/internal/model"
 	"github.com/SugiKent/loop-cli/internal/snapshot"
@@ -87,14 +88,17 @@ func TestAddedNowCountsSubjectChange(t *testing.T) {
 // TestAddedNowCountsSettledOtherBecomingNow は、猶予（s30）で進行中に置かれていた
 // その他の PR が猶予明けに今やるタブへ現れたとき、差分が「増えた」と数えることを確かめる。
 func TestAddedNowCountsSettledOtherBecomingNow(t *testing.T) {
-	settling := model.Result{Situation: model.SituationInProgress, Priority: 7, Tab: model.TabInProgress, Summary: "PR #61 はどの局面にも当たらない（更新から 30m は様子見）"}
-	other := model.Result{Situation: model.SituationOther, Priority: 6, Tab: model.TabNow, Summary: "PR #61 はどの局面にも当たらない"}
-	cardWith := func(r model.Result) model.Card {
-		pr := model.PR{Repo: "org/app", Number: 61, Title: "手書き PR", State: "OPEN", UpdatedAt: at, Result: r}
-		return model.Card{PRs: []model.PR{pr}, Result: r}
+	// 分類そのものを通す。猶予の実装が壊れたらこのテストも落ちる。
+	card := model.Card{PRs: []model.PR{{Repo: "org/app", Number: 61, Title: "手書き PR", State: "OPEN", UpdatedAt: at}}}
+	grace := 30 * time.Minute
+	prev := classify.Card(card, model.ModeSDD, at.Add(10*time.Minute), grace)
+	next := classify.Card(card, model.ModeSDD, at.Add(31*time.Minute), grace)
+
+	if prev.Result.Tab != model.TabInProgress || next.Result.Tab != model.TabNow {
+		t.Fatalf("前提が崩れています: prev.Tab = %q, next.Tab = %q", prev.Result.Tab, next.Result.Tab)
 	}
 
-	added := addedNow([]model.Card{cardWith(settling)}, []model.Card{cardWith(other)})
+	added := addedNow([]model.Card{prev}, []model.Card{next})
 
 	if len(added) != 1 {
 		t.Fatalf("増えたカード = %d 枚, want 1: %+v", len(added), added)

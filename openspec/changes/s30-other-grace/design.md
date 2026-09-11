@@ -36,6 +36,7 @@ Refs #43
 
 - `Result.Situation` が `other`、かつ `grace > 0`、かつ PR の `UpdatedAt` が取得できていて（ゼロ値以外）、かつ `now.Sub(UpdatedAt) < grace` なら、その PR の `Result` を `in-progress` に置き換える。要約は `PR #<n> はどの局面にも当たらない（更新から <M>m は様子見）`。`<M>` は `grace` を分に切り捨てた整数
 - それ以外の PR と、`Issue` は触らない
+- `mode` が `label`（ILD）のカードには猶予を当てない。`human-turn-classify`「方式が label の入力は…」が「`label` のリポジトリの open PR は全件が `[1]今やる` に並び、`[3]進行中` には 1 件も入らない」と定めており、ILD は 1 issue = 1 PR を人が捌く方式で checks 待ちの PR も日常的に `other` になる。猶予の動機は sdd の状態機械の話なので、ILD には当たらない
 
 issue の `other` を対象にしない理由: issue が `other` になるのは `question` と `blocked` があるのに `Comments` が nil または空のときだけで、`Comments` が nil になるのは詳細取得に失敗したときだけ（human-turn-classify「入力の前提」）。これは取得の欠損であり、本来は B（人待ち・優先度 2）の取りこぼしである。routine の途中という本 change の動機に当たらない。既存の spec も「進行中に落とすと人待ちの issue が見えなくなる」と MUST の根拠に書いている。隠す根拠が無い。
 
@@ -52,6 +53,8 @@ issue の `other` を対象にしない理由: issue が `other` になるのは
 ### D2. 取得時刻と猶予は `Fetch` の引数で受け取り、`Fetch` は壁時計を読まない
 
 `Fetch(ctx context.Context, client gh.GHClient, repos []string, modes map[string]model.Mode, now time.Time, grace time.Duration) (*Result, error)` にし、`classify.Card` の呼び出しへそのまま渡す。`cmd/loop-cli` の `Fetcher` の閉包が呼ぶたびに `time.Now()` を渡す。
+
+（実装時の補足: `modes` 引数は s30-mode-from-labels で `Fetch` から消え、`now` は s32 で既に入っている。実際に足すのは `grace` だけで、`Fetch(ctx, client, repos, now, grace)` になる。）
 
 `Fetch` が自分で `time.Now()` を読むと、`fetch_test.go` で猶予内の挙動を検証するには fixture の `UpdatedAt` を実行時刻に合わせて書き直す必要が出る。引数なら fixture の `UpdatedAt` に近い `now` を渡すだけでよい。
 
@@ -85,7 +88,7 @@ onboarding の `Marshal` は書かない。`Load` が既定を埋めるので、
 ### D6. docs の更新
 
 - `human-turn-signals.md`「その他」バケットの段落に、猶予の規則（`UpdatedAt` から `other_grace_min` 分未満は進行中に出す。超えたら今やるに出す。`0` で無効）を足し、変更履歴に 1 行足す。この文書は分類器の正本なので、コードより先に直す
-- `mvp.md` 設定ファイルの例に `other_grace_min: 30` を足し、変更履歴に 1 行足す
+- `mvp.md` 設定ファイルの例に `other_grace_min: 30` を足し、変更履歴に 1 行足す（実装時の補足: この 2 件と下の `decisions.md` D-005 は行わない。`CLAUDE.md`「docs/mvp はこれ以降更新しない」が「設定ファイルが変わっても `docs/mvp` に書き戻さず、変更履歴の行も足さない」と定めているため。利用者向けの説明は `README.md` に置く）
 - `decisions.md` に D-005 として「その他の PR に最終更新からの時間猶予を入れる。起点は GitHub の `updatedAt` で、ローカルに履歴を持たない」を足す。D-001（GitHub の状態だけで分類する）の性格を変える判断なので、決定として残す
 - `README.md` の設定表と例に `other_grace_min` を足す
 
@@ -95,6 +98,8 @@ onboarding の `Marshal` は書かない。`Load` が既定を埋めるので、
 - **`UpdatedAt` は routine や bot の書き込みでも延びる** → 自動 rebase される Dependabot PR、bot がコメントを付け続ける PR は、base が動くたびに猶予が延び、今やるタブに出ないことがある。進行中タブには出ているので消えはしないが、「誰も触っていない」の判定に人と bot の区別は無い。区別するには `CreatedAt` の上限や著者の判定が要り、この change では入れない。実運用で bot の PR が埋もれるなら別 change で上限を足す
 - **checks が猶予より長いリポジトリでは CI 中の PR が今やるタブに出る** → `other_grace_min` を CI の所要時間より長くする（D3）
 - **猶予内に取得が失敗し続けると進行中に残る** → 取得失敗時は前回の `Cards` を維持する（D-002）ので、分類も更新されない。既存の挙動で、この change が新たに作る問題ではない
+- **`other_grace_min` を 3 時間以上にすると s32 の時間切れも飲み込む** → 猶予は `other` の由来を問わないので、`grace` が `classify.StaleAfter`（3 時間）以上のとき、規則 2 / 3 の時間切れで `other` になった PR（`PR #<n> は人のコメントに AI が応答していない`）も進行中に置かれ、要約が `どの局面にも当たらない` に変わる。既定の 30 分では起こらない。由来で分けるには `PR()` の戻り値に理由を持たせることになるので、この change では入れず境界を spec に書く
+- **bot が猶予より長い間隔で触る PR は通知が繰り返される** → `UpdatedAt` が延びるたびに 進行中 → 今やる → 進行中 を往復し、今やるに戻るたびに `addedNow` が「増えた」と数える。この change の前は一度今やるに出たら出っぱなしで通知は 1 回だった。通知済みのキーを持てば止められるが、`internal/ui` に新しい状態が要るのでここでは入れない
 - **snapshot からの起動は前回の分類のまま** → 起動直後は前回取得時の `now` で分類した結果が出る。初回取得で直る。stale 表示は D-002 が認めている
 
 ## 未決事項

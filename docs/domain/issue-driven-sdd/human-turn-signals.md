@@ -30,12 +30,13 @@ loop-cli の分類器（`internal/classify`）と action 層はこの文書を�
 分類はこの順で評価し、最初に当たった行で止める。どの行にも当たらない open PR（ラベルなし・コメントなしの PR、旧構成の `retro` PR など）は
 「その他」バケットに入れて必ず画面に出す。「進行中」に混ぜると人の出番かどうかを判別できなくなるため。消えて見えなくなる項目を作らない。
 
-ただし「その他」になった open PR のうち、最終更新（`updatedAt`）から `other_grace_min` 分（既定 30）未満のものは
+ただし issue-driven-sdd のリポジトリでは、「その他」になった open PR のうち、最終更新（`updatedAt`）から `other_grace_min` 分（既定 30）未満のものは
 `[3]進行中` に出し、猶予を超えたら今までどおり `[1]今やる` に出す。PR のその他の大半は routine の状態機械の途中
 （PR を作った直後でラベルが無い、checks が pending、`未確定の判断: N 件` が N > 0 のまま grill 中、`ai-assess:requested` が付く前）で、
 人が判断できないためである。誰も触らないまま猶予を超えたものだけが人の出番として浮上する。`other_grace_min: 0` で猶予なし。
 issue の「その他」（`question` と `blocked` があるのにコメントが取れなかったもの）は猶予の対象にしない。これは B（人待ち）の
-取りこぼしなので、人にすぐ出す。時間の判断を持つのは `Card()` だけで、判定表の行とフォールバックの意味（どの行にも当たらない）は変えない。
+取りこぼしなので、人にすぐ出す。issue-label-driven のリポジトリの PR も対象にしない（下の ILD の節のとおり open PR を全件今やるに出す）。
+猶予の判断を持つのは `Card()` だけで、判定表の行とフォールバックの意味（どの行にも当たらない）は変えない。
 
 F を「段階ラベル 2 つ以上」だけに絞った理由: `restart: 3/3` に達した issue と、`question` 付きのまま merge された propose PR は、
 どちらも dispatcher が issue に `blocked-by: human` + `question` を書くので、B として自然に浮上する。人が merge せずに close した

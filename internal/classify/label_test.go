@@ -2,6 +2,7 @@ package classify
 
 import (
 	"testing"
+	"time"
 
 	"github.com/SugiKent/loop-cli/internal/gh"
 	"github.com/SugiKent/loop-cli/internal/model"
@@ -210,6 +211,18 @@ func TestLabelModeCard(t *testing.T) {
 		}
 		if got.Result.Situation != model.SituationC {
 			t.Errorf("Card.Result = %+v, want C", got.Result)
+		}
+	})
+
+	t.Run("猶予内のその他も今やるに残る", func(t *testing.T) {
+		// ILD の open PR は全件 [1]今やる に出す（差分 7）ので、s30 の猶予を当てない。
+		now := time.Date(2026, 9, 11, 10, 0, 0, 0, time.UTC)
+		pr := model.PR{Repo: "org/board", Number: 61, State: "OPEN", UpdatedAt: now.Add(-5 * time.Minute)}
+
+		got := Card(model.Card{PRs: []model.PR{pr}}, model.ModeLabel, now, 30*time.Minute)
+
+		if got.Result.Situation != model.SituationOther || got.Result.Tab != model.TabNow {
+			t.Errorf("Card.Result = %+v, want other / 今やる", got.Result)
 		}
 	})
 

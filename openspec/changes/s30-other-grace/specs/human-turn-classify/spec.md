@@ -3,7 +3,7 @@
 ### Requirement: どの行にも当たらないものはその他バケットに入れる
 `PR()` は、進行中の規則にも判定表の行にも当たらない open PR を `Situation` `other`、`Priority` 6、`Tab` `今やる` と MUST 判定する（human-turn-signals.md: ラベルなし・コメントなしの PR、旧構成の `retro` PR など。「進行中」に混ぜると人の出番かどうかを判別できなくなる。消えて見えなくなる項目を作らない）。`in-progress` を返す規則は Requirement「キューに入れないものは進行中にする」の 7 規則だけで、それ以外の open PR を黙って落とさない。規則 2 / 3 の条件を満たしたまま時間切れになった PR も、同じ Requirement のとおり `other` にする。
 `Issue()` も、`Labels` に `question` と `blocked` の両方があるのに B に当たらない issue（`Comments` が nil または空で、最新コメントが AI か人か決められない）を `other` と MUST 判定する。この issue は本来 B か進行中の規則 4 のどちらかであり、進行中に落とすと s07 の取り忘れで人待ちの issue が見えなくなる。
-`Issue()` / `PR()` は時刻を見ない。open PR の `other` を最終更新からの猶予の間だけ進行中に置く判断は `Card()` が持つ（Requirement「Card は猶予内のその他の PR を進行中に置き換える」）。issue の `other` は `Card()` でも置き換えない（上記のとおり人待ちの取りこぼしであり、隠す根拠が無い）。
+`Issue()` / `PR()` が見る時刻は判定表の時間条件（規則 2 / 3 / 7 の時間切れ）だけで、猶予は見ない。open PR の `other` を最終更新からの猶予の間だけ進行中に置く判断は `Card()` が持つ（Requirement「Card は猶予内のその他の PR を進行中に置き換える」）。issue の `other` は `Card()` でも置き換えない（上記のとおり人待ちの取りこぼしであり、隠す根拠が無い）。
 
 #### Scenario: ラベルもコメントも無い PR
 - **WHEN** `Labels` が空、`Comments` が空、`MergeState` が nil の open PR を `PR()` に渡す
@@ -90,14 +90,17 @@
 ## ADDED Requirements
 
 ### Requirement: Card は猶予内のその他の PR を進行中に置き換える
-`Card()` は、`PR()` で埋めた `State` が `OPEN` の各 PR の `Result` について、次の 4 つをすべて満たすものを `Situation` `in-progress`、`Priority` 7、`Tab` `進行中` に MUST 置き換える（proposal: PR のその他の大半は routine の状態機械の途中であり、最終更新から一定時間誰も触っていないものだけを人に出す）。
+`Card()` は、`PR()` で埋めた `State` が `OPEN` の各 PR の `Result` について、次の 5 つをすべて満たすものを `Situation` `in-progress`、`Priority` 7、`Tab` `進行中` に MUST 置き換える（proposal: PR のその他の大半は routine の状態機械の途中であり、最終更新から一定時間誰も触っていないものだけを人に出す）。
+- `mode` が `label` でない
 - `Result.Situation` が `other`
 - `grace` が 0 より大きい
 - その PR の `UpdatedAt` がゼロ値でない（取得できている）
 - `now.Sub(UpdatedAt)` が `grace` 未満（負の値、つまり `now` が `UpdatedAt` より前の場合も含む。ちょうど `grace` は含まない）
 
+`mode` が `label` の PR を対象から外すのは、Requirement「方式が label の入力は issue-label-driven の語彙と規則で分類し、open PR を全件今やるに出す」が「`label` のリポジトリの open PR は全件が `[1]今やる` に並び、`[3]進行中` には 1 件も入らない」と定めているためである。ILD は 1 issue = 1 PR を人が捌く方式で、checks が pending の PR も日常的に `other` になる。猶予の動機（routine の状態機械の途中を隠す）は sdd の状態機械の話であり、ILD には当たらない。
+
 置き換え後の `Summary` は `PR #<n> はどの局面にも当たらない（更新から <M>m は様子見）`（`<M>` は `grace` を分に切り捨てた整数）。
-4 つのいずれかを満たさない PR は触らない。`Issue.Result` はこの置き換えの対象にしない（issue の `other` は詳細取得の失敗で B を取りこぼしたもので、routine の途中ではない）。`other` 以外の `Situation` も対象にならず、`grace` が 0 なら `Card()` の結果はこの change の前と 1 件も変わらない。置き換えは `Card.Result` を決める前に行うので、猶予内の `other` は候補にならず、他の要素がすべて `in-progress` ならカードも `in-progress` になる。`now.Sub(UpdatedAt)` が `grace` 以上になった取得では `other` に戻り、今やるタブに出る（s13 `desktop-notify` がこれを「増えた」と数える）。
+5 つのいずれかを満たさない PR は触らない。`Issue.Result` はこの置き換えの対象にしない（issue の `other` は詳細取得の失敗で B を取りこぼしたもので、routine の途中ではない）。`other` 以外の `Situation` も対象にならず、`grace` が 0 なら `Card()` の結果はこの change の前と 1 件も変わらない。`other` の由来は問わないので、`grace` が `StaleAfter`（3 時間）以上のときは規則 2 / 3 の時間切れで `other` になった PR（`PR #<n> は人のコメントに AI が応答していない`）も置き換わり、その間は要約が `どの局面にも当たらない` に変わる。既定の 30 分では起こらず、`other_grace_min` を 180 以上にしたときだけ起きる。置き換えは `Card.Result` を決める前に行うので、猶予内の `other` は候補にならず、他の要素がすべて `in-progress` ならカードも `in-progress` になる。`now.Sub(UpdatedAt)` が `grace` 以上になった取得では `other` に戻り、今やるタブに出る（s13 `desktop-notify` がこれを「増えた」と数える）。
 
 #### Scenario: 更新から猶予未満のラベル無し PR は進行中
 - **WHEN** `Issue` が nil、`PRs` が `Labels` 空・`Comments` 空・`MergeState` nil・`UpdatedAt` が `now` の 10 分前の open PR 61 の `Card` を、`mode` `sdd`、`grace` 30 分で `Card()` に渡す
@@ -122,6 +125,14 @@
 #### Scenario: 猶予内のその他は他の局面を隠さない
 - **WHEN** `Issue` が `stage:propose` と `wip`（進行中）、`PRs` が open の `propose` + `question` で最新コメントが AI の PR 131（A）と、`Labels` 空・`Comments` 空・`UpdatedAt` が `now` の 1 分前の open PR 132 の `Card` を `mode` `sdd`、`grace` 30 分で `Card()` に渡す
 - **THEN** `Card.Result.Situation` は `A`、`PRs[1].Result.Situation` は `in-progress` である
+
+#### Scenario: now が UpdatedAt より前でも猶予内として扱う
+- **WHEN** `Issue` が nil、`PRs` が `Labels` 空・`Comments` 空・`UpdatedAt` が `now` の 1 分後の open PR 61 の `Card` を、`mode` `sdd`、`grace` 30 分で `Card()` に渡す
+- **THEN** `Card.Result.Situation` は `in-progress` である（ローカル時計が GitHub より遅れているときは「いま触られた」と読む）
+
+#### Scenario: label 方式の PR は猶予の対象にならない
+- **WHEN** `Issue` が nil、`PRs` が `Labels` 空・`Comments` 空・`UpdatedAt` が `now` の 5 分前の open PR 61 の `Card` を、`mode` `label`、`grace` 30 分で `Card()` に渡す
+- **THEN** `Card.Result.Situation` は `other`、`Card.Result.Tab` は `今やる` である（ILD の open PR は全件今やるに出す）
 
 #### Scenario: その他以外は猶予の対象にならない
 - **WHEN** `Issue` が nil、`PRs` が `docs` の open PR で `UpdatedAt` が `now` の 1 分前の `Card` を `mode` `sdd`、`grace` 30 分で `Card()` に渡す

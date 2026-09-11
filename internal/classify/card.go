@@ -21,8 +21,9 @@ func Card(c model.Card, mode model.Mode, now time.Time, grace time.Duration) mod
 	for i := range out.PRs {
 		out.PRs[i].Canonical = false
 		out.PRs[i].Result = PR(out.PRs[i], mode, now)
-		if settling(out.PRs[i], now, grace) {
-			out.PRs[i].Result = result(model.SituationInProgress, settlingSummary(out.PRs[i].Number, grace))
+		if settling(out.PRs[i], mode, now, grace) {
+			summary := fmt.Sprintf("PR #%d はどの局面にも当たらない（更新から %dm は様子見）", out.PRs[i].Number, int(grace.Minutes()))
+			out.PRs[i].Result = result(model.SituationInProgress, summary)
 		}
 	}
 	markCanonical(out.PRs, mode)
@@ -45,15 +46,13 @@ func Card(c model.Card, mode model.Mode, now time.Time, grace time.Duration) mod
 }
 
 // settling は「その他」の open PR が最終更新からの猶予の中にいるかを返す。
+// 猶予は sdd だけに当てる。label（ILD）は 1 issue = 1 PR を人が捌く方式で、open PR を
+// 全件今やるに出すと決めてある（human-turn-classify「方式が label の入力は…」差分 7）。
 // UpdatedAt がゼロ値（取得できなかった）なら、いつ触られたか分からないので猶予を当てない。
 // now が UpdatedAt より前（ローカル時計の遅れ）なら差は負で、猶予内として扱う。
-func settling(pr model.PR, now time.Time, grace time.Duration) bool {
-	return pr.Result.Situation == model.SituationOther && grace > 0 &&
+func settling(pr model.PR, mode model.Mode, now time.Time, grace time.Duration) bool {
+	return mode != model.ModeLabel && pr.Result.Situation == model.SituationOther && grace > 0 &&
 		!pr.UpdatedAt.IsZero() && now.Sub(pr.UpdatedAt) < grace
-}
-
-func settlingSummary(number int, grace time.Duration) string {
-	return fmt.Sprintf("PR #%d はどの局面にも当たらない（更新から %dm は様子見）", number, int(grace.Minutes()))
 }
 
 // 候補は open な要素のうち進行中でないもの。MERGED / CLOSED の PR は Result がゼロ値で候補にならない。
