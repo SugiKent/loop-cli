@@ -42,7 +42,7 @@ TBD - created by archiving change s09-card-detail. Update Purpose after archive.
 - **THEN** 終了コマンドが返る
 
 ### Requirement: ヘッダはリポジトリ・番号・いま人が何をすべきか・現在の段階・バッジ・depends on を出す
-カード詳細画面の `View` はヘッダ領域の先頭に、詳細の対象の Card について MUST 次の行をこの順で出す（mvp.md「カード詳細」のヘッダ）。行番号は固定せず順序だけを定める（s17 が ADDED で行を足せるようにするため）。方式は `Options.Modes`（設定由来。`queue-screen`「リポジトリごとの運用方式を設定から受け取る」）に対象の `Repo` を引いて決め、Card の中の値からは決めない。
+カード詳細画面の `View` はヘッダ領域の先頭に、詳細の対象の Card について MUST 次の行をこの順で出す（mvp.md「カード詳細」のヘッダ）。行番号は固定せず順序だけを定める（s17 が ADDED で行を足せるようにするため）。方式は `queue-screen`「運用方式は取得のたびに判定した結果を持つ」の表に対象の `Repo` を引いて決め、Card の中の値からは決めない。表に無いリポジトリ（方式がまだ分からない）はゼロ値の `sdd` の語彙で描く。
 - `<Repo> #<Number>  <Title>`（`Card.Issue` の値）
 - `Card.Result.Summary`（空なら出さない。s05 が定めた「いま人が何をすべきか」。mvp.md「カードは『いま人が何をすべきか』を 1 行目に出す」。s08 のプレビューはこれを出さず、この change のヘッダに委ねている）
 - `段階: ` に続けて `model.IssueStages(mode, Issue.Labels)` の段階ラベルを空白区切りで並べる。1 件も無ければ `段階なし`。2 件以上あればすべて並べる（異常の状態を隠さない）。続けてバッジを出す。`sdd`（ゼロ値を含む）なら `[blocked]` / `[wip]` / `[question]` の順、`label` なら `[blocked]` / `[question]` の順で、`Labels` にあるものだけ出す（`label` の方式に `wip` ラベルは無く、作業中は段階ラベル `In Progress` が示す）
@@ -75,7 +75,7 @@ TBD - created by archiving change s09-card-detail. Update Purpose after archive.
 - **THEN** `段階: stage:propose stage:apply` と `[blocked]` と `[wip]` がこの順で含まれる
 
 #### Scenario: label 方式の issue の段階とバッジ
-- **WHEN** `Options.Modes` が `org/board` を `label` にした `Model` で、`org/board` の `Labels` が `In Progress` と `question` の issue の Card の詳細を開き、`View` を読む
+- **WHEN** `org/board` を `label` と判定した `Result` を渡した `Model` で、`org/board` の `Labels` が `In Progress` と `question` の issue の Card の詳細を開き、`View` を読む
 - **THEN** `段階: In Progress` と `[question]` が含まれ、`[wip]` は含まれない
 
 #### Scenario: label 方式では sdd の段階ラベルを段階行に出さない
@@ -116,7 +116,7 @@ TBD - created by archiving change s09-card-detail. Update Purpose after archive.
 - **THEN** `[propose] なし`、`[apply] PR#90 open`、`[archive] なし`、`[-] PR#61 open` の行がこの順で含まれる
 
 #### Scenario: label 方式の PR 一覧は段階の見出しを持たない
-- **WHEN** `Options.Modes` が `org/board` を `label` にした `Model` で、`org/board` の Card（`PRs` が `[ラベル無し, OPEN, #61, Body に Closes #12]`、`[question, OPEN, #62]`）の詳細を開き、`View` を読む
+- **WHEN** `org/board` を `label` と判定した `Result` を渡した `Model` で、`org/board` の Card（`PRs` が `[ラベル無し, OPEN, #61, Body に Closes #12]`、`[question, OPEN, #62]`）の詳細を開き、`View` を読む
 - **THEN** `▶` で始まる `[-] PR#61 open` の行と `[-] PR#62 open` の行がこの順で含まれ、`[propose] なし` と `[apply] なし` と `[archive] なし` は含まれない
 
 #### Scenario: label 方式で PR が 1 件も無ければ PR の行を出さない
