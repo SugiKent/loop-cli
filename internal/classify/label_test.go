@@ -200,7 +200,7 @@ func TestLabelModePR(t *testing.T) {
 func TestLabelModeCard(t *testing.T) {
 	t.Run("カードの全要素が同じ方式で分類される", func(t *testing.T) {
 		is := labelIssue(12, model.LabelInProgress)
-		got := Card(model.Card{Issue: &is, PRs: []model.PR{closesPR(61)}}, model.ModeLabel, updatedNow)
+		got := Card(model.Card{Issue: &is, PRs: []model.PR{closesPR(61)}}, model.ModeLabel, updatedNow, 0)
 
 		if got.Issue.Result.Situation != model.SituationInProgress {
 			t.Errorf("Issue.Result = %+v, want in-progress", got.Issue.Result)
@@ -215,7 +215,7 @@ func TestLabelModeCard(t *testing.T) {
 
 	t.Run("Canonical は立たない", func(t *testing.T) {
 		merged := model.PR{Repo: "org/board", Number: 61, State: "MERGED"}
-		got := Card(model.Card{PRs: []model.PR{merged}}, model.ModeLabel, updatedNow)
+		got := Card(model.Card{PRs: []model.PR{merged}}, model.ModeLabel, updatedNow, 0)
 		if got.PRs[0].Canonical {
 			t.Error("label 方式で Canonical が立っている")
 		}

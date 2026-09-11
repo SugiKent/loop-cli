@@ -135,8 +135,9 @@ func runTUI() error {
 		repos[i] = r.Name
 	}
 
+	otherGrace := time.Duration(cfg.OtherGraceMin) * time.Minute
 	var fetcher ui.Fetcher = func(ctx context.Context) (*fetch.Result, error) {
-		return fetch.Fetch(ctx, client, repos, time.Now())
+		return fetch.Fetch(ctx, client, repos, time.Now(), otherGrace)
 	}
 	claudeClient := claude.NewClient()
 	opts := ui.Options{

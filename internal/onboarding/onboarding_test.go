@@ -97,6 +97,9 @@ func TestWriteIsReadableByConfigLoad(t *testing.T) {
 	if cfg.Editor != "nvim" {
 		t.Errorf("Editor = %q, want nvim", cfg.Editor)
 	}
+	if cfg.OtherGraceMin != 30 {
+		t.Errorf("OtherGraceMin = %d, want 30（Marshal は書かず Load の既定に任せる）", cfg.OtherGraceMin)
+	}
 }
 
 func TestMarshalEmptyEditorIsReadable(t *testing.T) {

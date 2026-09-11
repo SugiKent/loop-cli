@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: どの行にも当たらないものはその他バケットに入れる
-`PR()` は、進行中の規則にも判定表の行にも当たらない open PR を `Situation` `other`、`Priority` 6、`Tab` `今やる` と MUST 判定する（human-turn-signals.md: ラベルなし・コメントなしの PR、旧構成の `retro` PR など。「進行中」に混ぜると人の出番かどうかを判別できなくなる。消えて見えなくなる項目を作らない）。`in-progress` を返す規則は上記 5 規則だけで、それ以外の open PR を黙って落とさない。
+`PR()` は、進行中の規則にも判定表の行にも当たらない open PR を `Situation` `other`、`Priority` 6、`Tab` `今やる` と MUST 判定する（human-turn-signals.md: ラベルなし・コメントなしの PR、旧構成の `retro` PR など。「進行中」に混ぜると人の出番かどうかを判別できなくなる。消えて見えなくなる項目を作らない）。`in-progress` を返す規則は Requirement「キューに入れないものは進行中にする」の 7 規則だけで、それ以外の open PR を黙って落とさない。規則 2 / 3 の条件を満たしたまま時間切れになった PR も、同じ Requirement のとおり `other` にする。
 `Issue()` も、`Labels` に `question` と `blocked` の両方があるのに B に当たらない issue（`Comments` が nil または空で、最新コメントが AI か人か決められない）を `other` と MUST 判定する。この issue は本来 B か進行中の規則 4 のどちらかであり、進行中に落とすと s07 の取り忘れで人待ちの issue が見えなくなる。
 `Issue()` / `PR()` は時刻を見ない。open PR の `other` を最終更新からの猶予の間だけ進行中に置く判断は `Card()` が持つ（Requirement「Card は猶予内のその他の PR を進行中に置き換える」）。issue の `other` は `Card()` でも置き換えない（上記のとおり人待ちの取りこぼしであり、隠す根拠が無い）。
 
@@ -33,7 +33,7 @@
 | `C` | 3 | 今やる | merge | `PR #<n> を merge する` |
 | `E` | 4 | バックログ | todo 候補 | `#<n> の着手を承認する` |
 | `G` | 5 | 今やる | merge | `docs PR #<n> を merge する` |
-| `other` | 6 | 今やる | その他 | PR: `PR #<n> はどの局面にも当たらない` / issue: `#<n> はどの局面にも当たらない` |
+| `other` | 6 | 今やる | その他 | PR: `PR #<n> はどの局面にも当たらない` / 規則 2 / 3 の時間切れ: `PR #<n> は人のコメントに AI が応答していない` / issue: `#<n> はどの局面にも当たらない` |
 | `in-progress` | 7 | 進行中 | 進行中 | 規則 1: `#<n> は AI が作業中` / 規則 2: `PR #<n> は auto-fix が受け取り中` / 規則 3: `PR #<n> は回答済み。worker が受け取り中` / 規則 4: `#<n> は回答済み。sweep 待ち` / 規則 5: `#<n> は question のみ。dispatcher の回収待ち` / 規則 6: `#<n> は段階ラベルの書き直し中。sweep 待ち` / 規則 7: `PR #<n> は AI 評価待ち` / 猶予（`Card()` の置き換え。PR のみ）: `PR #<n> はどの局面にも当たらない（更新から <M>m は様子見）` / フォールバック: `#<n> は進行中` |
 | `""` | 8 | （無し。`Tab()` は空文字列） | （空文字列） | （空文字列） |
 
@@ -48,7 +48,7 @@
 - **THEN** 順に 今やる / 今やる / 今やる / 今やる / 今やる / 今やる / バックログ / 異常 / 進行中 が返る
 
 ### Requirement: Card は Issue と open PR 群のうち最上位の局面を 1 行目に出す
-`internal/classify` は `Card(c model.Card, mode model.Mode, now time.Time, grace time.Duration) model.Card` を MUST 提供する。1 枚の Card は 1 つのリポジトリの issue と PR だけを持つので、`mode` はカード全体で 1 つに決まる。`now` は取得時刻、`grace` は「その他」を進行中に置く猶予で、どちらも呼び出し側（s07 `Fetch`）が渡す。`Card()` は壁時計を読まない。返り値は入力のコピーで、`Issue.Result`（`Issue` が nil でなければ）と各 `PRs[i].Result`（`State` が `OPEN` のものだけ。それ以外はゼロ値）を `Issue()` / `PR()` に同じ `mode` を渡して埋め、Requirement「Card は猶予内のその他の PR を進行中に置き換える」の置き換えを open PR ごとに当て、`Canonical`（次の Requirement）を立て、`Card.Result` を次の規則で決める。
+`internal/classify` は `Card(c model.Card, mode model.Mode, now time.Time, grace time.Duration) model.Card` を MUST 提供する。1 枚の Card は 1 つのリポジトリの issue と PR だけを持つので、`mode` はカード全体で 1 つに決まる。`now` は取得時刻、`grace` は「その他」を進行中に置く猶予で、どちらも呼び出し側（s07 `Fetch`）が渡す。`Card()` は壁時計を読まない。返り値は入力のコピーで、`Issue.Result`（`Issue` が nil でなければ）と各 `PRs[i].Result`（`State` が `OPEN` のものだけ。それ以外はゼロ値）を `Issue()` / `PR()` に同じ `mode`（`PR()` には同じ `now` も）を渡して埋め、Requirement「Card は猶予内のその他の PR を進行中に置き換える」の置き換えを open PR ごとに当て、`Canonical`（次の Requirement）を立て、`Card.Result` を次の規則で決める。
 - 候補は `Issue.Result` と、`State` が `OPEN` の各 PR の `Result` のうち、`Situation` が `in-progress` でないもの
 - 候補があれば、`Priority` が最小のものを `Card.Result` にする。同点なら `Issue` を優先し、次に `PRs` の並び順で先のもの
 - 候補が無ければ（すべて `in-progress`、または Issue が nil で open PR も無い）`Card.Result` は `in-progress` にし、`Summary` は `PRs` の並び順で先頭の open PR の `Summary`、open PR が無ければ `Issue` の `Summary`、どちらも無ければ `進行中`（`MERGED` / `CLOSED` の PR は `Summary` が空なので採らない）
@@ -64,7 +64,7 @@
 - **THEN** `Card.Result.Summary` は issue の `#<n> に段階ラベルが 2 つ以上ある` である
 
 #### Scenario: すべて進行中なら進行中
-- **WHEN** `Issue` が `stage:apply` と `wip`、`PRs` が `apply` で最新コメントが人の open PR の `Card` を `mode` `sdd` で `Card()` に渡す
+- **WHEN** `Issue` が `stage:apply` と `wip`、`PRs` が `apply` で最新コメントが人かつ `UpdatedAt` が `now` の 10 分前の open PR の `Card` を `mode` `sdd` で `Card()` に渡す
 - **THEN** `Card.Result.Situation` は `in-progress`、`Tab` は `進行中`、`Summary` は open PR の `PR #<n> は auto-fix が受け取り中` である
 
 #### Scenario: open PR が無ければ issue の要約

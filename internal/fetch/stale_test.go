@@ -18,7 +18,7 @@ func TestFetchPassesNowToClassify(t *testing.T) {
 		{"1 日後は AI が応答していない", time.Date(2026, 9, 5, 10, 0, 0, 0, time.UTC), "PR #90 は人のコメントに AI が応答していない"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			res, err := Fetch(t.Context(), gh.NewFake("testdata/link"), repos, tt.now)
+			res, err := Fetch(t.Context(), gh.NewFake("testdata/link"), repos, tt.now, 0)
 			if err != nil {
 				t.Fatalf("Fetch: %v", err)
 			}

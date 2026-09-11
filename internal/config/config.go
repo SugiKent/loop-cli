@@ -33,12 +33,14 @@ type Repo struct {
 }
 
 // Config は設定ファイルの内容。
+// OtherGraceMin は「その他」の PR を進行中に置く猶予（分）。0 で猶予なし。
 type Config struct {
 	Repos              []Repo      `yaml:"repos"`
 	RefreshIntervalSec int         `yaml:"refresh_interval_sec"`
 	MergeMethod        MergeMethod `yaml:"merge_method"`
 	Editor             string      `yaml:"editor"`
 	Notify             bool        `yaml:"notify"`
+	OtherGraceMin      int         `yaml:"other_grace_min"`
 }
 
 // DefaultPath は設定ファイルの既定パス $HOME/.config/loop-cli/config.yml を返す。
@@ -97,6 +99,7 @@ func Load(path string) (*Config, error) {
 		MergeMethod:        MergeSquash,
 		Editor:             "$EDITOR",
 		Notify:             true,
+		OtherGraceMin:      30,
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
@@ -154,6 +157,9 @@ func validate(cfg *Config) error {
 	}
 	if cfg.RefreshIntervalSec < 1 {
 		return errors.New("refresh_interval_sec は 1 以上を指定してください")
+	}
+	if cfg.OtherGraceMin < 0 {
+		return errors.New("other_grace_min は 0 以上を指定してください（0 で猶予なし）")
 	}
 	return nil
 }

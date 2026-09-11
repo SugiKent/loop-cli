@@ -30,6 +30,13 @@ loop-cli の分類器（`internal/classify`）と action 層はこの文書を�
 分類はこの順で評価し、最初に当たった行で止める。どの行にも当たらない open PR（ラベルなし・コメントなしの PR、旧構成の `retro` PR など）は
 「その他」バケットに入れて必ず画面に出す。「進行中」に混ぜると人の出番かどうかを判別できなくなるため。消えて見えなくなる項目を作らない。
 
+ただし「その他」になった open PR のうち、最終更新（`updatedAt`）から `other_grace_min` 分（既定 30）未満のものは
+`[3]進行中` に出し、猶予を超えたら今までどおり `[1]今やる` に出す。PR のその他の大半は routine の状態機械の途中
+（PR を作った直後でラベルが無い、checks が pending、`未確定の判断: N 件` が N > 0 のまま grill 中、`ai-assess:requested` が付く前）で、
+人が判断できないためである。誰も触らないまま猶予を超えたものだけが人の出番として浮上する。`other_grace_min: 0` で猶予なし。
+issue の「その他」（`question` と `blocked` があるのにコメントが取れなかったもの）は猶予の対象にしない。これは B（人待ち）の
+取りこぼしなので、人にすぐ出す。時間の判断を持つのは `Card()` だけで、判定表の行とフォールバックの意味（どの行にも当たらない）は変えない。
+
 F を「段階ラベル 2 つ以上」だけに絞った理由: `restart: 3/3` に達した issue と、`question` 付きのまま merge された propose PR は、
 どちらも dispatcher が issue に `blocked-by: human` + `question` を書くので、B として自然に浮上する。人が merge せずに close した
 propose / apply PR も同じく dispatcher が `blocked-by: human` にするので B に出る。`question` 単独（`blocked` 無し）の issue は
@@ -147,6 +154,7 @@ issue-driven-sdd を運用しているリポジトリを 1 つ読んで確認し
 
 | 日時 | 変更内容 | 理由 |
 | --- | --- | --- |
+| 2026-09-12-0100 | 「その他」の open PR に最終更新からの時間猶予（`other_grace_min`、既定 30 分）を足し、猶予内は進行中タブに出すことにした。issue の「その他」は対象外 | PR のその他の大半が routine の処理中で人が判断できず、ゾンビ化した PR だけを人に出すため（s30-other-grace・#43） |
 | 2026-09-12-0030 | PR の進行中の規則（最新コメントが人・AI 評価待ち）を `updatedAt` から 3 時間以内に限り、時間切れの扱いと、`ai-assess:requested` 付き PR を「最新コメントが人」の規則から外すことを足した。行 C の `ai-assess:requested` なしの条件に時間切れの例外を足した | ca-ai-role-play で assess Routine が止まり `ai-assess:requested` が外れなくなり、open PR が全件進行中に隠れたため（s32-stale-in-progress-pr） |
 | 2026-09-10-0900 | 冒頭の `ai-assess:requested` の一文と不変条件 1・2 を `L`（ラベル一覧）に合わせて改訂。不変条件 1 を「ラベル集合の置換は行わない」に狭め、まとめ送信が原子的でないことと Routine の起動順の帰結を追記 | `L` が任意のラベルを 1 回の書き込みでまとめて変えるようになり、「1 ラベルずつ」「書くラベルは 2 つに限る」が事実と合わなくなったため（#3・s28-label-picker） |
 | 2026-09-11-1030 | ILD の方式の正本をラベル一覧に変え、行 C / 行 D から `Closes #n` を外し、PR の「最新コメントが人」の 2 規則を ILD で適用しないことにした | ILD の open PR を全件「今やる」に出し、方式の書き忘れという状態を無くすため（#24） |

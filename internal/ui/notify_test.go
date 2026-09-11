@@ -84,6 +84,26 @@ func TestAddedNowCountsSubjectChange(t *testing.T) {
 	}
 }
 
+// TestAddedNowCountsSettledOtherBecomingNow は、猶予（s30）で進行中に置かれていた
+// その他の PR が猶予明けに今やるタブへ現れたとき、差分が「増えた」と数えることを確かめる。
+func TestAddedNowCountsSettledOtherBecomingNow(t *testing.T) {
+	settling := model.Result{Situation: model.SituationInProgress, Priority: 7, Tab: model.TabInProgress, Summary: "PR #61 はどの局面にも当たらない（更新から 30m は様子見）"}
+	other := model.Result{Situation: model.SituationOther, Priority: 6, Tab: model.TabNow, Summary: "PR #61 はどの局面にも当たらない"}
+	cardWith := func(r model.Result) model.Card {
+		pr := model.PR{Repo: "org/app", Number: 61, Title: "手書き PR", State: "OPEN", UpdatedAt: at, Result: r}
+		return model.Card{PRs: []model.PR{pr}, Result: r}
+	}
+
+	added := addedNow([]model.Card{cardWith(settling)}, []model.Card{cardWith(other)})
+
+	if len(added) != 1 {
+		t.Fatalf("増えたカード = %d 枚, want 1: %+v", len(added), added)
+	}
+	if repo, number, isPR, _, _ := Subject(added[0]); repo != "org/app" || number != 61 || !isPR {
+		t.Errorf("増えたカード = %s %d (PR=%v), want org/app 61 (PR=true)", repo, number, isPR)
+	}
+}
+
 // notifyRecord は 1 件の通知。
 type notifyRecord struct{ title, body string }
 
