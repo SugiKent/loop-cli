@@ -25,7 +25,7 @@ func (m Model) previewLines(h int) []string {
 	var lines []string
 	if first := firstLine(r.body); first != "" {
 		if len(r.labels) > 0 {
-			first += "   labels: " + strings.Join(r.labels, " ")
+			first += "   labels: " + strings.Join(m.labelNames(r.repo, r.labels), " ")
 		}
 		lines = append(lines, first)
 	}

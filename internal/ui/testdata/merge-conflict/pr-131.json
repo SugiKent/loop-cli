@@ -1,0 +1,31 @@
+{
+  "body": "未確定の判断: 0 件\n\nissue #108 の提案。\n\nCloses #108",
+  "comments": [],
+  "isDraft": false,
+  "labels": [
+    {
+      "id": "LA_kwDOC",
+      "name": "propose",
+      "color": "1d76db",
+      "description": "提案 PR"
+    }
+  ],
+  "mergeStateStatus": "DIRTY",
+  "mergeable": "CONFLICTING",
+  "number": 131,
+  "reviewDecision": "APPROVED",
+  "statusCheckRollup": [
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-04T10:40:00Z",
+      "conclusion": "FAILURE",
+      "detailsUrl": "https://github.com/org/app/actions/runs/9001",
+      "name": "test",
+      "startedAt": "2026-09-04T10:35:00Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    }
+  ],
+  "title": "propose: ログインのセッション仕様",
+  "url": "https://github.com/org/app/pull/131"
+}

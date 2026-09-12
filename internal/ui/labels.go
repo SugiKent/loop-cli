@@ -266,13 +266,15 @@ func (m Model) renderLabels() string {
 	return strings.Join(append(lines, m.footer(hint)), "\n")
 }
 
-// labelLine は一覧の 1 行 `<選択の印><状態の印> <名前>  <説明>`。色（gh label list の color）は使わない。
+// labelLine は一覧の 1 行 `<選択の印><状態の印> <名前>  <説明>`。名前の背景色には、この画面が
+// `L` で取ったラベル一覧の color を使う（Model のラベル色の表は引かない。同じ画面に新旧 2 つの
+// 色が混ざらないようにするため）。印と説明は塗らない。
 func (m Model) labelLine(l gh.RepoLabel, selected bool) string {
 	mark := "  "
 	if selected {
 		mark = "▶ "
 	}
-	line := mark + labelMark(m.labelPicker.origin[l.Name], m.labelPicker.want[l.Name]) + " " + l.Name
+	line := mark + labelMark(m.labelPicker.origin[l.Name], m.labelPicker.want[l.Name]) + " " + renderLabelName(l.Name, l.Color)
 	if l.Description != "" {
 		line += "  " + l.Description
 	}
