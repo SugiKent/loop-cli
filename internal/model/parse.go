@@ -25,9 +25,11 @@ var (
 
 var (
 	undecidedRe = regexp.MustCompile(`^未確定の判断:\s*(\d+)\s*件`)
-	questionRe  = regexp.MustCompile(`^##\s*Q(\d+)\.\s*(.*)$`)
-	optionRe    = regexp.MustCompile(`^[-*]\s*選択肢\s*([A-Z])\s*(（推奨）|\(推奨\))?\s*[:：]\s*(.*)$`)
-	closesRe    = regexp.MustCompile(`(?i)\bcloses\s+#(\d+)`)
+	// 見出しは `#` の数を問わない（上流の質問コメントは `###`、mvp.md の例は `##`）。
+	questionRe = regexp.MustCompile(`^#+\s*Q(\d+)\.\s*(.*)$`)
+	// 選択肢行は Markdown の強調 `**` を `選択肢` の前・記号の直後・`（推奨）` の直後で読み飛ばす。
+	optionRe = regexp.MustCompile(`^[-*]\s*(?:\*\*)?選択肢\s*([A-Z])\s*(?:\*\*)?\s*(（推奨）|\(推奨\))?\s*(?:\*\*)?\s*[:：]\s*(.*)$`)
+	closesRe = regexp.MustCompile(`(?i)\bcloses\s+#(\d+)`)
 )
 
 // IsAI は本文だけで routine（AI）の発言かを判定する。
@@ -142,7 +144,8 @@ type Question struct {
 	Options []Option
 }
 
-// ParseQuestions は mvp.md「カード詳細」の形式で質問と選択肢を読む。
+// ParseQuestions は質問と選択肢を読む。読む書式は routine が実際に投稿するもの
+// （`### Q<n>.` の見出しと `- **選択肢 A（推奨）**: …`）と mvp.md「カード詳細」の形（`##` と素の選択肢）の両方。
 // 見出しの無い本文はパースできた分だけ返す。回答テンプレートの組み立ては s10 が担当する。
 func ParseQuestions(body string) []Question {
 	var out []Question

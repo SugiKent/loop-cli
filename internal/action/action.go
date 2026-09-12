@@ -16,6 +16,7 @@ const (
 	routineMarker        = "<!-- routine -->"
 	routineMarkerEscaped = "&lt;!-- routine --&gt;"
 	blockedByPrefix      = "blocked-by:"
+	unblockWhenPrefix    = "unblock-when:"
 )
 
 var (
@@ -50,12 +51,26 @@ func BlockedByLines(body string) []string {
 	return out
 }
 
+// IsBlankAnswer は中身の無い回答かを返す。前後の空白を除いて空でも `>` で始まってもいない行が
+// 1 つも無ければ真。引用行だけの下書き（AnswerTemplate を開いてそのまま閉じたもの）を投稿すると、
+// dispatcher が「人が答えた」とみなして worker が推奨案で進むため、空白だけの本文と同じ扱いにする。
+func IsBlankAnswer(body string) bool {
+	for _, line := range strings.Split(body, "\n") {
+		t := strings.TrimSpace(line)
+		if t == "" || strings.HasPrefix(t, ">") {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 // Comment は対象の種類に応じた書き先へ本文を 1 回だけ投稿する（不変条件 4）。
 // ラベルは触らない（不変条件 2。question / blocked の付け外しは sweep の仕事）。
 // blocked-by: 行は拒否しない。不変条件 8 は「検出して警告する」であり、
 // 確認したうえで投稿する余地を残す（警告は UI が出す）。
 func Comment(ctx context.Context, client gh.GHClient, t Target, body string) error {
-	if strings.TrimSpace(body) == "" {
+	if IsBlankAnswer(body) {
 		return ErrEmptyBody
 	}
 	if HasRoutineMarker(body) {
