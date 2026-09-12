@@ -67,7 +67,11 @@ issue #42 は「リポジトリごと、またステータスやラベルごと�
 `Priority` 4 の Card を `Tab: TabInProgress` で作っており、タブで分岐する実装ではこの Card も
 新しい経路を通る。分岐の条件にはタブを使う。`tableLines` と `buildRows` はどちらもタブを手元に
 持っており、`Situation` を見に行くと Card 1 枚ごとの判定が増える。
-この Card は段階ラベルを持たないので列は `-` になり、並びも 1 枚なので観測できる差は出ない。
+この Card は `stage:todo` を持つので列は `todo` になるが、1 枚しか無いので並びに観測できる差は出ない。
+この Card は `Kind()` が `todo 候補` で `kindStyle` に項目がある。`tableRow` はタブだけで分岐するので、
+行全体の色を持つ行の内側に段階ラベルの色を置かないという spec の規則（MODIFIED「表の行は…種別の色で
+出す」）は、製品コードでは `Tab()` と `Kind()` が同じ `Situation` から出ること（進行中タブの行は必ず
+`Kind()` が `進行中` で `kindStyle` に無い）だけで保たれる。手で組み立てた Card はこの不変条件の外にある。
 
 他の 3 タブは 4 キーをそのまま残す。`rows_test.go` の既存の期待値（優先度順）は今やるタブで
 書かれているので、進行中タブだけ分けるかぎり通る。
@@ -130,11 +134,11 @@ design D3 が計算で否決済みで、実測でも `5319e7` は黒に対して
 種別の列は 10 列で、`colFixed`（48）と `colTitleStart`（43）が `queue-screen` の Scenario と
 `internal/ui/view_test.go` の期待値に埋まっている。段階ラベル名のうち `propose`（7）/ `archive`（7）/
 `apply`（5）/ `todo`（4）は収まり、`label` 方式の `In Progress`（11）だけが 1 列はみ出す。
-`pad` が `ansi.Truncate(s, 10, "…")` で切るので `In Progr…` になる（`internal/ui/view.go:287-293`）。
+`pad` が `ansi.Truncate(s, 10, "…")` で切るので `In Progre…` になる（`internal/ui/view.go:287-293`）。
 
 `In Progress` のために列を 11 に広げると、タイトル列の開始位置が 43 → 44 に動き、折り返しの継続行の
 字下げを見る Scenario とテストが全部ずれる。色と区切りの change でそこまで波及させる価値は無い。
-`label` 方式は issue-label-driven のリポジトリ向けで、`In Progr…` でも段階は読める。
+`label` 方式は issue-label-driven のリポジトリ向けで、`In Progre…` でも段階は読める。
 
 一覧では `stage:` を落とし、カード詳細は `段階: stage:propose` を出したままにする
 （`internal/ui/detail.go:186-188`）。一覧は列幅 10 に収める必要があり、詳細は幅に余裕がある。
