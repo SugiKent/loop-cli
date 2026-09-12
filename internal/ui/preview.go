@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -36,24 +35,20 @@ func (m Model) previewLines(h int) []string {
 	return cut(lines, h)
 }
 
-// commentLines はコメントを並び順に描く。プレビューは折りたたまない。
+// commentLines はコメントを並び順に描く。
 func (m Model) commentLines(comments []model.Comment) []string {
 	var lines []string
 	for _, c := range comments {
-		lines = append(lines, commentBlock(c.Author, c.Body, c.CreatedAt, c.AI, m.location(), m.width, true)...)
+		lines = append(lines, commentBlock(c.Author, c.Body, c.CreatedAt, c.AI, m.location(), m.width)...)
 	}
 	return lines
 }
 
 // commentBlock はコメント 1 件の行を作る。AI 発は見出しと本文の全行に ▌ を付ける。
-// expanded が false の AI コメントは見出し 1 行に畳む（s09 のカード詳細 / PR 詳細）。
-func commentBlock(author, body string, createdAt time.Time, ai bool, loc *time.Location, width int, expanded bool) []string {
+// 折りたたみは持たず、AI も人も常に全文を返す（s38）。
+func commentBlock(author, body string, createdAt time.Time, ai bool, loc *time.Location, width int) []string {
 	at := createdAt.In(loc).Format("15:04")
-	stripped := stripMarkers(body)
-	if ai && !expanded {
-		return []string{"▌AI  " + at + "  " + summarize(stripped)}
-	}
-	rendered := renderMarkdown(stripped, width-1)
+	rendered := renderMarkdown(stripMarkers(body), width-1)
 	if ai {
 		lines := []string{"▌AI  " + at}
 		for _, l := range rendered {
@@ -62,19 +57,6 @@ func commentBlock(author, body string, createdAt time.Time, ai bool, loc *time.L
 		return lines
 	}
 	return append([]string{author + "  " + at}, rendered...)
-}
-
-// summarize は畳んだ AI コメントの `<要約>  (+<n> 行)` を作る。
-// 要約は空行でない最初の行、n はその後の行数。Glamour の環境差に依らないよう生の行を数える。
-func summarize(body string) string {
-	lines := strings.Split(body, "\n")
-	for i, l := range lines {
-		if strings.TrimSpace(l) == "" {
-			continue
-		}
-		return fmt.Sprintf("%s  (+%d 行)", strings.TrimRight(l, "\r"), len(lines)-i-1)
-	}
-	return "(+0 行)"
 }
 
 // location は時刻を書く基準のタイムゾーン。取得完了時刻に合わせる。

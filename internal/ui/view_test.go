@@ -536,8 +536,8 @@ func indexOf(lines []string, s string) (int, bool) {
 }
 
 // TestHintWidths はフッタのヒントが設計どおりの表示幅であることを検証する。
-// キューは c close を足して 99 列、カード詳細は 144 列だが
-// `? ヘルプ` が 65 列目、`u URL` が 72 列目で終わるのでヘルプと URL 一覧の入口は幅 80 でも見える。
+// キューは c close を足して 99 列、カード詳細は s38 が `x 展開` を落として 136 列だが
+// `? ヘルプ` が 57 列目、`u URL` が 64 列目で終わるのでヘルプと URL 一覧の入口は幅 80 でも見える。
 func TestHintWidths(t *testing.T) {
 	card := Model{screen: screenCard, detail: detailState{card: model.Card{PRs: []model.PR{{Number: 131}}}}}
 	cases := map[string]struct {
@@ -545,9 +545,9 @@ func TestHintWidths(t *testing.T) {
 		want int
 	}{
 		"キュー":          {newModel(nil).queueHint(), 99},
-		"PR 詳細":        {Model{screen: screenPR}.detailHint(), 109},
-		"カード詳細":        {card.detailHint(), 144},
-		"カード詳細（PR 無し）": {Model{screen: screenCard}.detailHint(), 96},
+		"PR 詳細":        {Model{screen: screenPR}.detailHint(), 101},
+		"カード詳細":        {card.detailHint(), 136},
+		"カード詳細（PR 無し）": {Model{screen: screenCard}.detailHint(), 88},
 	}
 	for name, tc := range cases {
 		if got := ansi.StringWidth(tc.hint); got != tc.want {
@@ -556,11 +556,11 @@ func TestHintWidths(t *testing.T) {
 	}
 
 	hint := card.detailHint()
-	if end := ansi.StringWidth(hint[:strings.Index(hint, "? ヘルプ")]) + ansi.StringWidth("? ヘルプ"); end != 65 {
-		t.Errorf("カード詳細の `? ヘルプ` が %d 列目で終わる, want 65: %q", end, hint)
+	if end := ansi.StringWidth(hint[:strings.Index(hint, "? ヘルプ")]) + ansi.StringWidth("? ヘルプ"); end != 57 {
+		t.Errorf("カード詳細の `? ヘルプ` が %d 列目で終わる, want 57: %q", end, hint)
 	}
-	if end := ansi.StringWidth(hint[:strings.Index(hint, "u URL")]) + ansi.StringWidth("u URL"); end != 72 {
-		t.Errorf("カード詳細の `u URL` が %d 列目で終わる, want 72: %q", end, hint)
+	if end := ansi.StringWidth(hint[:strings.Index(hint, "u URL")]) + ansi.StringWidth("u URL"); end != 64 {
+		t.Errorf("カード詳細の `u URL` が %d 列目で終わる, want 64: %q", end, hint)
 	}
 }
 

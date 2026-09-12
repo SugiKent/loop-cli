@@ -546,15 +546,19 @@ func TestPRListFetchFailed(t *testing.T) {
 	wantOrder(t, []string{row}, "[propose] PR#131 open", "checks 取得失敗", "mergeable 取得失敗")
 }
 
-func TestAICommentIsCollapsedAndExpandedByX(t *testing.T) {
+func TestCommentsAreAlwaysFullText(t *testing.T) {
 	m, _ := send(detailModel(161, 40, exampleResult(t).Cards), enterKey)
 
 	lines := linesOf(m)
-	if _, ok := lineWith(lines, "▌AI  18:00  Q1: セッションの寿命は何日にしますか。  (+1 行)"); !ok {
-		t.Fatalf("畳んだ AI コメントの見出しが無い:\n%s", strings.Join(lines, "\n"))
+	if _, ok := lineWith(lines, "▌AI  18:00"); !ok {
+		t.Fatalf("AI コメントの見出しが無い:\n%s", strings.Join(lines, "\n"))
 	}
-	if strings.Contains(strings.Join(lines, "\n"), "Q2: 失効時は") {
-		t.Error("畳んだ AI コメントに 2 行目が出ている")
+	line, ok := lineWith(lines, "Q2: 失効時はログイン画面へ戻しますか。")
+	if !ok {
+		t.Fatalf("AI コメントの 2 行目が無い:\n%s", strings.Join(lines, "\n"))
+	}
+	if !strings.HasPrefix(line, "▌") {
+		t.Errorf("AI コメントの行が ▌ で始まらない: %q", line)
 	}
 	for _, sub := range []string{"user-2  18:12", "寿命は 30 日で。"} {
 		line, ok := lineWith(lines, sub)
@@ -565,38 +569,56 @@ func TestAICommentIsCollapsedAndExpandedByX(t *testing.T) {
 			t.Errorf("人のコメントの行が ▌ で始まる: %q", line)
 		}
 	}
-
-	m, _ = send(m, runeKey('x'))
-	lines = linesOf(m)
-	if _, ok := lineWith(lines, "▌AI  18:00"); !ok {
-		t.Error("展開後に AI の見出しが無い")
-	}
-	line, ok := lineWith(lines, "Q2: 失効時はログイン画面へ戻しますか。")
-	if !ok {
-		t.Fatal("展開後に 2 行目が無い")
-	}
-	if !strings.HasPrefix(line, "▌") {
-		t.Errorf("展開した AI コメントの行が ▌ で始まらない: %q", line)
-	}
 	for _, ng := range []string{"<!-- routine -->", "(+1 行)"} {
 		if strings.Contains(strings.Join(lines, "\n"), ng) {
-			t.Errorf("展開後に %q がある", ng)
+			t.Errorf("%q がある", ng)
 		}
-	}
-
-	m, _ = send(m, runeKey('x'))
-	text := plainText(m)
-	if !strings.Contains(text, "(+1 行)") || strings.Contains(text, "Q2: 失効時は") {
-		t.Error("もう一度の x で折りたたみに戻らない")
 	}
 }
 
-func TestReopenCollapsesAgain(t *testing.T) {
-	m, _ := send(detailModel(120, 40, exampleResult(t).Cards), enterKey)
-	m, _ = send(m, runeKey('x'), escKey, enterKey)
-	text := plainText(m)
-	if !strings.Contains(text, "(+1 行)") || strings.Contains(text, "Q2: 失効時は") {
-		t.Error("開き直しても展開のままになっている")
+func TestXDoesNothingInDetail(t *testing.T) {
+	// 幅 161 は TestCommentsAreAlwaysFullText と同じ。Q2 の行が折り返されずに 1 行に収まる。
+	m, _ := send(detailModel(161, 40, exampleResult(t).Cards), enterKey)
+	before := linesOf(m)
+
+	m, cmd := send(m, runeKey('x'))
+	if cmd != nil {
+		t.Error("x でコマンドが返った")
+	}
+	if m.screen != screenCard {
+		t.Errorf("x の後の画面 = %v, want %v", m.screen, screenCard)
+	}
+	if got := linesOf(m); !slices.Equal(got, before) {
+		t.Errorf("x で表示が変わった:\n%s", strings.Join(got, "\n"))
+	}
+
+	m, _ = send(m, escKey, enterKey)
+	if got := linesOf(m); !slices.Equal(got, before) {
+		t.Errorf("開き直しで表示が変わった:\n%s", strings.Join(got, "\n"))
+	}
+	line, ok := lineWith(linesOf(m), "Q2: 失効時はログイン画面へ戻しますか。")
+	if !ok {
+		t.Fatal("開き直した後に AI コメントの 2 行目が無い")
+	}
+	if !strings.HasPrefix(line, "▌") {
+		t.Errorf("開き直した後の AI コメントの行が ▌ で始まらない: %q", line)
+	}
+	if strings.Contains(plainText(m), "(+1 行)") {
+		t.Error("開き直した後に (+1 行) がある")
+	}
+
+	// PR 詳細でも x は何もしない（ADDED Requirement が両画面を名指ししている）。
+	m, _ = send(m, enterKey)
+	beforePR := linesOf(m)
+	m, cmd = send(m, runeKey('x'))
+	if cmd != nil {
+		t.Error("PR 詳細の x でコマンドが返った")
+	}
+	if m.screen != screenPR {
+		t.Errorf("PR 詳細の x の後の画面 = %v, want %v", m.screen, screenPR)
+	}
+	if got := linesOf(m); !slices.Equal(got, beforePR) {
+		t.Errorf("PR 詳細の x で表示が変わった:\n%s", strings.Join(got, "\n"))
 	}
 }
 
@@ -760,7 +782,8 @@ func TestPRDetailOfPR131(t *testing.T) {
 		"── 本文 ",
 		"issue #108 の提案",
 		"── コメント ",
-		"▌AI  19:31  Q1: マイグレーションを分けますか。  (+0 行)",
+		"▌AI  19:31",
+		"Q1: マイグレーションを分けますか。",
 		"── review thread ",
 		"thread 未 resolve",
 	)
@@ -837,7 +860,7 @@ func TestPRDetailWithEmptyChecksAndThreads(t *testing.T) {
 	}
 }
 
-func TestRiskHeadingCommentIsCollapsedAsAI(t *testing.T) {
+func TestRiskHeadingCommentIsFullTextAsAI(t *testing.T) {
 	pr := prOf(153, "OPEN", []string{model.LabelApply})
 	pr.Comments = []model.Comment{model.CommentFrom(gh.Comment{
 		Author:    gh.Author{Login: "user-2"},
@@ -848,15 +871,18 @@ func TestRiskHeadingCommentIsCollapsedAsAI(t *testing.T) {
 	m, _ := send(detailModel(120, 40, []model.Card{issueCard(issue, []model.PR{pr}, "見る")}), enterKey, enterKey)
 
 	lines := linesOf(m)
-	line, ok := lineWith(lines, "PR #131 の評価です。")
+	if _, ok := lineWith(lines, "▌AI"); !ok {
+		t.Fatalf("リスク評価コメントの AI の見出しが無い:\n%s", strings.Join(lines, "\n"))
+	}
+	line, ok := lineWith(lines, "影響範囲: 小")
 	if !ok {
-		t.Fatal("リスク評価コメントの見出しが無い")
+		t.Fatalf("リスク評価コメントの本文が無い:\n%s", strings.Join(lines, "\n"))
 	}
-	if !strings.HasPrefix(line, "▌AI") || !strings.Contains(line, "(+4 行)") {
-		t.Errorf("AI として畳まれていない: %q", line)
+	if !strings.HasPrefix(line, "▌") {
+		t.Errorf("AI として ▌ が付いていない: %q", line)
 	}
-	if strings.Contains(strings.Join(lines, "\n"), "影響範囲: 小") {
-		t.Error("畳んだのに本文が出ている")
+	if strings.Contains(strings.Join(lines, "\n"), "(+4 行)") {
+		t.Error("(+4 行) がある")
 	}
 }
 
@@ -1000,7 +1026,7 @@ func TestDetailFooters(t *testing.T) {
 
 	lines := linesOf(m)
 	footer := lines[len(lines)-1]
-	for _, want := range []string{"Esc 戻る", "Tab PR 選択", "x 展開", "a 回答", "t todo", "L ラベル", "m merge", "c close", "n 新規", "o ブラウザ", "? ヘルプ", "u URL", "q 終了"} {
+	for _, want := range []string{"Esc 戻る", "Tab PR 選択", "a 回答", "t todo", "L ラベル", "m merge", "c close", "n 新規", "o ブラウザ", "? ヘルプ", "u URL", "q 終了"} {
 		if !strings.Contains(footer, want) {
 			t.Errorf("カード詳細のフッタに %q が無い: %q", want, footer)
 		}
@@ -1035,7 +1061,7 @@ func TestFooterWithoutPRs(t *testing.T) {
 
 	lines := linesOf(m)
 	footer := lines[len(lines)-1]
-	for _, want := range []string{"Esc 戻る", "x 展開", "t todo", "c close", "n 新規", "o ブラウザ", "u URL"} {
+	for _, want := range []string{"Esc 戻る", "t todo", "c close", "n 新規", "o ブラウザ", "u URL"} {
 		if !strings.Contains(footer, want) {
 			t.Errorf("フッタに %q が無い: %q", want, footer)
 		}

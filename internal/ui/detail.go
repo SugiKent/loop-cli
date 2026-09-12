@@ -38,7 +38,6 @@ const (
 type detailState struct {
 	card       model.Card
 	prIdx      int
-	expanded   bool
 	fromDetail bool // PR 詳細にカード詳細から入ったか
 	vp         viewport.Model
 }
@@ -100,9 +99,6 @@ func (m Model) updateDetailKey(key string) (tea.Model, tea.Cmd) {
 		m.detail.vp.GotoBottom()
 	case "home":
 		m.detail.vp.GotoTop()
-	case "x":
-		m.detail.expanded = !m.detail.expanded
-		m.refreshDetail()
 	case "esc":
 		if m.screen == screenPR && m.detail.fromDetail {
 			m.screen = screenCard
@@ -372,7 +368,7 @@ func (m Model) commentSection(comments []model.Comment) []string {
 	}
 	var lines []string
 	for _, c := range comments {
-		lines = append(lines, commentBlock(c.Author, c.Body, c.CreatedAt, c.AI, m.location(), m.leftWidth(), m.detail.expanded)...)
+		lines = append(lines, commentBlock(c.Author, c.Body, c.CreatedAt, c.AI, m.location(), m.leftWidth())...)
 	}
 	return lines
 }
@@ -465,7 +461,7 @@ func (m Model) reviewThreadLines(threads []gh.ReviewThread) []string {
 		}
 		lines = append(lines, head)
 		for _, c := range th.Comments {
-			lines = append(lines, commentBlock(c.Author.Login, c.Body, c.CreatedAt, model.IsAI(c.Body), m.location(), m.leftWidth(), true)...)
+			lines = append(lines, commentBlock(c.Author.Login, c.Body, c.CreatedAt, model.IsAI(c.Body), m.location(), m.leftWidth())...)
 		}
 	}
 	return lines
@@ -474,12 +470,12 @@ func (m Model) reviewThreadLines(threads []gh.ReviewThread) []string {
 // detailHint は詳細画面のフッタ左。動くキーだけを出す。
 func (m Model) detailHint() string {
 	if m.screen == screenPR {
-		return "Esc 戻る  x 展開  g issue へ  ? ヘルプ  u URL  a 回答  L ラベル  m merge  c close  n 新規  o ブラウザ  q 終了"
+		return "Esc 戻る  g issue へ  ? ヘルプ  u URL  a 回答  L ラベル  m merge  c close  n 新規  o ブラウザ  q 終了"
 	}
 	// n と c は PR の有無によらず動くので、PR のキーと違って省かない
 	// （c の対象はカード詳細では Issue で、これは常にある）。
 	if len(m.detail.card.PRs) == 0 {
-		return "Esc 戻る  x 展開  ? ヘルプ  u URL  a 回答  t todo  L ラベル  c close  n 新規  o ブラウザ  q 終了"
+		return "Esc 戻る  ? ヘルプ  u URL  a 回答  t todo  L ラベル  c close  n 新規  o ブラウザ  q 終了"
 	}
-	return "Esc 戻る  Tab PR 選択  Enter PR を開く  x 展開  g PR へ  ? ヘルプ  u URL  a 回答  t todo  L ラベル  m merge  c close  n 新規  o ブラウザ  q 終了"
+	return "Esc 戻る  Tab PR 選択  Enter PR を開く  g PR へ  ? ヘルプ  u URL  a 回答  t todo  L ラベル  m merge  c close  n 新規  o ブラウザ  q 終了"
 }
