@@ -31,16 +31,12 @@
 - **THEN** `Situation` は `in-progress`、`Tab` は `進行中`、`Summary` は `#<n> は AI が作業中` である
 
 #### Scenario: question 無し PR で最新コメントが人なら進行中
-- **WHEN** `Labels` が `apply`、`Comments` の末尾が `人: "この分岐を消してください"`、`UpdatedAt` が `now` の 10 分前の open PR を `mode` `sdd` で `PR()` に渡す
-- **THEN** `Situation` は `in-progress`、`Summary` は `PR #<n> は auto-fix が受け取り中` である（C の条件を満たしていても進行中が先）
+- **WHEN** `Labels` が `apply`、`Body` の 1 行目が `未確定の判断: 0 件 — レビューをお願いします`、`Comments` の末尾が `人: "この分岐を消してください"` でその `CreatedAt` が `UpdatedAt` と同時刻、`MergeState` が `Mergeable: MERGEABLE` で `StatusCheckRollup` が `CheckRun/SUCCESS` 1 件、`UpdatedAt` が `now` の 10 分前の open PR を `mode` `sdd` で `PR()` に渡す
+- **THEN** `Situation` は `in-progress`、`Summary` は `PR #<n> は auto-fix が受け取り中` である（人が `apply` PR にレビューを書いた直後がこれで、C の条件を満たしていても worker が動くまで merge 候補に出さない）
 
 #### Scenario: 反映を終えた印があれば最新コメントが人でも判定表へ流す
 - **WHEN** `Labels` が `propose`、`Body` の 1 行目が `未確定の判断: 0 件 — レビューをお願いします`、`Comments` の末尾が `now` の 61 分前の `人: "質問の回答はすべて推奨で"`、`UpdatedAt` が `now` の 59 分前、`MergeState` が `Mergeable: MERGEABLE` で `StatusCheckRollup` が `CheckRun/SUCCESS` 1 件の open PR を `mode` `sdd` で `PR()` に渡す
 - **THEN** `Situation` は `C`、`Summary` は `PR #<n> を merge する` である（worker が本文とラベルだけを更新してコメントを返さなかった PR を 3 時間隠さない）
-
-#### Scenario: 人のコメントの後に PR が動いていなければ進行中のまま
-- **WHEN** 上と同じで `UpdatedAt` が `Comments` の末尾の `CreatedAt` と同時刻の open PR を `PR()` に渡す
-- **THEN** `Situation` は `in-progress`、`Summary` は `PR #<n> は auto-fix が受け取り中` である（人が `apply` PR にレビューを書いた直後がこれで、worker が動くまで merge 候補に出さない）
 
 #### Scenario: 未確定が残る PR は反映を終えた印にならない
 - **WHEN** `Labels` が `apply`、`Body` の 1 行目が `未確定の判断: 2 件 — このまま merge すると worker が推奨案で進めます`、`Comments` の末尾が `now` の 61 分前の `人: "Q1: A"`、`UpdatedAt` が `now` の 59 分前の open PR を `mode` `sdd` で `PR()` に渡す
