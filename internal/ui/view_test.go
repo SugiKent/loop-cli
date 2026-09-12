@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/SugiKent/loop-cli/internal/fetch"
+	"github.com/SugiKent/loop-cli/internal/gh"
 	"github.com/SugiKent/loop-cli/internal/model"
 )
 
@@ -578,4 +580,408 @@ func TestViewRequestsAltScreen(t *testing.T) {
 	if !m.View().AltScreen {
 		t.Error("ヘルプ画面の View が alt screen を要求していない")
 	}
+}
+
+// --- queue-screen: 進行中タブの種別の列（段階ラベル名） ---
+
+// kindColStart / kindColWidth は spec の列順が定める種別の列の位置と幅。実装の定数ではなく
+// リテラルで持つ（実装と一緒にずれて通るテストにしない）。
+const (
+	kindColStart = 6
+	kindColWidth = 10
+)
+
+// kindColumn は表の 1 行から種別の列を末尾の空白を除いて返す。
+func kindColumn(line string) string {
+	return strings.TrimRight(ansi.Cut(line, kindColStart, kindColStart+kindColWidth), " ")
+}
+
+// tableArea は表の領域の行（ヘッダの次から、表とプレビューの区切り線の手前まで）を返す。
+func tableArea(m Model) []string {
+	lines := plain(m)
+	divider := strings.Repeat("─", m.width)
+	for i, l := range lines[1:] {
+		if l == divider {
+			return lines[1 : 1+i]
+		}
+	}
+	return lines[1:]
+}
+
+func TestInProgressKindColumnShowsStageLabel(t *testing.T) {
+	cards := []model.Card{
+		inProgressCard("org/app", 101, false, []string{"stage:archive", "wip"}, at.Add(-2*time.Hour)),
+		inProgressCard("org/app", 102, true, []string{"propose"}, at.Add(-1*time.Hour)),
+	}
+	m := inProgressModel(t, 80, 24, &fetch.Result{Cards: cards})
+
+	lines := tableArea(m)
+	issueLine, ok := lineWith(lines, "#101")
+	if !ok {
+		t.Fatalf("issue の行が無い: %q", lines)
+	}
+	prLine, ok := lineWith(lines, "PR102")
+	if !ok {
+		t.Fatalf("PR の行が無い: %q", lines)
+	}
+	if got := kindColumn(issueLine); got != "archive" {
+		t.Errorf("issue の種別の列 = %q, want %q", got, "archive")
+	}
+	if got := kindColumn(prLine); got != "propose" {
+		t.Errorf("PR の種別の列 = %q, want %q", got, "propose")
+	}
+	for _, l := range []string{issueLine, prLine} {
+		if strings.Contains(l, "進行中") {
+			t.Errorf("進行中タブの行に種別 `進行中` が残っている: %q", l)
+		}
+	}
+}
+
+func TestInProgressKindColumnIsDashWithoutStageLabel(t *testing.T) {
+	cards := []model.Card{inProgressCard("org/app", 101, false, []string{"question"}, at)}
+	m := inProgressModel(t, 80, 24, &fetch.Result{Cards: cards})
+
+	line, ok := lineWith(tableArea(m), "#101")
+	if !ok {
+		t.Fatal("行が無い")
+	}
+	if got := kindColumn(line); got != "-" {
+		t.Errorf("段階ラベルの無い主体の種別の列 = %q, want %q", got, "-")
+	}
+}
+
+func TestInProgressKindColumnShowsFirstOfTwoStages(t *testing.T) {
+	cards := []model.Card{
+		inProgressCard("org/app", 101, false, []string{"stage:propose", "stage:apply", "question"}, at),
+	}
+	m := inProgressModel(t, 80, 24, &fetch.Result{Cards: cards})
+
+	line, ok := lineWith(tableArea(m), "#101")
+	if !ok {
+		t.Fatal("行が無い")
+	}
+	if got := kindColumn(line); got != "propose" {
+		t.Errorf("段階が 2 つある主体の種別の列 = %q, want %q（段階順で先のもの）", got, "propose")
+	}
+}
+
+func TestInProgressKindColumnTruncatesLabelModeStage(t *testing.T) {
+	cards := []model.Card{inProgressCard("org/kanban", 101, false, []string{"In Progress"}, at)}
+	res := &fetch.Result{Cards: cards, Modes: map[string]model.Mode{"org/kanban": model.ModeLabel}}
+	m := inProgressModel(t, 80, 24, res)
+
+	line, ok := lineWith(tableArea(m), "#101")
+	if !ok {
+		t.Fatal("行が無い")
+	}
+	col := ansi.Cut(line, kindColStart, kindColStart+kindColWidth)
+	if ansi.StringWidth(col) != kindColWidth {
+		t.Errorf("種別の列の表示幅 = %d, want %d: %q", ansi.StringWidth(col), kindColWidth, col)
+	}
+	if !strings.HasPrefix(col, "In Progr") || !strings.HasSuffix(col, "…") {
+		t.Errorf("種別の列 = %q, want `In Progr` で始まり `…` で終わる", col)
+	}
+}
+
+func TestOtherTabsKindColumnIsUnchanged(t *testing.T) {
+	m := exampleModel(t, 80, 24)
+
+	now, ok := lineWith(tableArea(m), "PR131")
+	if !ok {
+		t.Fatal("今やるタブの行が無い")
+	}
+	if got := kindColumn(now); got != "質問" {
+		t.Errorf("今やるタブの種別の列 = %q, want %q", got, "質問")
+	}
+
+	m, _ = send(m, runeKey('2'))
+	backlog, ok := lineWith(tableArea(m), "#140")
+	if !ok {
+		t.Fatal("バックログタブの行が無い")
+	}
+	if got := kindColumn(backlog); got != "todo 候補" {
+		t.Errorf("バックログタブの種別の列 = %q, want %q", got, "todo 候補")
+	}
+}
+
+// --- queue-screen: 進行中タブの段階ラベル名の色 ---
+
+// stageColors は org/app の段階ラベルの色の表。
+func stageColors() map[string]map[string]string {
+	return map[string]map[string]string{"org/app": {"stage:propose": "0e8a16", "archive": "5319e7"}}
+}
+
+func TestInProgressStageLabelIsColored(t *testing.T) {
+	cards := []model.Card{
+		inProgressCard("org/app", 101, false, []string{"stage:propose", "wip"}, at.Add(-1*time.Hour)),
+		inProgressCard("org/app", 102, true, []string{"archive"}, at.Add(-2*time.Hour)),
+	}
+	m := inProgressModel(t, 80, 24, &fetch.Result{Cards: cards, LabelColors: stageColors()})
+
+	view := m.View().Content
+	// 色は接頭辞を落とす前のラベル名で引き、列に出すのは落とした後の語。
+	wantIn(t, view, renderLabelName("propose", "0e8a16"), "issue の段階ラベル名")
+	wantIn(t, view, renderLabelName("archive", "5319e7"), "PR の段階ラベル名")
+
+	lines := tableArea(m)
+	issueLine, _ := lineWith(lines, "#101")
+	prLine, _ := lineWith(lines, "PR102")
+	if got := kindColumn(issueLine); got != "propose" {
+		t.Errorf("色を付けても ANSI を除いた種別の列は変わらない: %q, want %q", got, "propose")
+	}
+	if got := kindColumn(prLine); got != "archive" {
+		t.Errorf("色を付けても ANSI を除いた種別の列は変わらない: %q, want %q", got, "archive")
+	}
+}
+
+func TestInProgressStageLabelWithoutColorTableIsPlain(t *testing.T) {
+	cards := []model.Card{inProgressCard("org/app", 101, false, []string{"stage:propose", "wip"}, at)}
+	m := inProgressModel(t, 80, 24, &fetch.Result{Cards: cards})
+
+	wantPlain(t, m.View().Content, "propose", "ラベル色の表が無いときの段階ラベル名")
+}
+
+// rawRow は ANSI を残したまま、ANSI を除くと sub を含む最初の行を返す。
+func rawRow(t *testing.T, m Model, sub string) string {
+	t.Helper()
+	for _, l := range strings.Split(m.View().Content, "\n") {
+		if strings.Contains(ansi.Strip(l), sub) {
+			return l
+		}
+	}
+	t.Fatalf("%q を含む行が無い", sub)
+	return ""
+}
+
+// 進行中の行は行全体の色を持たないので、段階ラベルが無い行には色のエスケープが 1 つも無い。
+func TestInProgressRowWithoutStageHasNoColor(t *testing.T) {
+	cards := []model.Card{inProgressCard("org/app", 101, false, []string{"question"}, at)}
+	m := inProgressModel(t, 80, 24, &fetch.Result{Cards: cards, LabelColors: stageColors()})
+
+	row := rawRow(t, m, "#101")
+	if strings.Contains(row, "\x1b[") {
+		t.Errorf("段階ラベルの無い進行中の行に色のエスケープがある: %q", row)
+	}
+}
+
+// 進行中の行は行全体の色を持たず、色が付くのは種別の列の段階ラベル名の範囲だけ。
+func TestInProgressRowHasNoRowColor(t *testing.T) {
+	cards := []model.Card{inProgressCard("org/app", 101, false, []string{"stage:propose", "wip"}, at)}
+	m := inProgressModel(t, 80, 24, &fetch.Result{Cards: cards, LabelColors: stageColors()})
+
+	row := rawRow(t, m, "#101")
+	if strings.HasPrefix(strings.TrimPrefix(row, "▶ "), "\x1b[") {
+		t.Errorf("進行中の行が行全体の色で始まっている: %q", row)
+	}
+	// 色の指定は段階ラベル名の 1 か所だけ（種別の列）。
+	if got := strings.Count(row, "\x1b[m"); got != 1 {
+		t.Errorf("行の色のリセットが %d 個, want 1（段階ラベル名の分だけ）: %q", got, row)
+	}
+	// 色が始まるのは種別の列の先頭で、それより左（印と優先記号）には色が無い。
+	i := strings.Index(row, "\x1b[")
+	if i < 0 {
+		t.Fatalf("段階ラベル名に色が付いていない: %q", row)
+	}
+	if w := ansi.StringWidth(row[:i]); w != kindColStart {
+		t.Errorf("色が始まる位置 = %d 列, want %d（種別の列の先頭）: %q", w, kindColStart, row)
+	}
+}
+
+// --- queue-screen: 進行中タブのリポジトリの見出し行 ---
+
+func TestRepoHeaderLineFillsWidth(t *testing.T) {
+	got := repoHeaderLine("org/app", 2, 80)
+
+	if !strings.HasPrefix(got, "── org/app ── 2 件 ") {
+		t.Errorf("見出し行の書き出しが違う: %q", got)
+	}
+	if w := ansi.StringWidth(got); w != 80 {
+		t.Errorf("表示幅 = %d, want 80: %q", w, got)
+	}
+	if !strings.HasSuffix(got, "─") {
+		t.Errorf("端末の幅まで `─` で埋まっていない: %q", got)
+	}
+}
+
+func TestRepoHeaderLineTruncatesWithoutEllipsis(t *testing.T) {
+	got := repoHeaderLine("org/very-long-repository-name", 12, 20)
+
+	if w := ansi.StringWidth(got); w != 20 {
+		t.Errorf("表示幅 = %d, want 20: %q", w, got)
+	}
+	if strings.Contains(got, "…") {
+		t.Errorf("切った跡に … が付いている: %q", got)
+	}
+}
+
+func TestRepoHeaderLineIsEmptyAtZeroWidth(t *testing.T) {
+	if got := repoHeaderLine("org/app", 1, 0); got != "" {
+		t.Errorf("幅 0 の見出し行 = %q, want 空文字列", got)
+	}
+}
+
+func TestInProgressTableSeparatesRepos(t *testing.T) {
+	cards := []model.Card{
+		inProgressCard("org/app", 101, false, []string{"stage:propose", "wip"}, at.Add(-1*time.Hour)),
+		inProgressCard("org/app", 102, false, []string{"stage:apply", "wip"}, at.Add(-2*time.Hour)),
+		inProgressCard("org/web", 103, false, []string{"stage:apply", "wip"}, at.Add(-3*time.Hour)),
+	}
+	m := inProgressModel(t, 80, 40, &fetch.Result{Cards: cards})
+
+	lines := tableArea(m)
+	want := []string{"── org/app ── 2 件 ", "#101", "#102", "── org/web ── 1 件 ", "#103"}
+	got := strings.Join(lines, "\n")
+	order(t, got, want...)
+	for _, l := range lines {
+		if !strings.HasPrefix(l, "──") {
+			continue
+		}
+		trimmed := strings.TrimRight(l, " ")
+		if w := ansi.StringWidth(trimmed); w != 80 {
+			t.Errorf("見出し行の表示幅 = %d, want 80: %q", w, l)
+		}
+		if !strings.HasSuffix(trimmed, "─") {
+			t.Errorf("見出し行が `─` で終わっていない: %q", l)
+		}
+	}
+}
+
+func TestInProgressTableShowsHeaderForSingleRepo(t *testing.T) {
+	cards := []model.Card{
+		inProgressCard("org/app", 101, false, []string{"stage:propose", "wip"}, at.Add(-1*time.Hour)),
+		inProgressCard("org/app", 102, false, []string{"stage:apply", "wip"}, at.Add(-2*time.Hour)),
+		inProgressCard("org/app", 103, false, []string{"stage:archive", "wip"}, at.Add(-3*time.Hour)),
+	}
+	m := inProgressModel(t, 80, 40, &fetch.Result{Cards: cards})
+
+	lines := tableArea(m)
+	if !strings.HasPrefix(lines[0], "── org/app ── 3 件 ") {
+		t.Fatalf("表の 1 行目が見出し行でない: %q", lines[0])
+	}
+	order(t, strings.Join(lines, "\n"), "#101", "#102", "#103")
+}
+
+func TestRepoHeaderIsNotSelectable(t *testing.T) {
+	cards := []model.Card{
+		inProgressCard("org/app", 101, false, []string{"stage:propose", "wip"}, at.Add(-1*time.Hour)),
+		inProgressCard("org/web", 102, false, []string{"stage:propose", "wip"}, at.Add(-2*time.Hour)),
+	}
+	m := inProgressModel(t, 80, 40, &fetch.Result{Cards: cards})
+
+	m, _ = send(m, runeKey('j')) // j 1 回で 2 枚目の Card に移る（見出し行は飛ばさない）
+
+	lines := tableArea(m)
+	marked, ok := lineWith(lines, "▶")
+	if !ok {
+		t.Fatalf("選択行の印が無い: %q", lines)
+	}
+	if !strings.Contains(marked, "#102") {
+		t.Errorf("j 1 回で 2 枚目の Card に移っていない: %q", marked)
+	}
+	for _, l := range lines {
+		if strings.HasPrefix(l, "──") && strings.Contains(l, "▶") {
+			t.Errorf("見出し行に選択の印が付いている: %q", l)
+		}
+	}
+}
+
+func TestOtherTabsHaveNoRepoHeader(t *testing.T) {
+	cards := []model.Card{
+		nowCard("org/app", 101, 1, at.Add(-1*time.Hour)),
+		nowCard("org/web", 102, 1, at.Add(-2*time.Hour)),
+	}
+	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: 80, Height: 40}, fetchedMsg{res: &fetch.Result{Cards: cards}, at: at})
+
+	for _, l := range tableArea(m) {
+		if strings.HasPrefix(l, "──") {
+			t.Errorf("今やるタブに見出し行がある: %q", l)
+		}
+	}
+}
+
+func TestRepoHeaderIsCutAtNarrowWidth(t *testing.T) {
+	cards := []model.Card{
+		inProgressCard("org/app", 101, false, []string{"stage:propose", "wip"}, at.Add(-1*time.Hour)),
+		inProgressCard("org/web", 102, false, []string{"stage:propose", "wip"}, at.Add(-2*time.Hour)),
+	}
+	m := inProgressModel(t, 20, 40, &fetch.Result{Cards: cards})
+
+	var headers int
+	for _, l := range tableArea(m) {
+		if !strings.HasPrefix(l, "──") {
+			continue
+		}
+		headers++
+		if w := ansi.StringWidth(l); w != 20 {
+			t.Errorf("見出し行の表示幅 = %d, want 20: %q", w, l)
+		}
+		if strings.Contains(l, "…") {
+			t.Errorf("見出し行に … がある: %q", l)
+		}
+	}
+	if headers != 2 {
+		t.Errorf("見出し行が %d 本, want 2", headers)
+	}
+}
+
+// inProgressFixture は testdata/in-progress の 2 リポジトリ分の Card を s07 の Fetch で作る。
+func inProgressFixture(t *testing.T) *fetch.Result {
+	t.Helper()
+	res, err := fetch.Fetch(context.Background(), gh.NewFake("testdata/in-progress"), []string{"org/app", "org/web"}, at, 0)
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if len(res.Errors) > 0 {
+		t.Fatalf("詳細取得の失敗: %v", res.Errors)
+	}
+	return res
+}
+
+// numColStart / numColWidth は spec の列順が定める番号の列の位置と幅。
+const (
+	numColStart = 36
+	numColWidth = 7
+)
+
+// tableSummary は表の各行を「見出し行の文言」または「種別の列 + 番号の列」に畳む。
+// タイトルの折り返しで生まれた継続行（番号の列が空）は落とす。
+func tableSummary(lines []string) []string {
+	var out []string
+	for _, l := range lines {
+		if strings.HasPrefix(l, "──") {
+			out = append(out, strings.TrimRight(l, "─"))
+			continue
+		}
+		number := strings.TrimSpace(ansi.Cut(l, numColStart, numColStart+numColWidth))
+		if number == "" {
+			continue
+		}
+		out = append(out, kindColumn(l)+" "+number)
+	}
+	return out
+}
+
+// TestInProgressTabFullScreen は進行中タブの画面全体を 1 か所で固定する。
+// 見出し行 2 本・段階の語・行の並びが揃った状態を、fixture から実際に取得した Result で描く。
+func TestInProgressTabFullScreen(t *testing.T) {
+	m := inProgressModel(t, 80, 40, inProgressFixture(t))
+
+	got := tableSummary(tableArea(m))
+	want := []string{
+		"── org/app ── 4 件 ",
+		"propose #101",
+		"apply PR201",
+		"archive #102",
+		"- PR202",
+		"── org/web ── 1 件 ",
+		"apply #103",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("進行中タブの表 =\n%q\nwant\n%q", got, want)
+	}
+
+	// 段階ラベル名には fixture のラベル色が付く（色は接頭辞を落とす前の名前で引く）。
+	view := m.View().Content
+	wantIn(t, view, renderLabelName("propose", "0e8a16"), "issue #101 の段階ラベル名")
+	wantIn(t, view, renderLabelName("apply", "1d76db"), "PR 201 の段階ラベル名")
 }

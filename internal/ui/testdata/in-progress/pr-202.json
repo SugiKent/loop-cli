@@ -1,0 +1,27 @@
+{
+  "body": "作ったばかりで段階ラベルがまだ無い PR。",
+  "comments": [
+    {
+      "id": "IC_202_1",
+      "author": {"login": "user-1"},
+      "authorAssociation": "OWNER",
+      "body": "lockfile も更新してください。",
+      "createdAt": "2026-09-05T02:30:00Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/org/app/pull/202#issuecomment-1",
+      "viewerDidAuthor": false
+    }
+  ],
+  "isDraft": false,
+  "labels": [],
+  "mergeStateStatus": "BLOCKED",
+  "mergeable": "UNKNOWN",
+  "number": 202,
+  "reviewDecision": "REVIEW_REQUIRED",
+  "statusCheckRollup": [],
+  "title": "依存を更新する",
+  "url": "https://github.com/org/app/pull/202"
+}
