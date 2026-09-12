@@ -59,7 +59,7 @@ TUI を開かずに「今やる」タブと同じ判定結果を読むための�
 
 `items` の 1 要素は 1 枚のカードで、`situation`（局面の記号）・`kind`（画面に出す種別）・`priority`（優先度の整数。小さいほど先）・`summary`（いま人が何をすべきかの 1 行）・`repo`・`subject`（局面を出した `issue` か `pr` とその番号）・`issue`・`prs` を持ちます。並びは TUI のキュー画面と同じで、優先度の昇順 → 主体の更新が新しい順 → リポジトリ名の昇順 → 番号の昇順です。`subject` は番号だけを持つので、タイトルや URL は `issue` / `prs` の該当要素から引きます。PR 単独のカードでは `issue` が `null` になります。
 
-`prs` の 1 件は `number` / `title` / `url` / `labels` / `draft` / `updated_at` に加えて、PR 詳細画面が出しているのと同じ状態（`undecided`＝本文 1 行目の `未確定の判断: N 件`、`mergeable`、`merge_state_status`、`review_decision`、`checks_green`、`checks`、`unresolved_threads`）を持ちます。詳細の取得に失敗した PR では、これらが `null` になります。空の値なのか、取れなかったのかを読み分けられるようにするためです。
+`prs` の 1 件は `number` / `title` / `url` / `labels` / `draft` / `updated_at` に加えて、PR 詳細画面が出しているのと同じ状態を持ちます。`undecided` は本文 1 行目の `未確定の判断: N 件` の N で、1 行目にその行が無い PR では `null` です。`mergeable` / `merge_state_status` / `review_decision` / `checks_green` / `checks` / `unresolved_threads` の 6 つは、詳細の取得に失敗した PR で `null` になります。空の値なのか、取れなかったのかを読み分けられるようにするためです。
 
 ```sh
 # 先頭のカードの局面と、何をすべきかを読む

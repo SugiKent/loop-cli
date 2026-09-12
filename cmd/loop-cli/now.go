@@ -262,6 +262,10 @@ func runNow(ctx context.Context, deps nowDeps, stdout, stderr io.Writer) int {
 	enc := json.NewEncoder(stdout)
 	enc.SetIndent("", "  ")
 	enc.SetEscapeHTML(false)
-	_ = enc.Encode(buildNow(res, fetchedAt))
+	if err := enc.Encode(buildNow(res, fetchedAt)); err != nil {
+		// 途中まで書けている可能性があるので、成功として終わらせない。
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
+	}
 	return 0
 }

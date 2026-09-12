@@ -138,12 +138,13 @@ func TestBuildNowEmpty(t *testing.T) {
 		{Issue: &model.Issue{Repo: "org/app", Number: 1}, Result: model.Result{Situation: model.SituationE, Tab: model.TabBacklog}},
 	}}
 
-	got := decodeNow(t, buildNow(res, nowAt))
+	out := buildNow(res, nowAt)
 
-	if got["count"] != float64(0) {
+	if got := decodeNow(t, out); got["count"] != float64(0) {
 		t.Errorf("count = %v, want 0", got["count"])
 	}
-	b, err := json.Marshal(buildNow(res, nowAt))
+	// nil のスライスは null になるので、生の JSON で [] を確かめる（design.md D3）。
+	b, err := json.Marshal(out)
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
@@ -303,6 +304,7 @@ type stubDeps struct {
 	fetchErr  error
 	fetchArgs struct {
 		repos []string
+		now   time.Time
 		grace time.Duration
 	}
 }
@@ -311,8 +313,8 @@ func (s *stubDeps) deps() nowDeps {
 	return nowDeps{
 		configPath: func() (string, error) { return s.path, s.pathErr },
 		check:      func(context.Context) error { return s.checkErr },
-		fetch: func(_ context.Context, repos []string, _ time.Time, grace time.Duration) (*fetch.Result, error) {
-			s.fetchArgs.repos, s.fetchArgs.grace = repos, grace
+		fetch: func(_ context.Context, repos []string, now time.Time, grace time.Duration) (*fetch.Result, error) {
+			s.fetchArgs.repos, s.fetchArgs.now, s.fetchArgs.grace = repos, now, grace
 			return s.result, s.fetchErr
 		},
 	}
@@ -408,6 +410,38 @@ func TestRunNowSucceeds(t *testing.T) {
 	}
 	if s.fetchArgs.grace != 45*time.Minute {
 		t.Errorf("grace = %v, want 45m", s.fetchArgs.grace)
+	}
+	// 分類の基準時刻と fetched_at は同じ値（時間切れの判定と出力の時刻をそろえる）。
+	fetchedAt, err := time.Parse(time.RFC3339Nano, got["fetched_at"].(string))
+	if err != nil {
+		t.Fatalf("fetched_at のパース: %v", err)
+	}
+	if !fetchedAt.Equal(s.fetchArgs.now) {
+		t.Errorf("fetched_at = %v, want 取得に渡した %v", fetchedAt, s.fetchArgs.now)
+	}
+}
+
+// TestRunNowEmptySucceeds は「今やる」が 0 件でも 0 で終わることを検証する。
+func TestRunNowEmptySucceeds(t *testing.T) {
+	s := &stubDeps{path: writeConfig(t, "repos:\n  - org/app\n"), result: &fetch.Result{}}
+
+	code, stdout, stderr := runNowWith(t, s)
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr=%q)", code, stderr)
+	}
+	var got map[string]any
+	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
+		t.Fatalf("Unmarshal: %v (%q)", err, stdout)
+	}
+	if got["count"] != float64(0) {
+		t.Errorf("count = %v, want 0", got["count"])
+	}
+	if items, ok := got["items"].([]any); !ok || len(items) != 0 {
+		t.Errorf("items = %v, want []", got["items"])
+	}
+	if errs, ok := got["errors"].([]any); !ok || len(errs) != 0 {
+		t.Errorf("errors = %v, want []", got["errors"])
 	}
 }
 

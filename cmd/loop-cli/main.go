@@ -216,6 +216,7 @@ func savingFetcher(fetcher ui.Fetcher, path string) ui.Fetcher {
 
 // ensureConfig は設定ファイルが無いときだけ onboarding のフォームを起動する。
 // 「存在しない」以外は Load に任せる（壊れた設定を上書きしないため）。
+// isTerminal が false なら form は呼ばれない（now はそれを当てにして nil を渡す）。
 func ensureConfig(path string, isTerminal bool, form func(path string) error) error {
 	_, err := os.Stat(path)
 	switch {
