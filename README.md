@@ -37,6 +37,41 @@ loop-cli version   # 今入っている版を出す
 
 TUI は起動時に 1 度だけ最新の版を調べ、新しい版があればヘッダの右（時刻の左）に `↑ update` を出します。調べに失敗したときと、手元の `go build` で作ったバイナリのときは何も出ません。
 
+## AI agent 向けの出力（`loop-cli now`）
+
+```sh
+loop-cli now            # 「今やる」のカードを JSON で標準出力に出して終わる
+loop-cli now | jq '.items[0].summary'
+```
+
+TUI を開かずに「今やる」タブと同じ判定結果を読むためのサブコマンドです。人が読む画面は `loop-cli`、AI agent が読むのは `loop-cli now` という切り分けで、`--json` のようなフラグは持たず、常に 1 つの JSON オブジェクトだけを出します（2 スペースで整形し、末尾に改行を付けます）。引数やフラグを付けると、それを含む 1 行を標準エラーに出して終了コード 1 で終わります。
+
+設定ファイル（`~/.config/loop-cli/config.yml`）の `repos` を対象にし、TUI と同じだけ `gh` を呼びます。設定ファイルが無いときはフォームに入らず、`設定ファイルがありません: <path>` を標準エラーに出して終了コード 1 で終わります（`gh` が無い・未認証のときも同じく 1）。スナップショット（`~/.cache/loop-cli/snapshot.json`）は読みも書きもしないので、TUI を起動していない環境でも毎回取得した結果が出ます。呼び出しの間隔は制御しないので、短い間隔で叩くと `gh` のレート制限に当たります。
+
+最上位のキーは 4 つです。
+
+| キー | 中身 |
+| --- | --- |
+| `fetched_at` | 取得を始めた時刻（RFC 3339） |
+| `count` | `items` の件数 |
+| `items` | カードの配列。0 件でも `[]` |
+| `errors` | 取得の部分失敗。0 件でも `[]` |
+
+`items` の 1 要素は 1 枚のカードで、`situation`（局面の記号）・`kind`（画面に出す種別）・`priority`（優先度の整数。小さいほど先）・`summary`（いま人が何をすべきかの 1 行）・`repo`・`subject`（局面を出した `issue` か `pr` とその番号）・`issue`・`prs` を持ちます。並びは TUI のキュー画面と同じで、優先度の昇順 → 主体の更新が新しい順 → リポジトリ名の昇順 → 番号の昇順です。`subject` は番号だけを持つので、タイトルや URL は `issue` / `prs` の該当要素から引きます。PR 単独のカードでは `issue` が `null` になります。
+
+`prs` の 1 件は `number` / `title` / `url` / `labels` / `draft` / `updated_at` に加えて、PR 詳細画面が出しているのと同じ状態（`undecided`＝本文 1 行目の `未確定の判断: N 件`、`mergeable`、`merge_state_status`、`review_decision`、`checks_green`、`checks`、`unresolved_threads`）を持ちます。詳細の取得に失敗した PR では、これらが `null` になります。空の値なのか、取れなかったのかを読み分けられるようにするためです。
+
+```sh
+# 先頭のカードの局面と、何をすべきかを読む
+loop-cli now | jq -r '.items[0] | "\(.situation) \(.summary)"'
+# merge 待ち（局面 C）で checks が緑の PR だけを拾う
+loop-cli now | jq '[.items[] | select(.situation == "C") | .prs[] | select(.checks_green)]'
+```
+
+分岐に使うなら、`kind`（`質問` / `方針` / `merge` / `その他`）より `situation` の記号（`A` / `B` / `C` / `D` / `G` / `other`）の方が安定しています。`kind` と `priority` は画面のために作った値なので、種別の文言を変えたり局面が増えたりすると値が動きます。
+
+`errors` が空でないときの `items` は不完全であり得ます。issue / PR 1 件ごとの詳細取得の失敗に加えて、リポジトリのラベル一覧の取得の失敗もここに入り、失敗したリポジトリは運用方式を判定できず既定の方式（sdd）として分類されるためです。部分失敗があっても一覧は出し、終了コードは 0 のままなので、判定を当てにする前に `errors` を見てください。
+
 ## 初回起動
 
 設定ファイル `~/.config/loop-cli/config.yml` が無いとき、起動すると入力フォームが出ます。順に `repos`（owner/name を 1 行に 1 つ）、`merge_method`、`notify`、`editor` を聞き、回答を設定ファイルに書き出してからキュー画面に進みます。ディレクトリは `0700`、ファイルは `0600` で作られます。

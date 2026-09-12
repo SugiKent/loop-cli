@@ -93,13 +93,16 @@ JSON でも `err.Error()` の文字列をそのまま並べる。`gh` の失敗�
 一方 `runUpdate(ctx, up updater, stdout, stderr)` はスタブを渡してテストしている（`update_test.go`）。
 `now` は後者に合わせ、`runNow(ctx, deps, stdout, stderr) int` が
 
-- 設定ファイルのパス（文字列）
+- 設定ファイルのパス（`func() (string, error)`。`config.DefaultPath` の失敗も `runNow` が文言にするため、
+  文字列ではなく関数値で受け取る）
 - `gh` の確認（`func(context.Context) error`）
-- 取得（`func(context.Context, []string, time.Time) (*fetch.Result, error)`）
+- 取得（`func(context.Context, []string, time.Time, time.Duration) (*fetch.Result, error)`）
 
 を受け取る形にする。`run` の `case "now"` は本物（`config.DefaultPath()` / `gh.NewClient().Check` /
 `fetch.Fetch`）を組み立てて渡すだけにする。これで「設定ファイルが無い」「`gh` が無い」「取得が失敗する」
 「部分失敗がある」の 4 経路を、`gh` もネットワークも使わずにテストできる。
+取得の最後の引数は「その他」の猶予で、`fetch.Fetch` の引数（s30 `other-grace`）にそのまま渡る。
+`now` は設定の `other_grace_min` を TUI と同じように渡し、分類が画面と食い違わないようにする。
 
 `gh.Client.Check` は `gh.GHClient` インタフェースに無い `*gh.Client` のメソッドなので、
 インタフェースを広げず、関数値 1 つとして受け取る。

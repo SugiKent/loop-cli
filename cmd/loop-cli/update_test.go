@@ -57,7 +57,7 @@ func TestRunUnknownCommand(t *testing.T) {
 	if code := run([]string{"frobnicate"}, &stdout, &stderr); code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
 	}
-	for _, want := range []string{"unknown command: frobnicate", "version", "update"} {
+	for _, want := range []string{"unknown command: frobnicate", "version", "update", "now"} {
 		if !strings.Contains(stderr.String(), want) {
 			t.Errorf("stderr に %q が無い: %q", want, stderr.String())
 		}
