@@ -75,6 +75,7 @@ func TestAnswerTemplateQuotesUpstreamQuestion(t *testing.T) {
 		"> **何の話か**: 説明の段落。",
 		"> - **選択肢 A（推奨）**: 2 組を切り替える",
 		"> - 依存: なし",
+		"> ---",
 		"> ### Q2. 色を付ける範囲",
 	} {
 		if !slices.Contains(lines, want) {
@@ -126,6 +127,12 @@ func TestAnswerTemplate(t *testing.T) {
 			comments: []model.Comment{aiComment("<!-- routine -->\nblocked-by: human\nunblock-when: comment\n\n" +
 				"認可の方針をどこに書きますか。docs/policy.md を新しく作るか、README に足すかを決めてください。")},
 			want: "> 認可の方針をどこに書きますか。docs/policy.md を新しく作るか、README に足すかを決めてください。",
+		},
+		// 範囲の中にある正本の宣言行を引用に持ち込まない（不変条件 8）。落としたあとに `>` の行も残さない。
+		"範囲の中の blocked-by: と unblock-when: は落ちる": {
+			comments: []model.Comment{aiComment("<!-- routine -->\n## Q1. 方式をどうするか\n" +
+				"- 選択肢 A（推奨）: 案 1\n\nblocked-by: human\nunblock-when: comment")},
+			want: "> ## Q1. 方式をどうするか\n> - 選択肢 A（推奨）: 案 1\n\nQ1: A",
 		},
 		"末尾の区切り線と署名は引用に入らない": {
 			comments: []model.Comment{aiComment("<!-- routine -->\n## Q1. 方式をどうするか\n" +
@@ -207,5 +214,11 @@ func TestAnswerTemplateReplacesInlineMarker(t *testing.T) {
 	}
 	if HasRoutineMarker(got) {
 		t.Errorf("AnswerTemplate = %q, want マーカーを含まない（含むと投稿できない）", got)
+	}
+
+	escaped := AnswerTemplate([]model.Comment{aiComment(
+		"&lt;!-- routine --&gt;\n## Q1. 方式をどうするか\n- 選択肢 A（推奨）: 案 1")})
+	if HasRoutineMarker(escaped) {
+		t.Errorf("AnswerTemplate = %q, want エスケープ済みのマーカーも含まない", escaped)
 	}
 }

@@ -28,10 +28,10 @@ func AnswerTemplate(comments []model.Comment) string {
 	answers := strings.Join(lines, "\n")
 
 	quote := quoteQuestion(body)
-	switch {
-	case quote == "":
+	if quote == "" {
 		return answers
-	case answers == "":
+	}
+	if answers == "" {
 		return quote
 	}
 	return quote + "\n\n" + answers
@@ -68,14 +68,14 @@ func quoteQuestion(body string) string {
 		if isDroppedLine(raw) {
 			continue
 		}
-		line := strings.TrimRight(replaceMarkers(raw), " \t")
+		line := strings.TrimRight(replaceMarkers(raw), " \t\r")
 		if line == "" {
 			out = append(out, ">")
 			continue
 		}
 		out = append(out, "> "+line)
 	}
-	// 引用ブロックと回答行の間の空行を 1 行に保つ。
+	// 範囲の最終行が落とす行だったときに残る `>` を落とし、引用ブロックと回答行の間の空行を 1 行に保つ。
 	for len(out) > 0 && out[len(out)-1] == ">" {
 		out = out[:len(out)-1]
 	}
