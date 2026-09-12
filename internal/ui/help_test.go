@@ -62,10 +62,11 @@ func TestHelpOpensAndClosesFromQueue(t *testing.T) {
 	}
 }
 
-// TestHelpReturnsToCardDetail は展開状態を保ったままカード詳細へ戻ることを検証する。
+// TestHelpReturnsToCardDetail はカード詳細へ戻り、コメントの全文が出たままであることを検証する。
 func TestHelpReturnsToCardDetail(t *testing.T) {
 	m, _, _ := helpModel(t)
-	m, _ = send(m, enterKey, runeKey('x'))
+	// 幅 161 は AI コメントの 2 行目が折り返されずに 1 行に収まる幅（detail_test.go と同じ）。
+	m, _ = send(m, tea.WindowSizeMsg{Width: 161, Height: 40}, enterKey)
 
 	m, _ = send(m, questionKey, codeKey(tea.KeyEscape))
 
@@ -75,8 +76,12 @@ func TestHelpReturnsToCardDetail(t *testing.T) {
 	if m.detail.card.Issue.Number != 108 {
 		t.Errorf("詳細の対象 = #%d, want #108", m.detail.card.Issue.Number)
 	}
-	if strings.Contains(plainText(m), "(+1 行)") {
-		t.Error("ヘルプから戻ったときに展開状態が失われている")
+	line, ok := lineWith(plain(m), "Q2: 失効時はログイン画面へ戻しますか。")
+	if !ok {
+		t.Fatalf("戻った後に AI コメントの 2 行目が無い:\n%s", plainText(m))
+	}
+	if !strings.HasPrefix(line, "▌") {
+		t.Errorf("戻った後の AI コメントの行が ▌ で始まらない: %q", line)
 	}
 }
 
@@ -188,8 +193,13 @@ func TestHelpListsImplementedKeys(t *testing.T) {
 	m, _ = send(m, tea.WindowSizeMsg{Width: 80, Height: 24}, questionKey)
 
 	body := helpBody(t, m)
-	if len(body) != 21 {
-		t.Fatalf("キーの行数 = %d, want 21:\n%s", len(body), strings.Join(body, "\n"))
+	if len(body) != 20 {
+		t.Fatalf("キーの行数 = %d, want 20:\n%s", len(body), strings.Join(body, "\n"))
+	}
+	for _, l := range body {
+		if strings.HasPrefix(l, "x") {
+			t.Errorf("折りたたみを廃止したのに x の行がある: %q", l)
+		}
 	}
 	if !strings.Contains(body[0], "j / k / ↑ / ↓") || !strings.Contains(body[0], "行移動（キュー）/ スクロール（詳細）") {
 		t.Errorf("1 行目 = %q", body[0])
