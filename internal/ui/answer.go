@@ -97,8 +97,13 @@ func (m Model) updateAnswerEdited(msg editedMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case msg.err != nil:
 		m.writeStatus, m.writeStatusErr = "エディタ: "+msg.err.Error(), true
-	case strings.TrimSpace(msg.text) == "":
-		m.writeStatus, m.writeStatusErr = "回答を中止しました（本文が空）", false
+	case action.IsBlankAnswer(msg.text):
+		// 引用だけの下書きをそのまま投稿すると、dispatcher が「人が答えた」とみなす。
+		if strings.TrimSpace(msg.text) == "" {
+			m.writeStatus, m.writeStatusErr = "回答を中止しました（本文が空）", false
+		} else {
+			m.writeStatus, m.writeStatusErr = "回答を中止しました（引用だけです）", false
+		}
 	case action.HasRoutineMarker(msg.text):
 		m.answer.draft, m.answer.reason = msg.text, reasonMarker
 		m.screen = screenConfirm

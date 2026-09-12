@@ -56,7 +56,7 @@ func answer(t *testing.T, m Model) (Model, tea.Cmd) {
 // TestAnswerTargetIsWhatTheScreenShows は `a` の対象が画面の見せているものに決まることを検証する。
 // 局面 A は PR、局面 B は issue が主体なので、キュー画面の `a` はそのまま正しい書き先になる。
 func TestAnswerTargetIsWhatTheScreenShows(t *testing.T) {
-	question := "<!-- routine -->\n## Q1. 分けるか\n- 選択肢 A（推奨）: 分ける\n- 選択肢 B: 分けない"
+	question := "<!-- routine -->\n### Q1. 分けるか\n- **選択肢 A（推奨）**: 分ける\n- **選択肢 B**: 分けない"
 
 	t.Run("キュー画面は選択行の主体", func(t *testing.T) {
 		ed := &stubEditor{}
@@ -69,9 +69,21 @@ func TestAnswerTargetIsWhatTheScreenShows(t *testing.T) {
 		if want := (action.Target{Repo: "org/app", Number: 131, IsPR: true}); m.answer.target != want {
 			t.Errorf("対象 = %+v, want %+v", m.answer.target, want)
 		}
+	})
+
+	// 上流の書式の質問コメントが、引用付きでエディタに届くことを見る（issue #38 の動機そのもの）。
+	t.Run("エディタには質問の引用と回答行が入る", func(t *testing.T) {
+		ed := &stubEditor{}
+		m, _ := answerModel([]model.Card{prCard([]model.Comment{{Body: question, AI: true}})}, ed)
+
+		_, cmd := send(m, aKey)
+		if cmd == nil {
+			t.Fatal("a でエディタが起動していない")
+		}
 		cmd()
-		if ed.initial != "Q1: A" {
-			t.Errorf("テンプレート = %q, want %q", ed.initial, "Q1: A")
+		want := "> ### Q1. 分けるか\n> - **選択肢 A（推奨）**: 分ける\n> - **選択肢 B**: 分けない\n\nQ1: A"
+		if ed.initial != want {
+			t.Errorf("テンプレート = %q, want %q", ed.initial, want)
 		}
 	})
 
@@ -108,6 +120,10 @@ func TestAnswerTargetIsWhatTheScreenShows(t *testing.T) {
 		if want := (action.Target{Repo: "org/app", Number: 131, IsPR: true}); m.answer.target != want {
 			t.Errorf("対象 = %+v, want %+v", m.answer.target, want)
 		}
+		cmd()
+		if ed.initial != "" {
+			t.Errorf("見出しの無い質問からテンプレートを作っている: %q", ed.initial)
+		}
 	})
 
 	t.Run("question の無いバックログの issue にも書ける", func(t *testing.T) {
@@ -121,6 +137,10 @@ func TestAnswerTargetIsWhatTheScreenShows(t *testing.T) {
 		}
 		if want := (action.Target{Repo: "org/app", Number: 140}); m.answer.target != want {
 			t.Errorf("対象 = %+v, want %+v", m.answer.target, want)
+		}
+		cmd()
+		if ed.initial != "" {
+			t.Errorf("問いの無い issue にテンプレートが入っている: %q", ed.initial)
 		}
 	})
 
@@ -173,13 +193,34 @@ func TestAnswerPostsEditedBody(t *testing.T) {
 	}
 }
 
+// TestAnswerPostsQuoteWithAnswer は、引用を残したまま書き足した本文がそのまま投稿されることを検証する。
+// TUI は人が書いた行を落とさないので、引用は投稿されるコメントの一部になる。
+func TestAnswerPostsQuoteWithAnswer(t *testing.T) {
+	body := "> 認可の方針をどこに書きますか。\n\nA でお願いします"
+	ed := &stubEditor{msg: editedMsg{text: body}}
+	m, fake := answerModel([]model.Card{prCard(nil)}, ed)
+
+	m, cmd := answer(t, m)
+	runCmd(t, m, cmd)
+
+	want := gh.Call{Method: "CommentPR", Repo: "org/app", Number: 131, Body: body}
+	if len(fake.Calls) != 1 || !reflect.DeepEqual(fake.Calls[0], want) {
+		t.Errorf("呼び出し = %+v, want 1 件の %+v", fake.Calls, want)
+	}
+}
+
 // TestAnswerAbortsWithoutPosting は投稿に至らない編集結果を検証する。
 func TestAnswerAbortsWithoutPosting(t *testing.T) {
 	for name, tc := range map[string]struct {
 		edited editedMsg
 		want   string
 	}{
-		"本文が空":    {edited: editedMsg{text: " \n"}, want: "回答を中止しました（本文が空）"},
+		"本文が空": {edited: editedMsg{text: " \n"}, want: "回答を中止しました（本文が空）"},
+		// 引用だけの下書きを投稿すると、dispatcher が「人が答えた」とみなして worker が推奨案で進む。
+		"引用だけ": {
+			edited: editedMsg{text: "> 認可の方針をどこに書きますか。\n>\n> - 選択肢 A（推奨）: docs/policy.md"},
+			want:   "回答を中止しました（引用だけです）",
+		},
 		"エディタが失敗": {edited: editedMsg{err: errors.New("exit status 1")}, want: "エディタ: exit status 1"},
 	} {
 		t.Run(name, func(t *testing.T) {

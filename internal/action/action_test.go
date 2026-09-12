@@ -76,6 +76,7 @@ func TestCommentRejects(t *testing.T) {
 		want error
 	}{
 		"空白だけ":         {body: " \n\t\n", want: ErrEmptyBody},
+		"引用行だけ":        {body: "> 認可の方針をどこに書きますか。\n>\n> - 選択肢 A（推奨）: docs/policy.md\n", want: ErrEmptyBody},
 		"マーカーで始まる":     {body: "<!-- routine -->\nQ1: A", want: ErrRoutineMarker},
 		"マーカーが文中にある":   {body: "routine のコメントは <!-- routine --> で始まるはずでは？", want: ErrRoutineMarker},
 		"エスケープされたマーカー": {body: "&lt;!-- routine --&gt;\nQ1: A", want: ErrRoutineMarker},
@@ -90,6 +91,20 @@ func TestCommentRejects(t *testing.T) {
 				t.Errorf("拒否したのに client を呼んでいる: %+v", client.Calls)
 			}
 		})
+	}
+}
+
+// TestCommentAcceptsQuoteWithAnswer は、引用に 1 行でも書き足した本文が投稿されることを検証する。
+// 引用をそのまま残した回答は、GitHub 上で「引用された問い → 回答」の順に読める。
+func TestCommentAcceptsQuoteWithAnswer(t *testing.T) {
+	client := newExampleFake()
+	body := "> 認可の方針をどこに書きますか。\n\nA でお願いします"
+	if err := Comment(context.Background(), client, Target{Repo: "org/app", Number: 108}, body); err != nil {
+		t.Fatalf("Comment: %v", err)
+	}
+	want := gh.Call{Method: "CommentIssue", Repo: "org/app", Number: 108, Body: body}
+	if len(client.Calls) != 1 || !reflect.DeepEqual(client.Calls[0], want) {
+		t.Errorf("呼び出し = %+v, want 1 件の %+v（引用行は落とさない）", client.Calls, want)
 	}
 }
 

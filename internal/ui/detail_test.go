@@ -464,6 +464,16 @@ func TestBlockedByHumanShowsQuestionsAndOptions(t *testing.T) {
 	wantOrder(t, linesOf(m), "blocked-by: human", "Q1. 名前での絞り込みを含めるか", "A（推奨）: 含めない", "B: 含める")
 }
 
+// TestBlockedByHumanShowsUpstreamFormatQuestions は routine が実際に投稿する書式
+// （`###` の見出しと太字の選択肢）でも質問と選択肢が要約に出ることを見る。
+// この書式は s34 まで 1 件もパースできず、要約には本文がそのまま出ていた。
+func TestBlockedByHumanShowsUpstreamFormatQuestions(t *testing.T) {
+	body := "<!-- routine -->\nblocked-by: human\nunblock-when: comment\n" +
+		"### Q1. 色を付ける範囲\n- **選択肢 A（推奨）**: 状態語まで広げる\n- **選択肢 B**: ラベル名だけにする"
+	m, _ := send(detailModel(120, 40, []model.Card{blockedCard(body)}), enterKey)
+	wantOrder(t, linesOf(m), "blocked-by: human", "Q1. 色を付ける範囲", "A（推奨）: 状態語まで広げる", "B: ラベル名だけにする")
+}
+
 func TestBlockedByHumanWithoutQuestionsShowsBody(t *testing.T) {
 	body := "<!-- routine -->\nblocked-by: human\n次の方針をコメントで教えてください"
 	m, _ := send(detailModel(120, 40, []model.Card{blockedCard(body)}), enterKey)

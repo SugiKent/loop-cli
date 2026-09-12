@@ -123,6 +123,53 @@ func TestParseQuestionsAcceptsFullWidthColon(t *testing.T) {
 	}
 }
 
+// TestParseQuestionsUpstreamFormat は routine が実際に投稿する書式（`###` の見出しと太字の選択肢）を読む。
+// この書式が読めないと、局面 A で回答テンプレートが白紙のまま開く。
+func TestParseQuestionsUpstreamFormat(t *testing.T) {
+	body := "<!-- routine -->\n" +
+		"未確定の判断が 2 件あります。`Q1: A` の形で返してください。\n" +
+		"\n---\n\n" +
+		"### Q1. 状態語の色を端末の背景に追随させるか\n" +
+		"\n" +
+		"**何の話か**: 説明の段落。\n" +
+		"\n" +
+		"- **選択肢 A（推奨）**: 端末の背景色を受け取り 2 組を切り替える\n" +
+		"- **選択肢 B**: 状態語にも背景色を敷く\n" +
+		"- 依存: なし\n" +
+		"\n---\n\n" +
+		"### Q2. 色を付ける範囲\n" +
+		"\n" +
+		"- **選択肢 A**（推奨）: 状態語まで広げる\n" +
+		"- **選択肢 B**: ラベル名だけにする"
+
+	qs := ParseQuestions(body)
+	if len(qs) != 2 {
+		t.Fatalf("質問の件数 = %d, want 2", len(qs))
+	}
+	if qs[0].Number != 1 || qs[0].Title != "状態語の色を端末の背景に追随させるか" {
+		t.Errorf("Q1 = %+v", qs[0])
+	}
+	want := []Option{
+		{Letter: "A", Text: "端末の背景色を受け取り 2 組を切り替える", Recommended: true},
+		{Letter: "B", Text: "状態語にも背景色を敷く"},
+	}
+	if len(qs[0].Options) != 2 || qs[0].Options[0] != want[0] || qs[0].Options[1] != want[1] {
+		t.Errorf("Q1 の選択肢 = %+v, want %+v（`- 依存: なし` は選択肢にしない）", qs[0].Options, want)
+	}
+	if qs[1].Number != 2 || len(qs[1].Options) != 2 || !qs[1].Options[0].Recommended {
+		t.Errorf("Q2 = %+v", qs[1])
+	}
+}
+
+// TestParseQuestionsWithoutHeadingMarkIsEmpty は `#` の見出しを持たない行を質問にしないことを見る。
+// 緩めると、人が書いた `Q1: A` の回答コメントまで質問に化ける。
+func TestParseQuestionsWithoutHeadingMarkIsEmpty(t *testing.T) {
+	qs := ParseQuestions("<!-- routine -->\nQ1: マイグレーションを分けますか。\nQ2: 期限はいつですか。")
+	if len(qs) != 0 {
+		t.Errorf("ParseQuestions = %+v, want 空", qs)
+	}
+}
+
 func TestParseQuestionsWithoutHeadingIsEmpty(t *testing.T) {
 	qs := ParseQuestions("<!-- routine -->\nblocked-by: human\n次の方針をコメントで教えてください")
 	if len(qs) != 0 {
