@@ -2,7 +2,9 @@
 
 ## Purpose
 TBD - created by archiving change s10-answer-question. Update Purpose after archive.
+
 ## Requirements
+
 ### Requirement: 回答の書き先は対象の種類で決まり、ラベルは触らない
 `internal/action` は型 `Target { Repo string; Number int; IsPR bool }` と関数 `Comment(ctx context.Context, client gh.GHClient, t Target, body string) error` を MUST 提供する。`Comment` は human-turn-signals.md 不変条件 4「回答の書き先は 3 種類を混同しない」を実装し、`IsPR` が true なら `client.CommentPR(ctx, t.Repo, t.Number, body)`（grill の問い。PR 会話コメント。局面 A）、false なら `client.CommentIssue(ctx, t.Repo, t.Number, body)`（issue の `question`。局面 B）を 1 回だけ呼び、その戻り値をそのまま返す。不変条件 4 の 3 種類目である review thread への返信は、後続 change s16 が `ReplyReviewThread` を使って担当する。この `Comment` は review thread を扱わない。
 `Comment` はラベルを書かない（不変条件 2「TUI が書くラベルは `stage:todo` と `stage:propose` に限る」。`question` / `blocked` の付け外しは sweep が行う）。`AddLabel` / `RemoveLabel` を呼ばず、他の書き込みメソッドも呼ばない。
@@ -20,11 +22,21 @@ TBD - created by archiving change s10-answer-question. Update Purpose after arch
 - **THEN** `Calls` は 2 件で、`Method` が `AddLabel` または `RemoveLabel` の要素は無い
 
 ### Requirement: 空の本文は投稿しない
-`Comment` は `body` の前後の空白（空白・タブ・改行）を除いた結果が空文字列なら、エラー値 `ErrEmptyBody` を MUST 返し、`client` のメソッドを呼ばない。空白だけの本文を投稿すると、dispatcher が「`<!-- routine -->` で始まらないコメント」を人の回答とみなして `question` を外す（不変条件 7 の説明）ため、中身の無い回答が「回答済み」になるのを防ぐ。
+`internal/action` は判定関数 `IsBlankAnswer(body string) bool` を MUST 持ち、`body` の各行のうち、前後の空白を除いて空でも `>` で始まってもいない行が 1 つも無ければ真を返す（空白だけの本文、引用行だけの本文、その組み合わせが真になる）。`Comment` は `IsBlankAnswer(body)` が真なら、エラー値 `ErrEmptyBody` を MUST 返し、`client` のメソッドを呼ばない。
+
+空白だけの本文を投稿すると、dispatcher が「`<!-- routine -->` で始まらないコメント」を人の回答とみなして `question` を外す（不変条件 7 の説明）ため、中身の無い回答が「回答済み」になるのを防ぐ。引用行だけの本文を同じ扱いにするのは、Requirement「回答テンプレートは最新の routine コメントの質問から組み立てる」が引用だけのテンプレート（issue の `blocked-by: human`）を作るので、それを開いてそのまま閉じた下書きが「人が答えた」と読まれる経路を作らないためである。人が引用に 1 行でも書き足せば偽になる。
 
 #### Scenario: 空白だけの本文は拒否される
 - **WHEN** `Comment(ctx, client, Target{Repo: "org/app", Number: 131, IsPR: true}, " \n\t\n")` を呼ぶ
 - **THEN** `errors.Is(err, ErrEmptyBody)` が真で、`Fake.Calls` は空である
+
+#### Scenario: 引用行だけの本文は拒否される
+- **WHEN** `Comment(ctx, client, Target{Repo: "org/app", Number: 108, IsPR: false}, "> 認可の方針をどこに書きますか。\n>\n> - 選択肢 A（推奨）: docs/policy.md\n")` を呼ぶ
+- **THEN** `errors.Is(err, ErrEmptyBody)` が真で、`Fake.Calls` は空である
+
+#### Scenario: 引用に 1 行でも書き足した本文は投稿される
+- **WHEN** `Comment(ctx, client, Target{Repo: "org/app", Number: 108, IsPR: false}, "> 認可の方針をどこに書きますか。\n\nA でお願いします")` を呼ぶ
+- **THEN** nil が返り、`Fake.Calls` は 1 件で `Method` が `CommentIssue`、`Body` が引用行を含む本文そのままである
 
 ### Requirement: routine マーカーを含む本文は投稿しない
 `internal/action` は判定関数 `HasRoutineMarker(body string) bool` を MUST 持ち、`body` に `<!-- routine -->` または HTML エスケープ済みの `&lt;!-- routine --&gt;` が本文のどこかに含まれていれば真を返す。`Comment` は `HasRoutineMarker(body)` が真なら、エラー値 `ErrRoutineMarker` を MUST 返し、`client` のメソッドを呼ばない。根拠は不変条件 7「TUI は `<!-- routine -->` を書かない。TUI から投稿する文章はすべて人の発言」だけである。先頭に限らず本文のどこにあっても拒否する。判定は `body` の字面で行い、大文字小文字や空白の揺れを吸収しない。`## PR リスク評価` 見出しを含む本文は拒否しない（s05 `model.IsAI` はこの見出しを AI 扱いするが、不変条件 7 はマーカーだけを定める。`IsAI` との既知の差であり、design.md の未決事項）。
@@ -58,26 +70,76 @@ TBD - created by archiving change s10-answer-question. Update Purpose after arch
 - **THEN** nil が返り、`Fake.Calls` は 1 件で `Method` が `CommentIssue`、`Body` が `blocked-by: human\nQ1: A` である
 
 ### Requirement: 回答テンプレートは最新の routine コメントの質問から組み立てる
-`internal/action` は関数 `AnswerTemplate(comments []model.Comment) string` を MUST 提供する。`comments` を末尾（最新）から先頭へ見て、最初に `AI` が true のコメント（最新の routine コメント）を選び、その `Body` を s05 の `model.ParseQuestions` でパースする。各 `Question` について `Q<Number>: <Letter>` の 1 行を作り、質問の出現順に改行 `\n` で連結して返す（末尾に改行を付けない）。`<Letter>` は `Options` のうち `Recommended` が true の最初の選択肢の `Letter`（mvp.md「推奨（`（推奨）`）を既定値にする」）、無ければ先頭の選択肢の `Letter`、選択肢が 1 つも無ければ空（行は `Q<Number>: ` で終わる）。
-`comments` が nil または空、`AI` が true のコメントが無い、質問が 1 件もパースできない（issue の `blocked-by: human` コメントは見出し形式が固定でない。mvp.md「パースできた分だけ事前入力する」）のいずれでも空文字列を返す。テンプレートに `<!-- routine -->` を含めない（Requirement「routine マーカーを含む本文は投稿しない」）。
+`internal/action` は関数 `AnswerTemplate(comments []model.Comment) string` を MUST 提供する。テンプレートは**引用ブロック**と**回答行**を、間に空行 1 行を挟んでこの順に連結したものとする（末尾に改行を付けない）。回答行が 0 行なら引用ブロックだけを返し、引用ブロックも空なら空文字列を返す。引用を先に置くのは、投稿したときに GitHub 上で「引用された問い → 回答」の読み順になるからである。
+
+**対象のコメント**は、`comments` を末尾（最新）から先頭へ見て、次の両方を満たす最初のコメントを MUST 選ぶ。引用ブロックと回答行はどちらもこのコメントから作る。満たすコメントが 1 件も無ければ（`comments` が nil か空の場合を含めて）空文字列を返す。
+1. `AI` が true である
+2. 人への問いである。すなわち `model.ParseQuestions`（`card-model`「質問の見出しと選択肢をパースする」）が 1 件以上の質問を返すか、`BlockedByLines` が 1 行以上を返す。この 2 つが、人への問いが届く形（grill の質問コメントと issue の `blocked-by: human` コメント）である
+
+対象を末尾のコメントに限らないので、人の返信・`started:` / `session:` の作業印・`## PR リスク評価` の評価コメントを飛び越えて問いに届く。人が既に答えた問いも対象になり得る（人が引用を消して投稿する）。
+
+**回答行**は、対象のコメントの `Body` をパースした各 `Question` について `Q<Number>: <Letter>` の 1 行を作り、質問の出現順に改行 `\n` で連結したものとする。`<Letter>` は `Options` のうち `Recommended` が true の最初の選択肢の `Letter`（mvp.md「推奨（`（推奨）`）を既定値にする」）、無ければ先頭の選択肢の `Letter`、選択肢が 1 つも無ければ空（行は `Q<Number>: ` で終わる）。質問が 1 件もパースできなければ回答行は 0 行である。
+
+**引用ブロック**は、対象のコメントの `Body` のうち「質問が始まった行から終わった行まで」を写したものとする。範囲は次のとおり MUST 決める。
+- **始まり**: 最初の質問見出しの行。質問見出しが 1 つも無いコメントでは、routine マーカーの行と `blocked-by:` / `unblock-when:` の行を飛ばした後の最初の非空行
+- **終わり**: `Body` の末尾から、次の行を落としていって最初に残る行。空行、`-` `*` `_` のいずれかが 3 つ以上並んだだけの区切り線の行、`_` で始まり `_` で終わる 1 行（routine の PR コメントの署名 `_Generated by [Claude Code](…)_` がこの形）
+- 範囲の中にある説明文・表・`- 依存:` の行は、パースできたかどうかを問わず引用に入る
+
+範囲の各行は次のとおり写す。
+- 前後の空白を除いた結果が routine マーカー（`<!-- routine -->` または `&lt;!-- routine --&gt;`）と一致する行は落とす
+- 前後の空白を除いた結果が `blocked-by:` または `unblock-when:` で始まる行は落とす（dispatcher の正本の宣言を引用として持ち回らないため。`docs/domain/issue-driven-sdd/human-turn-signals.md` 不変条件 8）
+- 残った行に routine マーカーが含まれていれば、その箇所を `[routine マーカー]` に置き換える。行ごと落とさないのは、質問行にマーカーが含まれていたときに質問文が消えたまま回答行が残るのを避けるためである。判定に使うマーカーの文字列は Requirement「routine マーカーを含む本文は投稿しない」と同一のものを使い、テンプレート側で定義し直さない
+- 残った各行は、行末の空白を落とした結果が空なら `>` の 1 文字、そうでなければ `> ` を前に付けた 1 行にする
+- 末尾に連なる `>` だけの行は出さない（引用ブロックと回答行の間の空行を 1 行に保つため）
+
+`AnswerTemplate` の戻り値に routine マーカーを含めない。
+
+引用ブロックはテンプレートの一部であり、人が消さなければそのまま投稿される本文になる。`Comment` は引用行を落とさない。
+
+#### Scenario: 上流の質問コメントから引用と回答行ができる
+- **WHEN** `AI` が true で `Body` が `<!-- routine -->\n未確定の判断が 2 件あります。\n\n---\n\n### Q1. 状態語の色を端末の背景に追随させるか\n\n**何の話か**: 説明の段落。\n\n- **選択肢 A（推奨）**: 2 組を切り替える\n- **選択肢 B**: 背景色を敷く\n- 依存: なし\n\n---\n\n### Q2. 色を付ける範囲\n\n- **選択肢 A**: ラベル名だけ\n- **選択肢 B（推奨）**: 状態語まで\n\n---\n_Generated by [Claude Code](https://claude.ai/code)_` のコメント 1 件で `AnswerTemplate` を呼ぶ
+- **THEN** 戻り値の 1 行目は `> ### Q1. 状態語の色を端末の背景に追随させるか` で、`> **何の話か**: 説明の段落。`・`> - **選択肢 A（推奨）**: 2 組を切り替える`・`> - 依存: なし`・`> ### Q2. 色を付ける範囲` の各行を含み、`未確定の判断が 2 件あります。` と `_Generated by` を含まず、最後の 2 行が `Q1: A` と `Q2: B` で、その手前が空行 1 行である
 
 #### Scenario: 推奨を既定値にした 2 問のテンプレート
 - **WHEN** `AI` が true で `Body` が `<!-- routine -->\n以下 2 点、回答をお願いします\n## Q1. 名前での絞り込みを今回のスコープに含めるか\n- 選択肢 A（推奨）: 含めない。次の issue に回す\n- 選択肢 B: 含める\n## Q2. カードの情報量の見直しをどこまで行うか\n- 選択肢 A: 今回は触らない\n- 選択肢 B（推奨）: 幅だけ直す` のコメント 1 件で `AnswerTemplate` を呼ぶ
-- **THEN** `Q1: A\nQ2: B` が返る
+- **THEN** `> ## Q1. 名前での絞り込みを今回のスコープに含めるか\n> - 選択肢 A（推奨）: 含めない。次の issue に回す\n> - 選択肢 B: 含める\n> ## Q2. カードの情報量の見直しをどこまで行うか\n> - 選択肢 A: 今回は触らない\n> - 選択肢 B（推奨）: 幅だけ直す\n\nQ1: A\nQ2: B` が返る（マーカーの行と前置きの 1 行は引用に入らない）
 
 #### Scenario: 推奨が無ければ先頭の選択肢、選択肢が無ければ空
 - **WHEN** `AI` が true で `Body` が `## Q1. 方式をどうするか\n- 選択肢 A: 案 1\n- 選択肢 B: 案 2\n## Q2. 期限はいつか` のコメント 1 件で `AnswerTemplate` を呼ぶ
-- **THEN** `Q1: A\nQ2: ` が返る
+- **THEN** 回答行は `Q1: A` と `Q2: ` の 2 行である
 
 #### Scenario: 最新の routine コメントを採り、後ろの人のコメントは見ない
 - **WHEN** `example` の `issue-108.json` のコメント 2 件（1 件目が AI で `Q1: セッションの寿命は何日にしますか。…`、2 件目が人の `寿命は 30 日で。`）を `model.CommentFrom` で変換した列の後ろに、`AI` が true で `Body` が `## Q1. 方式をどうするか\n- 選択肢 B（推奨）: 案 2` のコメントと、`AI` が false で `Body` が `## Q1. 人が書いた見出し\n- 選択肢 A（推奨）: x` のコメントをこの順で足した列で `AnswerTemplate` を呼ぶ
-- **THEN** `Q1: B` が返る（`AI` が false のコメントは最新でも対象にしない）
+- **THEN** `> ## Q1. 方式をどうするか\n> - 選択肢 B（推奨）: 案 2\n\nQ1: B` が返る（`AI` が false のコメントは最新でも対象にしない）
+
+#### Scenario: 作業印のコメントを飛び越えて問いを選ぶ
+- **WHEN** `AI` が true で `Body` が `<!-- routine -->\n### Q1. 分けるか\n- **選択肢 A（推奨）**: 分ける` のコメントと、`AI` が true で `Body` が `<!-- routine -->\nstarted: 2026-09-11T17:05:00Z\nsession: session_01ABC` のコメントをこの順に持つ列で `AnswerTemplate` を呼ぶ
+- **THEN** `> ### Q1. 分けるか\n> - **選択肢 A（推奨）**: 分ける\n\nQ1: A` が返る（末尾の作業印のコメントは対象にならず、その中身は引用に入らない）
+
+#### Scenario: blocked-by のコメントは引用だけのテンプレートになる
+- **WHEN** `AI` が true で `Body` が `<!-- routine -->\nblocked-by: human\nunblock-when: comment\n\n認可の方針をどこに書きますか。docs/policy.md を新しく作るか、README に足すかを決めてください。` のコメント 1 件で `AnswerTemplate` を呼ぶ
+- **THEN** `> 認可の方針をどこに書きますか。docs/policy.md を新しく作るか、README に足すかを決めてください。` が返る（質問見出しが無いので、マーカー行と `blocked-by:` / `unblock-when:` の行を飛ばした後の最初の非空行から始まり、回答行は無い）
+
+#### Scenario: 行の途中のマーカーは置き換えて残す
+- **WHEN** `AI` が true で `Body` が `<!-- routine -->\n## Q1. 先頭に <!-- routine --> を入れるか\n- 選択肢 A（推奨）: 入れない` のコメント 1 件で `AnswerTemplate` を呼ぶ
+- **THEN** 戻り値は `> ## Q1. 先頭に [routine マーカー] を入れるか` の行を含み、`Q1: A` の行で終わり、`HasRoutineMarker` にその戻り値を渡すと false である（質問文が消えたまま回答行だけが残ることはない）
 
 #### Scenario: 見出しの無い routine コメントは空のテンプレート
-- **WHEN** `example` の `pr-131.json` のコメント（`AI` が true、`Body` が `<!-- routine -->\nQ1: マイグレーションを分けますか。`。`## Q1.` の見出し形式ではない）を `model.CommentFrom` で変換した 1 件で `AnswerTemplate` を呼ぶ
-- **THEN** 空文字列が返る
+- **WHEN** `example` の `pr-131.json` のコメント（`AI` が true、`Body` が `<!-- routine -->\nQ1: マイグレーションを分けますか。`。質問は `Q1:` の 1 行で書かれており、`#` の見出しも `blocked-by:` 行も持たない）を `model.CommentFrom` で変換した 1 件で `AnswerTemplate` を呼ぶ
+- **THEN** 空文字列が返る（人への問いと判定できるコメントが 1 件も無い）
+
+#### Scenario: 人への問いではない routine コメントは対象にしない
+- **WHEN** `AI` が true で `Body` が `<!-- routine -->\nstarted: 2026-09-11T17:05:00Z\nsession: session_01ABC` のコメント 1 件と、`AI` が true で `Body` が `## PR リスク評価\n\n影響範囲は小さい。` のコメント 1 件のそれぞれで `AnswerTemplate` を呼ぶ
+- **THEN** どちらも空文字列が返る
+
+#### Scenario: エスケープ済みのマーカーも引用に入らない
+- **WHEN** `AI` が true で `Body` が `&lt;!-- routine --&gt;\n## Q1. 方式をどうするか\n- 選択肢 A（推奨）: 案 1` のコメント 1 件で `AnswerTemplate` を呼ぶ
+- **THEN** `> ## Q1. 方式をどうするか\n> - 選択肢 A（推奨）: 案 1\n\nQ1: A` が返り、`HasRoutineMarker` にその戻り値を渡すと false である
 
 #### Scenario: コメントが無ければ空のテンプレート
 - **WHEN** nil と、`AI` が false のコメントだけの列のそれぞれで `AnswerTemplate` を呼ぶ
 - **THEN** どちらも空文字列が返る
 
+#### Scenario: 引用の末尾から区切り線と署名を落とす
+- **WHEN** `AI` が true で `Body` が `<!-- routine -->\n## Q1. 方式をどうするか\n- 選択肢 A（推奨）: 案 1\n\n---\n_Generated by [Claude Code](https://claude.ai/code)_\n` のコメント 1 件で `AnswerTemplate` を呼ぶ
+- **THEN** `> ## Q1. 方式をどうするか\n> - 選択肢 A（推奨）: 案 1\n\nQ1: A` が返る（末尾の空行・区切り線・署名の行は範囲の外なので引用に入らない）
