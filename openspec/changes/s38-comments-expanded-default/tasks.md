@@ -1,41 +1,57 @@
-## 1. 既定を展開にする
+## 1. 折りたたみを廃止する
 
-- [ ] 1.1 `detailState`（`internal/ui/detail.go:38-44`）のフィールド `expanded bool` を `collapsed bool` に
-  変える。`case "x"`（同 `:103-105`）は `collapsed` を反転して `refreshDetail` を呼び、コメントを描く箇所
-  （同 `:375`）は `commentBlock` の最後の引数へ `!m.detail.collapsed` を渡す。`openDetail` はゼロ値で
-  `detailState` を作るままにし、初期化を書き足さない
-- [ ] 1.2 `card-detail` の MODIFIED Requirement「routine コメントは既定で展開し、x で折りたたむ」の Scenario
-  「開いた直後は AI コメントの全行が出る」を `internal/ui/detail_test.go` の
-  `TestAICommentIsCollapsedAndExpandedByX`（`:549`）を作り直す形で書き、テスト名も既定に合わせて直して通す
-- [ ] 1.3 同 Requirement の Scenario「x で折りたたむと見出しだけになる」を 1.2 と同じテストの後半として書き、
-  `x` の 1 回目で `▌AI  18:00  Q1: セッションの寿命は何日にしますか。  (+1 行)` に畳まれ、2 回目で
-  全行に戻ることを検証して通す
-- [ ] 1.4 同 Requirement の Scenario「開き直すと展開に戻る」を `TestReopenCollapsesAgain`（`:594`）の
-  書き換えで通す。`x`（折りたたみ）→ `Esc` → `Enter` の後に全行が出ることを見る
-- [ ] 1.5 同 Requirement の Scenario「PR リスク評価の見出しを持つコメントも AI として扱う」を
-  `TestRiskHeadingCommentIsCollapsedAsAI`（`:840`）の書き換えで通す。開いた直後は `影響範囲: 小` が出て、
-  `x` の後に `(+4 行)` の見出し 1 行になることを見る
+- [ ] 1.1 `commentBlock`（`internal/ui/preview.go:50-65`）から引数 `expanded` と折りたたみの枝を消し、
+  AI かどうかで `▌` を付けるかだけを分けて常に全行を返す形にする。`summarize`（同 `:69-78`）を関数ごと消し、
+  `commentLines`（同 `:43`）の呼び出しから引数を 1 つ落とす
+- [ ] 1.2 `detailState`（`internal/ui/detail.go:38-44`）からフィールド `expanded` を消し、`case "x"`
+  （同 `:103-105`）を消し、コメントを描く箇所（同 `:375`）の呼び出しから引数を 1 つ落とす
+- [ ] 1.3 `card-detail` の ADDED Requirement「コメントは AI も人も常に全文を出す」の Scenario
+  「AI コメントも人のコメントも全文が出る」を `internal/ui/detail_test.go` の
+  `TestAICommentIsCollapsedAndExpandedByX`（`:549`）の書き換えで書き、テスト名も新しい振る舞いに直して通す
+- [ ] 1.4 同 Requirement の Scenario「x を押しても表示は変わらない」を `TestReopenCollapsesAgain`（`:594`）の
+  書き換えで書き、`x` でコマンドが返らず画面と行が変わらないこと、`Esc` → `Enter` で開き直しても
+  同じ全文が出ることを検証して通す
+- [ ] 1.5 同 Requirement の Scenario「PR リスク評価の見出しを持つコメントも AI として全文が出る」を
+  `TestRiskHeadingCommentIsCollapsedAsAI`（`:840`）の書き換えで通す
 - [ ] 1.6 `TestPRDetailOfPR131`（`:749`）の期待順から `▌AI  19:31  Q1: マイグレーションを分けますか。  (+0 行)`
   を外し、展開時の見出し `▌AI  19:31` に差し替える。高さ 40 の端末で `── review thread ` と
   `thread 未 resolve` がまだ本文領域に見えるかを実際に走らせて確かめ、見えなくなっていれば期待順を
   そこまでに切って、切った理由をテストのコメントに 1 行書く
-- [ ] 1.7 `go test ./internal/ui/...` を走らせ、この節で挙げていないテストが落ちていないことを確かめる。
-  落ちていたら、既定が展開になったことで期待値が変わったのか実装の取りこぼしかを判定して直す
 
 ## 2. フッタのヒント
 
-- [ ] 2.1 `internal/ui/detail.go` のフッタのヒント 3 本（`:477`, `:482`, `:484`）の `x 展開` を `x 畳む` に
-  変える。他のキーの並びと文言は変えない
-- [ ] 2.2 `card-detail` の MODIFIED Requirement「詳細の本文領域はスクロールし、ヘッダ領域は固定する」の
-  Scenario「詳細画面のフッタ」と「PR の無いカードのフッタには PR のキーを出さない」に合わせて、
-  `TestDetailFooters`（`:998`）と `TestFooterWithoutPRs`（`:1029`）の期待文字列を `x 畳む` に直して通す
+- [ ] 2.1 フッタのヒント 3 本から `x 展開` とその区切りの空白を落とす（`internal/ui/detail.go:477`, `:482`, `:484`）。
+  他のキーの並びと文言はそのまま残す
+- [ ] 2.2 `card-detail` の MODIFIED Requirement「詳細の本文領域はスクロールし、ヘッダ領域は固定する」に
+  合わせて、`TestDetailFooters`（`:998`）と `TestFooterWithoutPRs`（`:1029`）から `x 展開` の期待を外して通す。
+  あわせて 3 つのヒントの表示幅が spec の書いた 136 / 101 / 88 になっていることを、テストの中で
+  `ansi.StringWidth` を使って 1 本だけ確かめる
 
-## 3. ドキュメント
+## 3. ヘルプ画面
 
-- [ ] 3.1 `README.md` の「画面とキー操作」にある `x` の行を 2 か所（カード詳細 `:172`、PR 詳細 `:192`）
-  書き換え、「AI コメントを畳む / 戻す」の意味にする
+- [ ] 3.1 `helpKeys`（`internal/ui/help.go:11-33`）から `x` の行を落とす
+- [ ] 3.2 `help-screen` の MODIFIED Requirement「ヘルプ画面は実装済みのキーだけを一覧する」の Scenario
+  「実装済みのキーの行が順に出る」に合わせて、`TestHelpListsImplementedKeys`（`internal/ui/help_test.go:186`）の
+  行数の期待を 21 から 20 に直し、`x` で始まる行が無いことの検証を足して通す
+- [ ] 3.3 ヘルプから戻ったときの検証を直す。`TestHelpReturnsToCardDetail`（`internal/ui/help_test.go:66`）から
+  `x` を押す操作と `(+1 行)` の検証を外し、戻った後もコメントの全文が出ていることを見る形にして通す。
+  これは MODIFIED Requirement「? はヘルプ画面を開き、? か Esc で開いた画面に戻る」の Scenario
+  「カード詳細から開いて Esc で戻る」に対応する
 
-## 4. 通し確認
+## 4. キュー画面の台帳
 
-- [ ] 4.1 `gofmt -l .` の出力が空で、`go build ./... && go vet ./... && go test ./...` が通ることを確認する
-- [ ] 4.2 `openspec validate --strict` が緑であることを確認する
+- [ ] 4.1 `queue-screen` の MODIFIED Requirement「j / k / ↑ / ↓ で行を移動し、1–4 / Tab でタブを切り替え、
+  他のキーは何もしない」に合わせて、`TestUnimplementedKeysDoNothing`（`internal/ui/model_test.go:87-110`）が
+  `x` を含んだまま通ることを確かめる。キュー画面の扱いは変わらないので、テストの変更は要らない見込みである
+
+## 5. ドキュメント
+
+- [ ] 5.1 `README.md` の「画面とキー操作」にある `x` の行を 2 か所（カード詳細 `:172`、PR 詳細 `:192`）
+  消す。表の他の行は変えない
+
+## 6. 通し確認
+
+- [ ] 6.1 `gofmt -l .` の出力が空で、`go build ./... && go vet ./... && go test ./...` が通ることを確認する。
+  この change で挙げていないテストが落ちたら、折りたたみを消したことで期待値が変わったのか実装の
+  取りこぼしかを判定して直す
+- [ ] 6.2 `openspec validate --strict` が緑であることを確認する
