@@ -130,9 +130,10 @@ func (m Model) renderCloseConfirm() string {
 	if s.target.IsPR {
 		kind = "PR"
 	}
+	// `なし` はラベル名ではないので塗らない。見出しと注意の行も塗らない。
 	labels := "なし"
 	if len(s.labels) > 0 {
-		labels = strings.Join(s.labels, " ")
+		labels = strings.Join(m.labelNames(s.target.Repo, s.labels), " ")
 	}
 	lines := []string{
 		"close の確認: " + s.label + "  " + s.title,

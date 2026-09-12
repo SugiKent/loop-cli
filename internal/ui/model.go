@@ -85,7 +85,13 @@ type Model struct {
 	mergeMethods map[string]string
 	// modes はリポジトリ名 -> 判定できた運用方式。取得が成功するたびに丸ごと差し替える。
 	// 表に無いリポジトリは「方式が分からない」で、表示はゼロ値（sdd）、t は書き込まない。
-	modes          map[string]model.Mode
+	modes map[string]model.Mode
+	// labelColors はリポジトリ名 -> ラベル名 -> 色。modes と同じ規則で持ち、
+	// 表に無いラベルは色無しで描く（ListLabels が失敗したリポジトリ、スナップショットだけの起動直後）。
+	labelColors map[string]map[string]string
+	// lightBG は端末の背景が明るいかどうか。背景色を答えない端末は暗いものとして扱うので、
+	// ゼロ値（暗い）のままで始める（design.md D3）。
+	lightBG        bool
 	writing        bool
 	writeStatus    string
 	writeStatusErr bool
@@ -147,7 +153,8 @@ func fetchCmd(fetcher Fetcher) tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.spinner.Tick, fetchCmd(m.fetcher)}
+	// 端末の背景色は状態語の 4 色の組を決める（design.md D3）。答えない端末は暗いまま。
+	cmds := []tea.Cmd{m.spinner.Tick, fetchCmd(m.fetcher), tea.RequestBackgroundColor}
 	if m.refreshInterval > 0 {
 		cmds = append(cmds, tickCmd(m.refreshInterval))
 	}
@@ -174,6 +181,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case updateCheckedMsg:
 		m.updateAvailable = msg.available
 		return m, nil
+
+	case tea.BackgroundColorMsg:
+		m.lightBG = !msg.IsDark()
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		if m.screen == screenCard || m.screen == screenPR {
@@ -200,8 +212,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			prev, hadPrev := m.cards, !m.at.IsZero()
 			m.cards = msg.res.Cards
 			m.rows = buildRows(m.cards)
-			// 方式は毎回の判定で丸ごと入れ替え、L のラベル一覧も同じ鮮度にそろえて捨てる。
+			// 方式とラベル色は毎回の取得で丸ごと入れ替え、L のラベル一覧も同じ鮮度にそろえて捨てる。
 			m.modes = msg.res.Modes
+			m.labelColors = msg.res.LabelColors
 			m.repoLabels = nil
 			m.at = msg.at
 			m.errText = ""

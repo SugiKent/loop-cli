@@ -214,19 +214,20 @@ func (m Model) updateMerged(msg mergedMsg) Model {
 // `y` を押す指が止まる位置に警告を出す。スクロールは持たない（s10 の確認画面と同じ）。
 func (m Model) renderMergeConfirm() string {
 	s := m.merge
+	// `なし` はラベル名ではないので塗らない。見出しも塗らず、値の語だけを塗る。
 	labels := "なし"
 	if len(s.pr.Labels) > 0 {
-		labels = strings.Join(s.pr.Labels, " ")
+		labels = strings.Join(m.labelNames(s.pr.Repo, s.pr.Labels), " ")
 	}
-	checks := "緑以外"
+	checks := m.stateWord("緑以外")
 	if classify.ChecksGreen(s.pr.MergeState) {
-		checks = "緑"
+		checks = m.stateWord("緑")
 	}
 	lines := []string{
 		"merge の確認: " + s.label,
 		"方式: " + s.method,
 		"labels: " + labels,
-		strings.TrimSpace("mergeable: " + s.pr.MergeState.Mergeable + " " + s.pr.MergeState.MergeStateStatus),
+		strings.TrimSpace("mergeable: " + m.stateWord(s.pr.MergeState.Mergeable) + " " + m.stateWord(s.pr.MergeState.MergeStateStatus)),
 		"checks: " + checks,
 	}
 	for _, b := range s.blocked {

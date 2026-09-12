@@ -19,11 +19,13 @@ const CallTimeout = 30 * time.Second
 const detailConcurrency = 4
 
 // Result は Fetch の返り値。Modes は判定できたリポジトリの運用方式、
+// LabelColors はリポジトリごとの「ラベル名 -> 色」（表示にだけ使い、分類には使わない）、
 // Errors は詳細取得とラベル一覧の取得 1 件ごとの部分失敗。
 type Result struct {
-	Cards  []model.Card
-	Modes  map[string]model.Mode
-	Errors []error
+	Cards       []model.Card
+	Modes       map[string]model.Mode
+	LabelColors map[string]map[string]string
+	Errors      []error
 }
 
 // 失敗した層。Errors の並びは層 → repo → number → メソッド の順で決まる。
@@ -70,12 +72,17 @@ func Fetch(ctx context.Context, client gh.GHClient, repos []string, now time.Tim
 		prs[i] = model.PRFromSearch(sp)
 	}
 
-	modes, errs := fetchDetails(ctx, client, repos, issues, prs)
+	modes, colors, errs := fetchDetails(ctx, client, repos, issues, prs)
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("fetch: %w", ctx.Err())
 	}
 
-	return &Result{Cards: buildCards(issues, prs, modes, now, grace), Modes: modes, Errors: sortErrors(errs)}, nil
+	return &Result{
+		Cards:       buildCards(issues, prs, modes, now, grace),
+		Modes:       modes,
+		LabelColors: colors,
+		Errors:      sortErrors(errs),
+	}, nil
 }
 
 // call は 1 回の gh 呼び出しに CallTimeout の子 ctx を付ける。
@@ -86,15 +93,16 @@ func call[T any](ctx context.Context, f func(context.Context) (T, error)) (T, er
 }
 
 // fetchDetails は全 issue / 全 PR の詳細とリポジトリごとのラベル一覧を並行取得し、
-// 判定できた方式の表と部分失敗を返す。
+// 判定できた方式の表・ラベル色の表・部分失敗を返す。
 func fetchDetails(ctx context.Context, client gh.GHClient, repos []string,
-	issues []model.Issue, prs []model.PR) (map[string]model.Mode, []detailError) {
+	issues []model.Issue, prs []model.PR) (map[string]model.Mode, map[string]map[string]string, []detailError) {
 	var (
-		wg    sync.WaitGroup
-		mu    sync.Mutex
-		errs  []detailError
-		modes = map[string]model.Mode{}
-		sem   = make(chan struct{}, detailConcurrency)
+		wg     sync.WaitGroup
+		mu     sync.Mutex
+		errs   []detailError
+		modes  = map[string]model.Mode{}
+		colors = map[string]map[string]string{}
+		sem    = make(chan struct{}, detailConcurrency)
 	)
 	fail := func(layer int, method, repo string, number int, err error) {
 		mu.Lock()
@@ -113,7 +121,8 @@ func fetchDetails(ctx context.Context, client gh.GHClient, repos []string,
 	}
 
 	for _, repo := range repos {
-		// 0. リポジトリごとのラベル一覧。判定できたものだけを表に入れる。
+		// 0. リポジトリごとのラベル一覧。方式は判定できたものだけを表に入れ、
+		//    色は取得できたリポジトリをすべて表に入れる（色は方式の判定と関係が無い）。
 		run(func() {
 			labels, err := call(ctx, func(ctx context.Context) ([]gh.RepoLabel, error) {
 				return client.ListLabels(ctx, repo)
@@ -125,12 +134,13 @@ func fetchDetails(ctx context.Context, client gh.GHClient, repos []string,
 					err: fmt.Errorf("ListLabels %s: %w", repo, err)})
 				return
 			}
+			mu.Lock()
+			defer mu.Unlock()
+			colors[repo] = labelColors(labels)
 			mode, ok := model.ModeFromLabels(labels)
 			if !ok {
 				return
 			}
-			mu.Lock()
-			defer mu.Unlock()
 			modes[repo] = mode
 		})
 	}
@@ -187,7 +197,16 @@ func fetchDetails(ctx context.Context, client gh.GHClient, repos []string,
 	}
 
 	wg.Wait()
-	return modes, errs
+	return modes, colors, errs
+}
+
+// labelColors はラベル一覧から「ラベル名 -> 色」の表を作る。色は gh が返す値をそのまま写す。
+func labelColors(labels []gh.RepoLabel) map[string]string {
+	colors := make(map[string]string, len(labels))
+	for _, l := range labels {
+		colors[l.Name] = l.Color
+	}
+	return colors
 }
 
 func comments(cs []gh.Comment) []model.Comment {

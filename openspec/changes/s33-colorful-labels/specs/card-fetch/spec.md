@@ -1,10 +1,11 @@
 ## MODIFIED Requirements
 
 ### Requirement: Fetch は search を 2 回だけ実行し、方式を判定して分類済みの Card 群を返す
-`internal/fetch` は `Result { Cards []model.Card; Modes map[string]model.Mode; LabelColors map[string]map[string]string; Errors []error }` と、関数 `Fetch(ctx context.Context, client gh.GHClient, repos []string, now time.Time) (*Result, error)` を MUST 提供する。`repos` は `owner/name` の列（s02 の `Config.Repos[].Name`。`Fetch` は `internal/config` を import しない）。運用方式は引数で受け取らず、Requirement「Fetch はリポジトリごとにラベル一覧を取り運用方式を判定する」のとおり `Fetch` が判定する。`LabelColors` は同じ Requirement が作るリポジトリごとのラベル色で、分類には使わない。`now` は分類の基準時刻で、`Fetch` は壁時計を読まずにこの値を `classify.Card` へそのまま渡す（`cmd/loop-cli` は更新のたびに現在時刻を渡す）。
-`Fetch` は 1 回の呼び出しで `client.SearchIssues(ctx, repos)` を 1 回、`client.SearchPRs(ctx, repos)` を 1 回だけ実行し（D-001「1 回の更新で行う呼び出し」）、得た open issue / open PR を `model.IssueFromSearch` / `model.PRFromSearch` で `model` の型に写し、Requirement「Fetch は open の全 issue / 全 PR の詳細を取得する」の詳細を入れ、Requirement「PR は title と本文のパースで同一リポジトリの Issue に紐づく」で `model.Card` を組み立て、各 Card にそのカードのリポジトリの方式（`Result.Modes` を引き、無ければ `model.Mode` のゼロ値）と `now` を添えて s05 の `classify.Card` に通し、結果を `Result.Cards` に入れる。`Result.Cards` の各要素は `Card.Result` / `Issue.Result` / `PRs[i].Result` が埋まった状態で返る（s08 は分類を呼び直さない）。
+`internal/fetch` は `Result { Cards []model.Card; Modes map[string]model.Mode; LabelColors map[string]map[string]string; Errors []error }` と、関数 `Fetch(ctx context.Context, client gh.GHClient, repos []string, now time.Time, grace time.Duration) (*Result, error)` を MUST 提供する。`repos` は `owner/name` の列（s02 の `Config.Repos[].Name`。`Fetch` は `internal/config` を import しない）。運用方式は引数で受け取らず、Requirement「Fetch はリポジトリごとにラベル一覧を取り運用方式を判定する」のとおり `Fetch` が判定する。`LabelColors` は同じ Requirement が作るリポジトリごとのラベル色で、分類には使わない。`now` は分類の基準時刻、`grace` は「その他」を進行中に置く猶予（s30-other-grace）で、`Fetch` は壁時計を読まずにこの 2 つを `classify.Card` へそのまま渡す（`cmd/loop-cli` は更新のたびに現在時刻と `Config.OtherGraceMin` 分を渡す）。
+`Fetch` は 1 回の呼び出しで `client.SearchIssues(ctx, repos)` を 1 回、`client.SearchPRs(ctx, repos)` を 1 回だけ実行し（D-001「1 回の更新で行う呼び出し」）、得た open issue / open PR を `model.IssueFromSearch` / `model.PRFromSearch` で `model` の型に写し、Requirement「Fetch は open の全 issue / 全 PR の詳細を取得する」の詳細を入れ、Requirement「PR は title と本文のパースで同一リポジトリの Issue に紐づく」で `model.Card` を組み立て、各 Card にそのカードのリポジトリの方式（`Result.Modes` を引き、無ければ `model.Mode` のゼロ値）と `now` と `grace` を添えて s05 の `classify.Card` に通し、結果を `Result.Cards` に入れる。`Result.Cards` の各要素は `Card.Result` / `Issue.Result` / `PRs[i].Result` が埋まった状態で返る（s08 は分類を呼び直さない）。
 `Cards` の並びは、issue を持つカードを `SearchIssues` の返却順、続けて PR 単独カードを `SearchPRs` の返却順とする。タブ内の並び替えは s08 が `Card.Result.Tab` / `Priority` で行う。
 search 結果の全 issue と全 PR は、それぞれちょうど 1 枚の Card に含まれる。`Fetch` は issue / PR を黙って落とさない。
+この Requirement の Scenario で `grace` を書いていないものは `grace` が 0（猶予なし）である。
 
 #### Scenario: example の fixture から Card 2 枚が返る
 - **WHEN** `gh.NewFake("../gh/testdata/fixtures/example")` を `client` に、`[]string{"org/app"}` を `repos` に渡して `Fetch` を呼ぶ（`example` は issue 108（`stage:propose` + `question`）、issue 140（ラベル無し）、PR 131（`propose` + `question`、本文に `Closes #108`）を持ち、`labels.json` は `stage:todo` を含む）
@@ -21,6 +22,14 @@ search 結果の全 issue と全 PR は、それぞれちょうど 1 枚の Card
 #### Scenario: now が分類に渡る
 - **WHEN** `apply` ラベルで最新コメントが人の open PR（`UpdatedAt` が `2026-09-04T10:00:00Z`）を持つ fixture で、`now` を `2026-09-04T10:30:00Z` と `2026-09-05T10:00:00Z` にしてそれぞれ `Fetch` を呼ぶ
 - **THEN** 前者ではその PR の `Result.Summary` は `PR #<n> は auto-fix が受け取り中`（`in-progress`）、後者では `PR #<n> は人のコメントに AI が応答していない`（`other`）である
+
+#### Scenario: grace が分類に渡る
+- **WHEN** `Labels` が空、本文に `Refs` / `Closes` が無い PR 61（`UpdatedAt` が `2026-09-04T10:00:00Z`）を持つ fixture で、`now` を `2026-09-04T10:10:00Z`、`grace` を 30 分にして `Fetch` を呼ぶ
+- **THEN** PR 61 の Card の `Card.Result.Situation` は `in-progress`、`Summary` は `PR #61 はどの局面にも当たらない（更新から 30m は様子見）` である
+
+#### Scenario: 猶予以上経った now ではその他に戻る
+- **WHEN** 同じ fixture で、`now` を `2026-09-04T10:31:00Z`、`grace` を 30 分にして `Fetch` を呼ぶ
+- **THEN** PR 61 の Card の `Card.Result.Situation` は `other` である
 
 #### Scenario: search は 1 回ずつしか呼ばれない
 - **WHEN** `SearchIssues` / `SearchPRs` の呼び出し回数を数える `GHClient` で `Fetch` を呼ぶ

@@ -185,7 +185,7 @@ func (m Model) cardHeaderLines() ([]string, int) {
 	mode, _ := m.repoMode(issue.Repo)
 	stage := "段階なし"
 	if st := model.IssueStages(mode, issue.Labels); len(st) > 0 {
-		stage = "段階: " + strings.Join(st, " ")
+		stage = "段階: " + strings.Join(m.labelNames(issue.Repo, st), " ")
 	}
 	// label に wip ラベルは無く、作業中は段階ラベル In Progress が示す。
 	badges := []string{model.LabelBlocked, model.LabelWip, model.LabelQuestion}
@@ -194,7 +194,8 @@ func (m Model) cardHeaderLines() ([]string, int) {
 	}
 	for _, badge := range badges {
 		if model.HasLabel(issue.Labels, badge) {
-			stage += " [" + badge + "]"
+			// 角括弧は画面の構造を示す記号なので塗らず、中のラベル名だけを塗る。
+			stage += " [" + m.labelName(issue.Repo, badge) + "]"
 		}
 	}
 	lines = append(lines, stage)
@@ -226,7 +227,8 @@ func (m Model) prListLines() []string {
 				lines = append(lines, m.prListRow(i, stage, pr))
 			}
 			if !found {
-				lines = append(lines, "  ["+stage+"] なし")
+				// `なし` はラベル名ではないので塗らず、角括弧の中の段階ラベル名だけを塗る。
+				lines = append(lines, "  ["+m.labelName(m.detailRepo(), stage)+"] なし")
 			}
 		}
 	}
@@ -238,18 +240,11 @@ func (m Model) prListLines() []string {
 	return lines
 }
 
-// detailMode は詳細の対象カードのリポジトリの方式。Card は 1 リポジトリ分しか持たない。
+// detailMode は詳細の対象カードのリポジトリの方式。Card は 1 リポジトリ分しか持たないので、
+// detailRepo（PR 詳細は選択中の PR、それ以外は Issue）から引けば同じ答えになる。
 func (m Model) detailMode() model.Mode {
-	card := m.detail.card
-	if card.Issue != nil {
-		mode, _ := m.repoMode(card.Issue.Repo)
-		return mode
-	}
-	if len(card.PRs) > 0 {
-		mode, _ := m.repoMode(card.PRs[0].Repo)
-		return mode
-	}
-	return ""
+	mode, _ := m.repoMode(m.detailRepo())
+	return mode
 }
 
 // prListRow は PR 一覧の 1 行。選択中の PR には ▶ を付ける。
@@ -258,7 +253,8 @@ func (m Model) prListRow(i int, stage string, pr model.PR) string {
 	if i == m.detail.prIdx {
 		mark = "▶ "
 	}
-	line := fmt.Sprintf("%s[%s] PR#%d %s", mark, stage, pr.Number, prState(pr.State))
+	// 段階ラベルの無い PR の `-` はラベル名ではないので、表に無い名前として色が付かない。
+	line := fmt.Sprintf("%s[%s] PR#%d %s", mark, m.labelName(pr.Repo, stage), pr.Number, m.stateWord(prState(pr.State)))
 	if pr.Canonical {
 		line += "（最新・正本）"
 	}
@@ -267,14 +263,14 @@ func (m Model) prListRow(i int, stage string, pr model.PR) string {
 	} else {
 		line += " 1 行目なし"
 	}
-	line += " labels: " + strings.Join(pr.Labels, " ")
+	line += " labels: " + strings.Join(m.labelNames(pr.Repo, pr.Labels), " ")
 	switch {
 	case pr.MergeState == nil:
-		line += " checks 取得失敗 mergeable 取得失敗"
+		line += " checks " + m.stateWord("取得失敗") + " mergeable " + m.stateWord("取得失敗")
 	case classify.ChecksGreen(pr.MergeState):
-		line += " checks 緑 mergeable " + pr.MergeState.Mergeable
+		line += " checks " + m.stateWord("緑") + " mergeable " + m.stateWord(pr.MergeState.Mergeable)
 	default:
-		line += " checks 緑以外 mergeable " + pr.MergeState.Mergeable
+		line += " checks " + m.stateWord("緑以外") + " mergeable " + m.stateWord(pr.MergeState.Mergeable)
 	}
 	return line
 }
@@ -341,7 +337,7 @@ func questionLines(body string) []string {
 // commentSection はコメント時系列。nil は取得失敗、長さ 0 はなし（s05 が表示に委ねた区別）。
 func (m Model) commentSection(comments []model.Comment) []string {
 	if comments == nil {
-		return []string{"コメント: 取得失敗"}
+		return []string{"コメント: " + m.stateWord("取得失敗")}
 	}
 	if len(comments) == 0 {
 		return []string{"コメント: なし"}
@@ -366,7 +362,8 @@ func (m Model) prHeaderLines() ([]string, int) {
 		stage = st[0]
 	}
 	title := wrapTitle(fmt.Sprintf("%s PR#%d  ", pr.Repo, pr.Number), pr.Title, m.leftWidth())
-	labels := fmt.Sprintf("[%s] %s  labels: %s", stage, prState(pr.State), strings.Join(pr.Labels, " "))
+	labels := fmt.Sprintf("[%s] %s  labels: %s",
+		m.labelName(pr.Repo, stage), m.stateWord(prState(pr.State)), strings.Join(m.labelNames(pr.Repo, pr.Labels), " "))
 	return append(title, labels), len(title)
 }
 
@@ -384,18 +381,19 @@ func (m Model) prBodyLines() []string {
 	} else {
 		lines = append(lines, "紐づく issue: なし")
 	}
-	lines = append(lines, checkLines(pr.MergeState)...)
+	lines = append(lines, m.checkLines(pr.MergeState)...)
 	lines = append(lines, renderMarkdown(pr.Body, m.leftWidth())...)
 	lines = append(lines, m.commentSection(pr.Comments)...)
 	return append(lines, m.reviewThreadLines(pr.ReviewThreads)...)
 }
 
 // checkLines は merge 状態と checks。s20 は全 PR に取りに行くので nil は取得失敗を意味する。
-func checkLines(ms *gh.PRMergeState) []string {
+// 塗るのは値の語だけで、見出し（checks: / mergeable:）とチェック名は塗らない。
+func (m Model) checkLines(ms *gh.PRMergeState) []string {
 	if ms == nil {
-		return []string{"checks: 取得失敗"}
+		return []string{"checks: " + m.stateWord("取得失敗")}
 	}
-	lines := []string{strings.TrimSpace("mergeable: " + ms.Mergeable + " " + ms.MergeStateStatus)}
+	lines := []string{strings.TrimSpace("mergeable: " + m.stateWord(ms.Mergeable) + " " + m.stateWord(ms.MergeStateStatus))}
 	if len(ms.StatusCheckRollup) == 0 {
 		return append(lines, "  checks: なし")
 	}
@@ -406,9 +404,9 @@ func checkLines(ms *gh.PRMergeState) []string {
 			if state == "" {
 				state = c.Status
 			}
-			lines = append(lines, "  "+c.Name+": "+state)
+			lines = append(lines, "  "+c.Name+": "+m.stateWord(state))
 		case "StatusContext":
-			lines = append(lines, "  "+c.Context+": "+c.State)
+			lines = append(lines, "  "+c.Context+": "+m.stateWord(c.State))
 		}
 	}
 	return lines
@@ -417,7 +415,7 @@ func checkLines(ms *gh.PRMergeState) []string {
 // reviewThreadLines は review thread を未 resolve 先頭で並べる。thread のコメントは畳まない。
 func (m Model) reviewThreadLines(threads []gh.ReviewThread) []string {
 	if threads == nil {
-		return []string{"review thread: 取得失敗"}
+		return []string{"review thread: " + m.stateWord("取得失敗")}
 	}
 	if len(threads) == 0 {
 		return []string{"review thread: なし"}

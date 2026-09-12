@@ -680,3 +680,52 @@ func TestFetchPassesGraceToClassify(t *testing.T) {
 		}
 	})
 }
+
+// ラベル一覧から作った色の表は Result で返る。分類には使わない表示だけの値。
+func TestFetchReturnsLabelColors(t *testing.T) {
+	res := fetchDir(t, exampleDir)
+
+	want := map[string]string{"stage:propose": "0e8a16", "question": "d876e3", "wip": "fbca04"}
+	for name, color := range want {
+		if got := res.LabelColors["org/app"][name]; got != color {
+			t.Errorf("LabelColors[org/app][%q] = %q, want %q", name, got, color)
+		}
+	}
+}
+
+// 色は方式の判定と関係が無いので、方式を判定できないリポジトリにも返る。
+func TestFetchReturnsLabelColorsForUndetectedRepo(t *testing.T) {
+	stub := newLabelStub(boardDir, map[string][]gh.RepoLabel{
+		"org/board": {{Name: "bug", Color: "d73a4a"}},
+	})
+	res, err := Fetch(t.Context(), stub, []string{"org/board"}, fetchNow, 0)
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+
+	if len(res.Modes) != 0 {
+		t.Errorf("Modes = %v, want 空", res.Modes)
+	}
+	if got := res.LabelColors["org/board"]["bug"]; got != "d73a4a" {
+		t.Errorf("LabelColors[org/board][bug] = %q, want d73a4a", got)
+	}
+}
+
+// ListLabels が失敗したリポジトリは色の表にも入らない（方式の表と同じ落ち方）。
+func TestFetchListLabelsFailureKeepsLabelColorsOut(t *testing.T) {
+	stub := newLabelStub(boardDir, map[string][]gh.RepoLabel{
+		"org/board": {{Name: model.LabelToDo, Color: "0e8a16"}},
+	})
+	stub.err = map[string]error{"org/app": errors.New("gh label list: exit 1")}
+	res, err := Fetch(t.Context(), stub, []string{"org/app", "org/board"}, fetchNow, 0)
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+
+	if _, ok := res.LabelColors["org/app"]; ok {
+		t.Errorf("LabelColors に org/app がある: %v", res.LabelColors)
+	}
+	if got := res.LabelColors["org/board"][model.LabelToDo]; got != "0e8a16" {
+		t.Errorf("LabelColors[org/board][%s] = %q, want 0e8a16", model.LabelToDo, got)
+	}
+}
