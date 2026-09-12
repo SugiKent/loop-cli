@@ -17,6 +17,8 @@ issue: #58
 - カード詳細画面と PR 詳細画面に、本文領域を一度に最下部まで送るキーを 1 つ足す。**推奨は `G`（Shift+G）**
   とし、issue が書いた `gg` をそのまま採れない理由を「確定した判断」に書く（最終的な割り当ては Q1 の回答で決まる）
 - ヘルプ画面のキー一覧に 1 行足し、キーの行を 19 行から 20 行にする
+- キュー画面の「他のキーは何もしない」の台帳に新しいキーを 1 つ足す。キュー画面は詳細画面のキーを
+  名指しで列挙して「何もしない」ことを Scenario で検証しており、その一覧から漏らさない
 - 詳細画面のフッタのヒントは変えない。スクロール系のキーをヒントに出さずヘルプへ委ねる既存の規則に従う
 - キュー画面・URL 一覧・ラベル一覧・確認画面は変えない。これらはスクロールを持たないので、新しいキーは何もしない
 - 取得（`internal/gh` / `internal/fetch`）・分類（`internal/classify`）・書き込み（`internal/action`）には触れない
@@ -34,14 +36,18 @@ issue: #58
   フッタのヒント、スクロール位置が先頭に戻る条件）は変えない
 - `help-screen`: Requirement「ヘルプ画面は実装済みのキーだけを一覧する」のキーの行を 1 行足し、
   行数の記述（キーの行 19 → 20、画面全体 21 → 22）を書き換える
+- `queue-screen`: Requirement「j / k / ↑ / ↓ で行を移動し、1–4 / Tab でタブを切り替え、他のキーは何もしない」に
+  `G` を足し、Scenario「未実装のキーは何も変えない」の一覧にも足す
 
 ## Impact
 
 - `internal/ui/detail.go`: `updateDetailKey` の `switch` に分岐を 1 つ足す
 - `internal/ui/help.go`: `helpKeys` に 1 行足す
 - `internal/ui/detail_test.go` と `internal/ui/help_test.go`: 新しい Scenario の期待値を足す
+- `internal/ui/model_test.go`: `TestUnimplementedKeysDoNothing` の一覧に `G` を足す
 - `README.md`: 「画面とキー操作」のカード詳細 / PR 詳細の表に、新しいキーの行を 1 本足す
-- `openspec/specs/card-detail/spec.md` と `openspec/specs/help-screen/spec.md`: 上の 2 Requirement を書き換える
+- `openspec/specs/card-detail/spec.md`・`openspec/specs/help-screen/spec.md`・`openspec/specs/queue-screen/spec.md`:
+  上の 3 Requirement を書き換える
 - 依存の追加は無い。`internal/model` / `internal/classify` / `internal/action` / `internal/gh` は変更しない
 
 ## 確定した判断
@@ -49,7 +55,7 @@ issue: #58
 - **`g` は詳細画面で既に塞がっている。** `updateDetailKey` の `case "enter", "g"` が PR ↔ issue の相互
   ジャンプを担い、1 打鍵目でその場で画面が移る（`internal/ui/detail.go:114-128`）。この意味を書いている
   のは 4 か所で、mvp.md のキーバインド表（`docs/mvp/mvp.md:122`）、ヘルプの一覧（`internal/ui/help.go:23`）、
-  詳細のフッタ（`internal/ui/detail.go:442`, `:450`）、`card-detail` spec がそれに当たる。したがって
+  詳細のフッタ（`internal/ui/detail.go:443`, `:450`）、`card-detail` spec がそれに当たる。したがって
   「`g` を 2 回」は、1 打鍵目で何もせず次の打鍵を待つ前置キーに `g` を変えない限り実現しない。
 - **前置キーにすると画面の状態が 1 つ増える。** `detailState`（`internal/ui/detail.go:43` 付近）に
   「`g` を待っている」フラグを持たせ、他のキー・画面遷移・ヘルプの開閉のすべてで落とす必要がある。
@@ -60,12 +66,13 @@ issue: #58
   ときだけカード詳細へ戻るが、`Issue` が non-nil の Card は必ずカード詳細を経由して PR 詳細へ来る
   （`openDetail` は `Issue` が nil のときだけ PR 詳細を直接開く。`internal/ui/detail.go:66-83`）ため、
   そのとき `fromDetail` が真であり `Esc` も同じ戻り先を持つ（同 `:102-108`）。**つまり `g` を空けても、
-  行き来する道は無くならない。** Q1 で `g` を空ける案（B / C）の代償は打ち方が変わることだけで、
-  代わりのキーを新しく決める作業は起きない。
+  行き来する道は無くならない。** ただし戻り先が同じでも返すコマンドは違い、`g` は右ペインのセッションの取得を
+  始める（`internal/ui/detail.go:130` の `sessionOnOpenCmd`）のに対し `Esc` は何も返さない。Q1 で `g` を空ける
+  案（B / C）を採ると、この取得の起点が 1 つ減る（`R` で取り直す道は残る）。
 - **`G`（Shift+G）はどのキーとも当たらない。** mvp.md のキーバインド表（`docs/mvp/mvp.md:107-126`）に
   `G` は無い。表にあって未実装の予約キーを `help-screen` spec が `v` / `h` / `l` / `←` / `→` / `A` /
-  `s` / `/` と列挙しており、`G` はどれでもない。大文字はキーの文字列にそのまま載る（`L` と `R` が
-  既にその形。`internal/ui/model.go:274`, `:312`）。
+  `s` / `/` と列挙しており、`G` はどれでもない。大文字はキーの文字列にそのまま載る（`L` が
+  `internal/ui/model.go:313`、`R` が同 `:347` と `:379` で既にその形）。
 - **スクロールのキーはフッタのヒントに出さず、ヘルプに出す。** `card-detail` の Requirement
   「詳細の本文領域はスクロールし、ヘッダ領域は固定する」が「s11 までにあった `j/k スクロール` は…
   ヒントから外す」と決めており、`PgUp` / `PgDn` もヘルプにだけ出ている（`internal/ui/help.go:30`）。
@@ -73,16 +80,29 @@ issue: #58
   カード詳細 144 列）は変わらない。
 - **ヘルプは行数を spec が固定しているので MODIFIED になる。** `help-screen` の Requirement が
   「キーの行は 19 行」「行数は 21 で、`Model` の既定の高さ 24 に収まる」と書き、Scenario も 19 行を
-  検証している。1 行足すと 20 行と 22 行になり、既定の高さ 24 には収まったままである。
-- **スクロールを持つ画面は詳細の本文領域だけである。** URL 一覧（`internal/ui/urls.go:115-127`）と
-  ラベル一覧（`internal/ui/labels.go:136-158`）はカーソルで動き、キュー画面の表もスクロールを持たない
-  （`s35-queue-grouping` が「表にスクロールを足さない」と明記）。だから「最下部へ」を詳細画面の外へ
-  広げる案（Q3 の B / C）では、カーソルを末尾へ動かす別の実装を書くことになる。
-- **進行中の 2 change とは触る Requirement が重ならない。** `s33-pr-status-sections` は `card-detail` の
+  検証している。1 行足すと 20 行と 22 行になり、既定の高さ 24 には空行 1 行を残して収まる。次にキーが
+  2 つ増えると、ヘルプは末尾から黙って切り詰め始める（`internal/ui/help.go:56-65`）。
+- **viewport で送る画面は詳細の本文領域だけである。** URL 一覧（`internal/ui/urls.go:115-127`）と
+  ラベル一覧（`internal/ui/labels.go:136-158`）はカーソルで動く。この 2 画面は表示の窓が
+  `start := max(cursor-h+1, 0)` で選択行に追従するので（`internal/ui/urls.go:157`, `internal/ui/labels.go:253`）、
+  Q3 の B はカーソルを末尾へ動かすだけで済む。キュー画面の表は窓の追従を持たない（`s35-queue-grouping` が「表にスクロールを足さない」と
+  明記）ので、Q3 の C では選択行だけが画面の外へ出る。
+- **`G` が着く先は本文領域の末尾であり、コメントの末尾ではない。** PR 詳細の本文領域は checks → 本文 →
+  コメント → review thread の順に並ぶ（`prBodyLines`。`internal/ui/detail.go:371-391`）。review thread を持つ
+  PR で `G` を押すと、最後のコメントを通り越して thread の末尾に着き、issue #58 が挙げた「コメントの末尾」は
+  画面の外に出ることがある（`k` / `PgUp` で戻れる）。spec の Scenario がこの振る舞いを固定する。
+  セクション単位で送るキーは、この change では扱わない。
+- **進行中の 2 change とは触る Requirement が重ならない（Q1 で推奨案 A を採る限り）。** `s33-pr-status-sections` は `card-detail` の
   「本文領域は Issue 本文…」と「PR 詳細は 1 行目判定…」を MODIFIED し、`s35-queue-grouping` は
   `queue-screen` を触る。この change が触るのは `card-detail` の「詳細の本文領域はスクロールし…」と
-  `help-screen` の 2 本で、どちらとも別である。`internal/ui/detail.go` を s33 と共有するが、s33 が触る
-  関数は `prBodyLines` / `cardBodyLines` / `checkLines` で、この change が触るのは `updateDetailKey` である。
+  `help-screen` と `queue-screen` の 3 本で、どれとも別である（`queue-screen` の「他のキーは何もしない」を
+  s35 は触らない）。`internal/ui/detail.go` を s33 と共有するが、s33 が触る関数は `prBodyLines` /
+  `cardBodyLines` / `checkLines` で、この change が触るのは `updateDetailKey` である。
+  **Q1 で B / C を採ると、この判断は崩れる。** `g` の意味は s33 が MODIFIED する Requirement
+  「PR 詳細は 1 行目判定・紐づけ・本文・会話・review thread・checks を出す」の中に書かれており
+  （`openspec/specs/card-detail/spec.md:220`, `:224` の Scenario 2 本）、同じ Requirement を s37 も
+  MODIFIED することになる。既存テストの `TestGoesBackAndForthBetweenIssueAndPR`
+  （`internal/ui/detail_test.go:155-173`）と `TestGDoesNothingOnPROnlyCard`（同 `:176-188`）も書き換えになる。
 - **スクロール位置が先頭に戻る条件は変えない。** キュー画面から開いたとき、およびカード詳細と PR 詳細を
   行き来したときに先頭へ戻る規則（`card-detail` の同じ Requirement）をそのまま残す。
 
@@ -94,6 +114,10 @@ issue: #58
 - 選択肢 A（推奨）: **`G`（Shift+G）の 1 打鍵で本文を最下部へ送り、`g` は今のまま残す。** 足すのはキーの分岐
   1 つだけで、既存のキーは 1 つも動かない。vim の `G` と同じ意味なので、`j` / `k` を使う人には馴染む。
   代わりに、issue に書かれた「`gg` と連続で押したら」という打ち方にはならない
+- 選択肢 B / C を採るときの追加の工事: s33 が MODIFIED する Requirement「PR 詳細は 1 行目判定…」を
+  s37 も MODIFIED し、`g` の Scenario 2 本と既存テスト 2 本（`TestGoesBackAndForthBetweenIssueAndPR` /
+  `TestGDoesNothingOnPROnlyCard`）と `queue-screen` の未実装キーの一覧を書き換える。s33 との merge 順で
+  どちらかが追随することになる
 - 選択肢 B: **issue の字面どおり `gg`（`g` を 2 回）で最下部へ送る。** `g` が前置キーになり、1 打鍵目では
   何も起きず次の打鍵を待つ状態を詳細画面が持つ。今の `g`（PR ↔ issue ジャンプ）は打てなくなる。ただし
   同じ行き来を `Enter`（カード詳細 → PR 詳細）と `Esc`（PR 詳細 → カード詳細）が既に担うので、移動の道は
