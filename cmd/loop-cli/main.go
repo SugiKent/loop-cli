@@ -35,6 +35,7 @@ const usage = `使い方:
   loop-cli            今やるキュー画面を開く
   loop-cli version    現在の版を出す
   loop-cli update     最新の版に入れ直す（go install）
+  loop-cli now        今やるのカードを JSON で出す
 `
 
 // updater は版の確認と入れ直し。テストは version.Client の代わりにスタブを渡す。
@@ -45,7 +46,7 @@ type updater interface {
 }
 
 // run は第 1 引数でサブコマンドに振り分ける。引数なしは TUI を起動する。
-// サブコマンドは設定ファイルを読まず gh も呼ばない。
+// version と update は設定ファイルを読まず gh も呼ばない。now は両方を使う。
 func run(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		if err := runTUI(); err != nil {
@@ -61,6 +62,21 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	case "update":
 		return runUpdate(context.Background(), version.NewClient(), stdout, stderr)
+	case "now":
+		// now はフラグを 1 つも持たない。余分な引数は黙って捨てない（design.md D8）。
+		if len(args) > 1 {
+			_, _ = fmt.Fprintf(stderr, "now は引数を取りません: %s\n", strings.Join(args[1:], " "))
+			return 1
+		}
+		client := gh.NewClient()
+		deps := nowDeps{
+			configPath: config.DefaultPath,
+			check:      client.Check,
+			fetch: func(ctx context.Context, repos []string, now time.Time, grace time.Duration) (*fetch.Result, error) {
+				return fetch.Fetch(ctx, client, repos, now, grace)
+			},
+		}
+		return runNow(context.Background(), deps, stdout, stderr)
 	default:
 		_, _ = fmt.Fprintf(stderr, "unknown command: %s\n", args[0])
 		_, _ = fmt.Fprint(stderr, usage)
@@ -200,6 +216,7 @@ func savingFetcher(fetcher ui.Fetcher, path string) ui.Fetcher {
 
 // ensureConfig は設定ファイルが無いときだけ onboarding のフォームを起動する。
 // 「存在しない」以外は Load に任せる（壊れた設定を上書きしないため）。
+// isTerminal が false なら form は呼ばれない（now はそれを当てにして nil を渡す）。
 func ensureConfig(path string, isTerminal bool, form func(path string) error) error {
 	_, err := os.Stat(path)
 	switch {
