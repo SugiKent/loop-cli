@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -14,9 +15,12 @@ import (
 )
 
 var (
-	escKey   = codeKey(tea.KeyEscape)
-	enterKey = codeKey(tea.KeyEnter)
-	tabKey   = codeKey(tea.KeyTab)
+	escKey      = codeKey(tea.KeyEscape)
+	enterKey    = codeKey(tea.KeyEnter)
+	tabKey      = codeKey(tea.KeyTab)
+	goBottomKey = runeKey('G')
+	homeKey     = codeKey(tea.KeyHome)
+	endKey      = codeKey(tea.KeyEnd)
 )
 
 // detailModel は幅 w・高さ h のサイズを与え、cards を取得完了として渡したキュー画面を返す。
@@ -896,6 +900,98 @@ func TestScrollResetsWhenMovingBetweenScreens(t *testing.T) {
 	m, _ = send(m, enterKey, escKey)
 	if !strings.Contains(plainText(m), "行01") {
 		t.Error("PR 詳細から戻ってもスクロール位置が先頭に戻っていない")
+	}
+}
+
+// commentPRCard は `コメント01` から `コメント30` までの 30 件を持つ open PR 1 件の Card。
+// review thread は引数で差し替える（G が着く先がコメントの末尾かどうかを分ける）。
+func commentPRCard(threads []gh.ReviewThread) model.Card {
+	pr := prOf(610, "OPEN", []string{model.LabelApply})
+	pr.MergeState = &gh.PRMergeState{Mergeable: "MERGEABLE", MergeStateStatus: "CLEAN", StatusCheckRollup: []gh.StatusCheck{}}
+	for i := 1; i <= 30; i++ {
+		pr.Comments = append(pr.Comments, model.Comment{Author: "user-1", Body: fmt.Sprintf("コメント%02d", i), CreatedAt: at})
+	}
+	pr.ReviewThreads = threads
+	issue := &model.Issue{Number: 610, Title: "コメントの多い PR", UpdatedAt: at}
+	return issueCard(issue, []model.PR{pr}, "読む")
+}
+
+func TestGScrollsCardBodyToBottom(t *testing.T) {
+	m, _ := send(detailModel(100, 20, []model.Card{longBodyCard()}), enterKey)
+
+	m, _ = send(m, goBottomKey)
+
+	text := plainText(m)
+	if !strings.Contains(text, "org/app #600") {
+		t.Errorf("G の後にヘッダが消えた:\n%s", text)
+	}
+	if !strings.Contains(text, "行60") {
+		t.Errorf("G で本文の末尾まで動いていない:\n%s", text)
+	}
+	if strings.Contains(text, "行01") {
+		t.Errorf("G の後に 行01 が残っている:\n%s", text)
+	}
+}
+
+func TestHomeReturnsBodyToTop(t *testing.T) {
+	m, _ := send(detailModel(100, 20, []model.Card{longBodyCard()}), enterKey, goBottomKey)
+	if text := plainText(m); strings.Contains(text, "行01") {
+		t.Fatalf("Home を押す前に末尾へ動いていない:\n%s", text)
+	}
+
+	m, _ = send(m, homeKey)
+
+	text := plainText(m)
+	if !strings.Contains(text, "行01") {
+		t.Errorf("Home で本文の先頭へ戻っていない:\n%s", text)
+	}
+	if strings.Contains(text, "行60") {
+		t.Errorf("Home の後に 行60 が残っている:\n%s", text)
+	}
+}
+
+func TestEndScrollsToSamePlaceAsG(t *testing.T) {
+	withG, _ := send(detailModel(100, 20, []model.Card{longBodyCard()}), enterKey, goBottomKey)
+	withEnd, _ := send(detailModel(100, 20, []model.Card{longBodyCard()}), enterKey, endKey)
+
+	text := plainText(withEnd)
+	if !strings.Contains(text, "行60") || strings.Contains(text, "行01") {
+		t.Errorf("End で本文の末尾まで動いていない:\n%s", text)
+	}
+	if want := plainText(withG); text != want {
+		t.Errorf("End と G で表示が違う:\nEnd:\n%s\nG:\n%s", text, want)
+	}
+}
+
+func TestGShowsLastCommentWithoutReviewThreads(t *testing.T) {
+	m, _ := send(detailModel(100, 20, []model.Card{commentPRCard([]gh.ReviewThread{})}), enterKey, enterKey)
+
+	m, _ = send(m, goBottomKey)
+
+	text := plainText(m)
+	if !strings.Contains(text, "コメント30") {
+		t.Errorf("G で最後のコメントが出ていない:\n%s", text)
+	}
+	if strings.Contains(text, "コメント01") {
+		t.Errorf("G の後に コメント01 が残っている:\n%s", text)
+	}
+}
+
+func TestGPassesLastCommentWhenReviewThreadExists(t *testing.T) {
+	thread := gh.ReviewThread{IsResolved: false}
+	for i := 1; i <= 20; i++ {
+		thread.Comments = append(thread.Comments, gh.ReviewComment{Author: gh.Author{Login: "user-1"}, Body: fmt.Sprintf("返信%02d", i), CreatedAt: at})
+	}
+	m, _ := send(detailModel(100, 20, []model.Card{commentPRCard([]gh.ReviewThread{thread})}), enterKey, enterKey)
+
+	m, _ = send(m, goBottomKey)
+
+	text := plainText(m)
+	if !strings.Contains(text, "返信20") {
+		t.Errorf("G で review thread の末尾まで動いていない:\n%s", text)
+	}
+	if strings.Contains(text, "コメント30") {
+		t.Errorf("G が本文領域の末尾ではなくコメントの末尾で止まっている:\n%s", text)
 	}
 }
 

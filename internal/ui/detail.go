@@ -96,6 +96,10 @@ func (m Model) updateDetailKey(key string) (tea.Model, tea.Cmd) {
 		m.detail.vp.PageDown()
 	case "pgup":
 		m.detail.vp.PageUp()
+	case "G", "end":
+		m.detail.vp.GotoBottom()
+	case "home":
+		m.detail.vp.GotoTop()
 	case "x":
 		m.detail.expanded = !m.detail.expanded
 		m.refreshDetail()

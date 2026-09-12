@@ -21,7 +21,8 @@ func helpModel(t *testing.T) (Model, *gh.Fake, *stubEditor) {
 	return todoModel(fake, exampleResult(t).Cards, ed), fake, ed
 }
 
-// helpBody はヘルプ画面の View からキーの行（見出しと空行の次から次の空行まで）を返す。
+// helpBody はヘルプ画面の View からキーの行（見出しと空行の次から、次の空行かフッタの手前まで）を返す。
+// キーの行が端末の高さを埋め切ると空行が 1 つも残らないので、最終行のフッタを先に外す。
 func helpBody(t *testing.T, m Model) []string {
 	t.Helper()
 	lines := plain(m)
@@ -29,7 +30,7 @@ func helpBody(t *testing.T, m Model) []string {
 		t.Fatalf("1 行目 = %q, want キーバインド", lines[0])
 	}
 	var body []string
-	for _, l := range lines[2:] {
+	for _, l := range lines[2 : len(lines)-1] {
 		if strings.TrimSpace(l) == "" {
 			break
 		}
@@ -187,8 +188,8 @@ func TestHelpListsImplementedKeys(t *testing.T) {
 	m, _ = send(m, tea.WindowSizeMsg{Width: 80, Height: 24}, questionKey)
 
 	body := helpBody(t, m)
-	if len(body) != 19 {
-		t.Fatalf("キーの行数 = %d, want 19:\n%s", len(body), strings.Join(body, "\n"))
+	if len(body) != 21 {
+		t.Fatalf("キーの行数 = %d, want 21:\n%s", len(body), strings.Join(body, "\n"))
 	}
 	if !strings.Contains(body[0], "j / k / ↑ / ↓") || !strings.Contains(body[0], "行移動（キュー）/ スクロール（詳細）") {
 		t.Errorf("1 行目 = %q", body[0])
@@ -205,6 +206,8 @@ func TestHelpListsImplementedKeys(t *testing.T) {
 		{"R", "全件再取得（キュー）/ セッション取得（詳細）"},
 		{"?", "ヘルプを開く / 閉じる"},
 		{"PgUp / PgDn", "ページ単位のスクロール（詳細）"},
+		{"G / End", "本文の末尾へ飛ぶ（詳細）"},
+		{"Home", "本文の先頭へ飛ぶ（詳細）"},
 	}
 	i := 1
 	for _, want := range wants {
