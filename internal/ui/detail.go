@@ -240,7 +240,8 @@ func (m Model) prListLines() []string {
 	return lines
 }
 
-// detailMode は詳細の対象カードのリポジトリの方式。Card は 1 リポジトリ分しか持たない。
+// detailMode は詳細の対象カードのリポジトリの方式。Card は 1 リポジトリ分しか持たないので、
+// detailRepo（PR 詳細は選択中の PR、それ以外は Issue）から引けば同じ答えになる。
 func (m Model) detailMode() model.Mode {
 	mode, _ := m.repoMode(m.detailRepo())
 	return mode

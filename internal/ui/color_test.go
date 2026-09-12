@@ -38,6 +38,43 @@ func TestLabelNameGetsBackgroundColor(t *testing.T) {
 	if !strings.Contains(got, "48;2;14;138;22") {
 		t.Errorf("背景色 0e8a16 が指定されていない: %q", got)
 	}
+	// 0e8a16 は相対輝度 0.1832 でしきい値 0.179 のすぐ上。ここが黒のままであることを固定する。
+	if !strings.Contains(got, fgBlack) {
+		t.Errorf("しきい値のすぐ上の 0e8a16 の文字色が黒でない: %q", got)
+	}
+}
+
+// 状態語がどの色になるかを、実装の表を参照せずに 16 進値で固定する。
+func TestStateWordUsesTheColorOfItsMeaning(t *testing.T) {
+	tests := []struct {
+		word       string
+		dark       string
+		light      string
+		meaning    string
+		colorNames string
+	}{
+		{"MERGEABLE", "63;185;80", "26;127;55", "良い", "#3FB950 / #1A7F37"},
+		{"SUCCESS", "63;185;80", "26;127;55", "良い", "#3FB950 / #1A7F37"},
+		{"緑", "63;185;80", "26;127;55", "良い", "#3FB950 / #1A7F37"},
+		{"open", "63;185;80", "26;127;55", "良い", "#3FB950 / #1A7F37"},
+		{"CONFLICTING", "248;81;73", "207;34;46", "悪い", "#F85149 / #CF222E"},
+		{"FAILURE", "248;81;73", "207;34;46", "悪い", "#F85149 / #CF222E"},
+		{"緑以外", "248;81;73", "207;34;46", "悪い", "#F85149 / #CF222E"},
+		{"closed", "248;81;73", "207;34;46", "悪い", "#F85149 / #CF222E"},
+		{"取得失敗", "248;81;73", "207;34;46", "悪い", "#F85149 / #CF222E"},
+		{"UNKNOWN", "210;153;34", "154;103;0", "保留", "#D29922 / #9A6700"},
+		{"PENDING", "210;153;34", "154;103;0", "保留", "#D29922 / #9A6700"},
+		{"DRAFT", "210;153;34", "154;103;0", "保留", "#D29922 / #9A6700"},
+		{"merged", "163;113;247", "130;80;223", "merged", "#A371F7 / #8250DF"},
+	}
+	for _, tt := range tests {
+		if got := renderStateWord(tt.word, true); !strings.Contains(got, "38;2;"+tt.dark) {
+			t.Errorf("暗い端末の %q が %s（%s）でない: %q", tt.word, tt.meaning, tt.colorNames, got)
+		}
+		if got := renderStateWord(tt.word, false); !strings.Contains(got, "38;2;"+tt.light) {
+			t.Errorf("明るい端末の %q が %s（%s）でない: %q", tt.word, tt.meaning, tt.colorNames, got)
+		}
+	}
 }
 
 // contrast は 2 つの相対輝度のコントラスト比。
