@@ -2,7 +2,9 @@
 
 ## Purpose
 TBD - created by archiving change s01-bootstrap. Update Purpose after archive.
+
 ## Requirements
+
 ### Requirement: q で終了する
 起動中に `q` または `Ctrl+C` を押すと、プログラムは終了コード 0 で MUST 終了し、端末を元の状態に戻す。それ以外のキーでは終了しない。
 
@@ -19,7 +21,7 @@ TBD - created by archiving change s01-bootstrap. Update Purpose after archive.
 - **THEN** 終了コマンドは返らず、モデルは描画可能なまま残る
 
 ### Requirement: 起動失敗は標準エラーに出て終了コード 1 になる
-`main()` は次のいずれかが失敗した場合、エラー内容を標準エラー出力に書き、終了コード 1 で MUST 終了する。文言は 1 行で、`Check` の失敗だけは原因と次の一手の 2 行（1 行ずつ改行で区切る）。panic しない。Bubble Tea のプログラムは起動しない（設定と `Check` の失敗は画面を出す前に分かる）。
+引数なしで実行したとき（TUI の起動）、`main()` は次のいずれかが失敗した場合、エラー内容を標準エラー出力に書き、終了コード 1 で MUST 終了する。文言は 1 行で、`Check` の失敗だけは原因と次の一手の 2 行（1 行ずつ改行で区切る）。panic しない。Bubble Tea のプログラムは起動しない（設定と `Check` の失敗は画面を出す前に分かる）。サブコマンドの失敗はそれぞれの Requirement が定めるが、設定ファイルと `Check` の文言はここで定めたものを使い回す（s33 `now-command`「now は設定ファイルを読み gh を呼ぶ」）。
 - `config.DefaultPath` のエラー
 - 設定ファイルの存在確認のエラー（s08a `onboarding`「設定ファイルが無いときだけ onboarding に入る」）: 標準入力が端末でない状態で設定ファイルが無ければ `設定ファイルがありません: <パス>`。存在確認が「存在しない」以外のエラーを返せばそのエラーとパス
 - onboarding フォームの中止（`onboarding.ErrAborted`）: `設定の作成を中止しました（<パス> は書いていません）`。設定ファイルは書かれない
@@ -30,7 +32,7 @@ TBD - created by archiving change s01-bootstrap. Update Purpose after archive.
   - `gh auth status` が非 0（`*gh.Error`）: 1 行目 `gh の認証に失敗しました: <Stderr を TrimSpace したもの>`、2 行目 `gh auth login を実行してください`
   - それ以外（`ctx` の中断など）: s03 のエラー文字列を 1 行
 - Bubble Tea のプログラム実行のエラー（端末が無い環境での起動など）
-取得（`fetch.Fetch`）の失敗は起動失敗ではなく、s08 `queue-screen` の Requirement「取得は非同期に行い、取得中はスピナー、失敗時は前回結果を維持する」に従い画面に赤で出す。設定ファイルが無く標準入力が端末の場合は `onboarding` のフォームに入り、フォームが完了すれば通常どおり起動する。
+取得（`fetch.Fetch`）の失敗は起動失敗として扱わず、s08 `queue-screen` の Requirement「取得は非同期に行い、取得中はスピナー、失敗時は前回結果を維持する」に従い画面に赤で出す。設定ファイルが無く標準入力が端末の場合は `onboarding` のフォームに入り、フォームが完了すれば通常どおり起動する。
 
 #### Scenario: 端末でない環境で設定ファイルが無い
 - **WHEN** `$HOME/.config/loop-cli/config.yml` が無く、標準入力が端末でない状態でバイナリを実行する
@@ -67,9 +69,10 @@ TBD - created by archiving change s01-bootstrap. Update Purpose after archive.
 - 引数なし: 今までどおり TUI を起動する
 - `version`: s23 `self-update`「version サブコマンドは現在の版を 1 行出す」に従う
 - `update`: s23 `self-update`「update は新しい版があるときだけ go install で入れ直す」に従う
-- それ以外（フラグを含む）: `unknown command: <args[0]>` と使い方を標準エラーに書き、終了コード 1 で終わる。使い方には `version` と `update` の 1 行説明を含める
+- `now`: s33 `now-command`「now サブコマンドは今やるのカードだけを JSON で出す」に従う
+- それ以外（フラグを含む）: `unknown command: <args[0]>` と使い方を標準エラーに書き、終了コード 1 で終わる。使い方には `version` と `update` と `now` の 1 行説明を含める
 
-サブコマンドは設定ファイルを読まず、`gh` も呼ばない（`gh` が未認証でも `update` は動く）。
+`version` と `update` は設定ファイルを読まず、`gh` も呼ばない（`gh` が未認証でも `update` は動く）。`now` は設定ファイルの `repos` を対象にして `gh` を呼ぶ（s33 `now-command`「now は設定ファイルを読み gh を呼ぶ」）が、設定ファイルが無くても onboarding のフォームには入らない。
 
 #### Scenario: 引数なしは TUI を起動する
 - **WHEN** 引数なしで実行する
@@ -77,11 +80,15 @@ TBD - created by archiving change s01-bootstrap. Update Purpose after archive.
 
 #### Scenario: 未知のサブコマンド
 - **WHEN** 引数 `frobnicate` で実行する
-- **THEN** 標準エラーに `unknown command: frobnicate` と `version` と `update` を含む使い方が出て、終了コードは 1 である
+- **THEN** 標準エラーに `unknown command: frobnicate` と `version` と `update` と `now` を含む使い方が出て、終了コードは 1 である
 
 #### Scenario: update は設定ファイルが無くても動く
 - **WHEN** `$HOME/.config/loop-cli/config.yml` が無い状態で引数 `update` を実行する
 - **THEN** onboarding のフォームは出ず、更新の処理が実行される
+
+#### Scenario: now は設定ファイルが無ければフォームを出さずに終わる
+- **WHEN** `$HOME/.config/loop-cli/config.yml` が無い状態で引数 `now` を実行する
+- **THEN** onboarding のフォームは出ず、標準エラーに `設定ファイルがありません` とそのパスが出て、終了コードは 1 である
 
 ### Requirement: loop-cli バイナリが起動して 1 フレーム描画する
 `go build ./cmd/loop-cli` は `loop-cli` バイナリを MUST 生成し、端末で起動すると Bubble Tea のプログラムとして 1 フレームを MUST 描画する。
@@ -121,4 +128,3 @@ TUI は次の順で起動する。
 #### Scenario: 設定ファイルが無い端末ではフォームの後にキュー画面が出る
 - **WHEN** `$HOME/.config/loop-cli/config.yml` が無く、`gh auth status` が通る端末で `loop-cli` を起動し、フォームに `org/app` を入力して完了する
 - **THEN** `$HOME/.config/loop-cli/config.yml` が `repos:\n  - org/app\nrefresh_interval_sec: 120\nmerge_method: squash\neditor: $EDITOR\nnotify: true\n` の内容で作られ、続けてキュー画面が描画される
-
