@@ -74,6 +74,30 @@ func nowCard(repo string, number int, priority int, updatedAt time.Time) model.C
 	return model.Card{Issue: issue, Result: result}
 }
 
+// inProgressCard は進行中タブに入る手書きの Card を 1 枚作る。isPR なら主体は PR。
+func inProgressCard(repo string, number int, isPR bool, labels []string, updatedAt time.Time) model.Card {
+	result := model.Result{Situation: model.SituationInProgress, Priority: 7, Tab: model.TabInProgress, Summary: "進行中"}
+	if isPR {
+		pr := model.PR{
+			Repo: repo, Number: number, Title: "手書き PR",
+			State: "OPEN", UpdatedAt: updatedAt, Labels: labels, Result: result,
+		}
+		return model.Card{PRs: []model.PR{pr}, Result: result}
+	}
+	issue := &model.Issue{Repo: repo, Number: number, Title: "手書き", UpdatedAt: updatedAt, Labels: labels, Result: result}
+	return model.Card{Issue: issue, Result: result}
+}
+
+// inProgressModel は進行中の Card 群を取得完了として渡し、進行中タブに切り替えた幅 w・高さ h の Model。
+func inProgressModel(t *testing.T, w, h int, res *fetch.Result) Model {
+	t.Helper()
+	m, _ := send(newModel(nil), tea.WindowSizeMsg{Width: w, Height: h}, fetchedMsg{res: res, at: at}, runeKey('3'))
+	if m.tab != model.TabInProgress {
+		t.Fatalf("進行中タブに切り替わっていない: tab = %s", m.tab)
+	}
+	return m
+}
+
 func contains(s, sub string) bool { return strings.Contains(s, sub) }
 
 // confirmModel は s10 の手順（blocked-by 行のある下書き）で確認画面に移った Model と投稿先の Fake を返す。

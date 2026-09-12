@@ -119,7 +119,7 @@ func New(fetcher Fetcher, client gh.GHClient, editor Editor, opts Options) Model
 		fetcher:         fetcher,
 		client:          client,
 		editor:          editor,
-		rows:            buildRows(nil),
+		rows:            buildRows(nil, nil),
 		tab:             model.TabNow,
 		fetching:        true,
 		width:           80,
@@ -138,7 +138,9 @@ func New(fetcher Fetcher, client gh.GHClient, editor Editor, opts Options) Model
 	// スナップショットがあれば前回の表と保存時刻から始める（D-002「起動直後は stale 表示」）。
 	if opts.Snapshot != nil {
 		m.cards = opts.Snapshot.Cards
-		m.rows = buildRows(m.cards)
+		// スナップショットは運用方式を持たないので、初回の取得が終わるまでゼロ値の sdd で描く
+		// （design.md D3。label 方式のリポジトリの段階は、そのとき段階付きに入れ替わる）。
+		m.rows = buildRows(m.cards, nil)
 		m.at = opts.Snapshot.At
 	}
 	return m
@@ -211,10 +213,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// 通知の比較は差し替える前の Cards と、最終更新時刻の有無（前回があるか）で決まる。
 			prev, hadPrev := m.cards, !m.at.IsZero()
 			m.cards = msg.res.Cards
-			m.rows = buildRows(m.cards)
 			// 方式とラベル色は毎回の取得で丸ごと入れ替え、L のラベル一覧も同じ鮮度にそろえて捨てる。
+			// 方式は buildRows の並びと列の語を決めるので、行を組むより先に入れ替える（design.md D3）。
 			m.modes = msg.res.Modes
 			m.labelColors = msg.res.LabelColors
+			m.rows = buildRows(m.cards, m.modes)
 			m.repoLabels = nil
 			m.at = msg.at
 			m.errText = ""

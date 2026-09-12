@@ -1,0 +1,25 @@
+{
+  "body": "proposal を書いている最中の issue。",
+  "comments": [
+    {
+      "id": "IC_101",
+      "author": {"login": "user-1"},
+      "authorAssociation": "OWNER",
+      "body": "<!-- routine -->\nstarted: 2026-09-05T02:40:00Z",
+      "createdAt": "2026-09-05T02:40:00Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/org/app/issues/101#issuecomment-1",
+      "viewerDidAuthor": false
+    }
+  ],
+  "labels": [
+    {"name": "stage:propose", "color": "0e8a16", "description": "proposal を作ってよい"},
+    {"name": "wip", "color": "ededed", "description": "worker が作業中"}
+  ],
+  "number": 101,
+  "title": "ログインのセッション仕様を決める",
+  "url": "https://github.com/org/app/issues/101"
+}

@@ -1,0 +1,25 @@
+{
+  "body": "実装中の issue。",
+  "comments": [
+    {
+      "id": "IC_103",
+      "author": {"login": "user-1"},
+      "authorAssociation": "OWNER",
+      "body": "<!-- routine -->\nstarted: 2026-09-05T01:50:00Z",
+      "createdAt": "2026-09-05T01:50:00Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/org/web/issues/103#issuecomment-1",
+      "viewerDidAuthor": false
+    }
+  ],
+  "labels": [
+    {"name": "stage:apply", "color": "1d76db", "description": "実装してよい"},
+    {"name": "wip", "color": "ededed", "description": "worker が作業中"}
+  ],
+  "number": 103,
+  "title": "ログイン画面のエラー表示",
+  "url": "https://github.com/org/web/issues/103"
+}

@@ -84,6 +84,27 @@ func TestTabSwitching(t *testing.T) {
 	}
 }
 
+// 進行中タブの並びと列の語は運用方式で決まるので、方式は行を組むより先に取り込む必要がある。
+// 取得完了のメッセージ 1 回で、そのメッセージが運ぶ方式が使われる（1 回前の方式ではない）。
+func TestFetchedMsgUsesItsOwnModesForInProgressRows(t *testing.T) {
+	cards := []model.Card{
+		inProgressCard("org/kanban", 1, false, []string{"In Progress"}, at.Add(-1*time.Hour)),
+		inProgressCard("org/kanban", 2, false, []string{"To Do"}, at.Add(-2*time.Hour)),
+	}
+	res := &fetch.Result{Cards: cards, Modes: map[string]model.Mode{"org/kanban": model.ModeLabel}}
+
+	m, _ := send(newModel(nil), fetchedMsg{res: res, at: at})
+
+	rows := m.rows[model.TabInProgress]
+	if len(rows) != 2 {
+		t.Fatalf("進行中タブの行数 = %d, want 2", len(rows))
+	}
+	// 段階順は To Do → In Progress なので、更新が古い To Do が先に来る。
+	if got := []string{rows[0].stageWord, rows[1].stageWord}; got[0] != "To Do" || got[1] != "In Progress" {
+		t.Errorf("1 回目の取得の列の語と並び = %v, want [To Do In Progress]", got)
+	}
+}
+
 func TestUnimplementedKeysDoNothing(t *testing.T) {
 	base := loaded(threeNowCards()[:2])
 	base, _ = send(base, runeKey('j'))

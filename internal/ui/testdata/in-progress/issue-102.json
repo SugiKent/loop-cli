@@ -1,0 +1,25 @@
+{
+  "body": "実装が merge 済みで archive を待っている issue。",
+  "comments": [
+    {
+      "id": "IC_102",
+      "author": {"login": "user-1"},
+      "authorAssociation": "OWNER",
+      "body": "<!-- routine -->\nstarted: 2026-09-03T03:00:00Z",
+      "createdAt": "2026-09-03T03:00:00Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/org/app/issues/102#issuecomment-1",
+      "viewerDidAuthor": false
+    }
+  ],
+  "labels": [
+    {"name": "stage:archive", "color": "5319e7", "description": "archive してよい"},
+    {"name": "wip", "color": "ededed", "description": "worker が作業中"}
+  ],
+  "number": 102,
+  "title": "検索の並び順を直す",
+  "url": "https://github.com/org/app/issues/102"
+}

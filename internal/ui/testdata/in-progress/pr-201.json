@@ -1,0 +1,42 @@
+{
+  "body": "未確定の判断: 1 件 — このまま merge すると worker が推奨案で進めます\n\nRefs #901",
+  "comments": [
+    {
+      "id": "IC_201_1",
+      "author": {"login": "user-1"},
+      "authorAssociation": "OWNER",
+      "body": "<!-- routine -->\nQ1: 保存先を分けますか。",
+      "createdAt": "2026-09-05T00:50:00Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/org/app/pull/201#issuecomment-1",
+      "viewerDidAuthor": false
+    },
+    {
+      "id": "IC_201_2",
+      "author": {"login": "user-1"},
+      "authorAssociation": "OWNER",
+      "body": "A1: 分けてください。",
+      "createdAt": "2026-09-05T01:00:00Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/org/app/pull/201#issuecomment-2",
+      "viewerDidAuthor": false
+    }
+  ],
+  "isDraft": false,
+  "labels": [
+    {"name": "apply", "color": "1d76db", "description": "実装の PR"}
+  ],
+  "mergeStateStatus": "BLOCKED",
+  "mergeable": "UNKNOWN",
+  "number": 201,
+  "reviewDecision": "REVIEW_REQUIRED",
+  "statusCheckRollup": [],
+  "title": "[apply] #901 セッションの保存先を変える",
+  "url": "https://github.com/org/app/pull/201"
+}

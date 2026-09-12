@@ -1,0 +1,41 @@
+[
+  {
+    "body": "proposal を書いている最中の issue。",
+    "commentsCount": 1,
+    "labels": [
+      {"name": "stage:propose", "color": "0e8a16", "description": "proposal を作ってよい"},
+      {"name": "wip", "color": "ededed", "description": "worker が作業中"}
+    ],
+    "number": 101,
+    "repository": {"name": "app", "nameWithOwner": "org/app"},
+    "title": "ログインのセッション仕様を決める",
+    "updatedAt": "2026-09-05T02:52:00Z",
+    "url": "https://github.com/org/app/issues/101"
+  },
+  {
+    "body": "実装が merge 済みで archive を待っている issue。",
+    "commentsCount": 1,
+    "labels": [
+      {"name": "stage:archive", "color": "5319e7", "description": "archive してよい"},
+      {"name": "wip", "color": "ededed", "description": "worker が作業中"}
+    ],
+    "number": 102,
+    "repository": {"name": "app", "nameWithOwner": "org/app"},
+    "title": "検索の並び順を直す",
+    "updatedAt": "2026-09-03T03:04:00Z",
+    "url": "https://github.com/org/app/issues/102"
+  },
+  {
+    "body": "実装中の issue。",
+    "commentsCount": 1,
+    "labels": [
+      {"name": "stage:apply", "color": "1d76db", "description": "実装してよい"},
+      {"name": "wip", "color": "ededed", "description": "worker が作業中"}
+    ],
+    "number": 103,
+    "repository": {"name": "web", "nameWithOwner": "org/web"},
+    "title": "ログイン画面のエラー表示",
+    "updatedAt": "2026-09-05T02:04:00Z",
+    "url": "https://github.com/org/web/issues/103"
+  }
+]

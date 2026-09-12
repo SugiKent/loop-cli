@@ -1,0 +1,24 @@
+[
+  {
+    "body": "未確定の判断: 1 件 — このまま merge すると worker が推奨案で進めます\n\nRefs #901",
+    "isDraft": false,
+    "labels": [
+      {"name": "apply", "color": "1d76db", "description": "実装の PR"}
+    ],
+    "number": 201,
+    "repository": {"name": "app", "nameWithOwner": "org/app"},
+    "title": "[apply] #901 セッションの保存先を変える",
+    "updatedAt": "2026-09-05T01:04:00Z",
+    "url": "https://github.com/org/app/pull/201"
+  },
+  {
+    "body": "作ったばかりで段階ラベルがまだ無い PR。",
+    "isDraft": false,
+    "labels": [],
+    "number": 202,
+    "repository": {"name": "app", "nameWithOwner": "org/app"},
+    "title": "依存を更新する",
+    "updatedAt": "2026-09-05T02:34:00Z",
+    "url": "https://github.com/org/app/pull/202"
+  }
+]

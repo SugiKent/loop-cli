@@ -7,6 +7,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/SugiKent/loop-cli/internal/model"
 )
 
 // 表の固定列幅（design.md の未決事項の既定値）。合計 48 列で、残りをタイトルに充てる。
@@ -186,9 +188,36 @@ func (m Model) tableLines(h int) []string {
 	rows := m.rows[m.tab]
 	lines := make([]string, 0, len(rows))
 	for i, r := range rows {
+		// 進行中タブはリポジトリの区切りに見出し行を挟む。行があるリポジトリが 1 つでも出す
+		// （design.md D7。データで分岐させると自動更新のたびに表が 1 行ずれる）。
+		// 挟むのは描画のときだけで rows の要素は増やさないので、カーソルと選択の意味は変わらない。
+		if m.tab == model.TabInProgress && (i == 0 || rows[i-1].repo != r.repo) {
+			lines = append(lines, repoHeaderLine(r.repo, countRepoRows(rows[i:]), m.width))
+		}
 		lines = append(lines, m.tableRow(r, i == m.cursor)...)
 	}
 	return cut(lines, h)
+}
+
+// countRepoRows は先頭と同じリポジトリの行が先頭から何枚続くかを返す（見出し行の件数）。
+func countRepoRows(rows []row) int {
+	for i, r := range rows {
+		if r.repo != rows[0].repo {
+			return i
+		}
+	}
+	return len(rows)
+}
+
+// repoHeaderLine は進行中タブのリポジトリの見出し行 `── <owner/name> ── <n> 件 ────…` を返す。
+// 端末の幅に達するまで `─` で埋め、収まらなければ幅で切る（`…` は付けない。切った跡が
+// 線の一部に見えるようにするため。design.md D8）。幅が 0 以下なら空文字列。
+func repoHeaderLine(repo string, n, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	head := ansi.Truncate(fmt.Sprintf("── %s ── %d 件 ", repo, n), width, "")
+	return head + strings.Repeat("─", max(width-ansi.StringWidth(head), 0))
 }
 
 // emptyHintLines はヒントの 2 行を上に空行を置いて縦中央にし、各行を横中央に置く。
@@ -222,8 +251,15 @@ func (m Model) tableRow(r row, selected bool) []string {
 		number = fmt.Sprintf("PR%d", r.number)
 	}
 	kind := r.card.Result.Situation.Kind()
+	kindCol := pad(kind, colKind)
+	if m.tab == model.TabInProgress {
+		// 進行中タブでは全行同じ `進行中` の代わりに段階ラベル名を出し、s33-colorful-labels の
+		// 規則で色を付ける（design.md D1 / D5）。色は接頭辞を落とす前のラベル名で引くので、
+		// 段階を持たない行（stage が空）の `-` には色が付かない。
+		kindCol = pad(renderLabelName(r.stageWord, m.labelColors[r.repo][r.stage]), colKind)
+	}
 
-	fixed := pad(mark, colMark) + pad(prio, colPrio) + pad(kind, colKind) +
+	fixed := pad(mark, colMark) + pad(prio, colPrio) + kindCol +
 		pad(r.repo, colRepo) + pad(number, colNumber)
 	elapsed := pad(Elapsed(m.at, r.updatedAt), colElapsed)
 

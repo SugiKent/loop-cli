@@ -51,7 +51,7 @@ func TestSubjectFallsBackToFirstOpenPR(t *testing.T) {
 }
 
 func TestBuildRowsSplitsExampleIntoTabs(t *testing.T) {
-	rows := buildRows(exampleResult(t).Cards)
+	rows := buildRows(exampleResult(t).Cards, nil)
 
 	want := map[model.Tab]int{model.TabNow: 1, model.TabBacklog: 1, model.TabInProgress: 0, model.TabAbnormal: 0}
 	for tab, n := range want {
@@ -77,7 +77,7 @@ func TestBuildRowsSortsByPriorityThenNewest(t *testing.T) {
 		nowCard("org/app", 5, 1, now.Add(-12*time.Minute)),
 	}
 
-	rows := buildRows(cards)[model.TabNow]
+	rows := buildRows(cards, nil)[model.TabNow]
 
 	var got []string
 	for _, r := range rows {
@@ -88,5 +88,74 @@ func TestBuildRowsSortsByPriorityThenNewest(t *testing.T) {
 		if i >= len(got) || got[i] != want[i] {
 			t.Fatalf("並びが %v, want %v", got, want)
 		}
+	}
+}
+
+// 進行中タブは優先度が全行同じなので、リポジトリ → 段階 → 新しい順 で並べる。
+func TestBuildRowsSortsInProgressByRepoThenStage(t *testing.T) {
+	now := at
+	cards := []model.Card{
+		inProgressCard("org/web", 1, true, []string{"apply"}, now.Add(-1*time.Hour)),
+		inProgressCard("org/app", 2, false, []string{"stage:archive"}, now.Add(-48*time.Hour)),
+		inProgressCard("org/app", 3, true, []string{"propose"}, now.Add(-3*time.Hour)),
+		inProgressCard("org/app", 4, true, []string{"propose"}, now.Add(-12*time.Minute)),
+		inProgressCard("org/app", 5, false, nil, now.Add(-5*time.Minute)),
+	}
+
+	rows := buildRows(cards, nil)[model.TabInProgress]
+
+	var got [][2]string
+	for _, r := range rows {
+		got = append(got, [2]string{r.repo, Elapsed(now, r.updatedAt)})
+	}
+	want := [][2]string{
+		{"org/app", "12m"}, // propose
+		{"org/app", "3h"},  // propose
+		{"org/app", "2d"},  // archive
+		{"org/app", "5m"},  // 段階なしは同じリポジトリの最後
+		{"org/web", "1h"},  // apply
+	}
+	if len(got) != len(want) {
+		t.Fatalf("行数 = %d, want %d（%v）", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("並びが %v, want %v", got, want)
+		}
+	}
+}
+
+// 種別の列に出す語は、主体の種別と運用方式で決まる（`stage:` は列でだけ落とす）。
+func TestRowStageWordByModeAndSubject(t *testing.T) {
+	modes := map[string]model.Mode{"org/app": model.ModeSDD, "org/kanban": model.ModeLabel}
+	tests := []struct {
+		name      string
+		repo      string
+		isPR      bool
+		labels    []string
+		stage     string
+		stageWord string
+	}{
+		{"sdd の issue", "org/app", false, []string{"stage:archive", "wip"}, "stage:archive", "archive"},
+		{"sdd の PR", "org/app", true, []string{"propose", "question"}, "propose", "propose"},
+		{"label の issue", "org/kanban", false, []string{"In Progress"}, "In Progress", "In Progress"},
+		{"label の PR", "org/kanban", true, []string{"In Progress"}, "", "-"},
+		{"段階なし", "org/app", false, []string{"question"}, "", "-"},
+		{"docs だけの PR", "org/app", true, []string{"docs"}, "", "-"},
+		{"段階 2 つ", "org/app", false, []string{"stage:propose", "stage:apply", "question"}, "stage:propose", "propose"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			card := inProgressCard(tt.repo, 1, tt.isPR, tt.labels, at)
+
+			r := newRow(card, modes)
+
+			if r.stage != tt.stage {
+				t.Errorf("色を引く段階ラベル名 = %q, want %q", r.stage, tt.stage)
+			}
+			if r.stageWord != tt.stageWord {
+				t.Errorf("列に出す語 = %q, want %q", r.stageWord, tt.stageWord)
+			}
+		})
 	}
 }
