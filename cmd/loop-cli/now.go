@@ -75,7 +75,7 @@ type nowCheck struct {
 }
 
 // buildNow は取得結果から「今やる」のカードだけを JSON へ写す形に組み立てる。
-// 並び順は buildRows と同じ（優先度昇順 → 主体の更新が新しい順 → リポジトリ名昇順 → 番号昇順）。
+// 並び順は buildRows の今やるタブと同じ（優先度昇順 → 主体の更新が新しい順 → リポジトリ名昇順 → 番号昇順）。
 func buildNow(res *fetch.Result, fetchedAt time.Time) nowOutput {
 	type subject struct {
 		card      model.Card
