@@ -2,10 +2,12 @@
 
 ## Purpose
 TBD - created by archiving change s13-auto-refresh-notify. Update Purpose after archive.
+
 ## Requirements
+
 ### Requirement: 今やるタブの差分は主体のキーで比較する純粋関数で求める
 `internal/ui` は非公開の純粋関数 `addedNow(prev, next []model.Card) []model.Card` を MUST 持つ。`prev` と `next` のそれぞれから `Card.Result.Tab` が `model.TabNow` の Card だけを取り、各 Card のキーを s08 `Subject` の（リポジトリ、番号、主体が PR か）の 3 つ組とし、`next` にあって `prev` に無いキーの Card を `next` での並び順で返す。`prev` にあって `next` に無い Card（減ったもの）と、両方にある Card（同じ。`Title` / `UpdatedAt` / `Summary` が変わっていても同じ）は返さない。他のタブの Card は比較に入れない。`gh` も時刻も読まない。
-主体の種別をキーに含めるので、同じ Card（issue 108 + PR 131）の主体が PR 131（局面 A）から issue 108（局面 B）に移ったときは「増えた」と数える（人がすべきことが変わっているため。design.md 未決事項の既定値）。局面 `other`（その他）の PR も今やるタブにあるので比較に入る。
+主体の種別をキーに含めるので、同じ Card（issue 108 + PR 131）の主体が PR 131（局面 A）から issue 108（局面 B）に移ったときは「増えた」と数える（人がすべきことが変わっているため。design.md 未決事項の既定値）。局面 `other`（その他）の PR も今やるタブにあるので比較に入る。s30 の猶予で進行中タブに置かれていた `other` の PR の Card が、猶予が明けた取得で今やるタブに現れたときも、`prev` では今やるタブに無かったので「増えた」と数える。これが「その他のまま誰も触っていない」項目の知らせになる。
 
 #### Scenario: 増えたカードだけが返る
 - **WHEN** `prev` が今やるタブの Card `org/app PR#131` と `org/app #91` の 2 枚、`next` が `org/app #91`（`UpdatedAt` は新しい）と `org/web PR#88` と バックログの `org/app #140` の 3 枚で `addedNow` を呼ぶ
@@ -22,6 +24,10 @@ TBD - created by archiving change s13-auto-refresh-notify. Update Purpose after 
 #### Scenario: 主体が PR から Issue に移ると増えたと数える
 - **WHEN** `prev` が主体 PR 131 の issue 108 の Card、`next` が同じ issue 108 で `Result` を局面 `B`（主体が Issue、タブは今やる）にした Card で呼ぶ
 - **THEN** issue 108 の Card の 1 枚が返る
+
+#### Scenario: 猶予が明けて今やるに現れたその他は増えたと数える
+- **WHEN** `prev` が PR 61 単独の Card で `Result` が `in-progress`（猶予中。タブは進行中）、`next` が同じ PR 61 単独の Card で `Result` が `other`（タブは今やる）で `addedNow` を呼ぶ
+- **THEN** PR 61 の Card の 1 枚が返る
 
 ### Requirement: 取得成功後に増えた今やるカードを 1 件 1 通知で出す
 `internal/ui` は通知関数の型 `Notifier`（`func(title, body string) error`）を MUST 公開し、`Model` は `New` の `Options.Notify` で受け取る。`cmd/loop-cli` は `Config.Notify` が true のとき `beeep.Notify(title, body, "")`（s06 `notify test` と同じ呼び方。icon は空文字列。`nil` を渡すと beeep v0.11.2 はエラーになる）を呼ぶ関数を渡し、false のとき `nil` を渡す。`nil` なら通知しない。
@@ -64,4 +70,3 @@ TBD - created by archiving change s13-auto-refresh-notify. Update Purpose after 
 #### Scenario: 取得の失敗では比較しない
 - **WHEN** `example` の `Result` を渡した後に error `search issues: gh search issues: exit 1: rate limited` を取得失敗として渡す
 - **THEN** 記録は増えず、`Cards` は `example` のままである
-
