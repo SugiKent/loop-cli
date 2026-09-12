@@ -60,6 +60,7 @@ refresh_interval_sec: 120
 merge_method: squash
 editor: $EDITOR
 notify: true
+other_grace_min: 30
 ```
 
 | キー | 意味 | 既定値 | 取り得る値 |
@@ -69,6 +70,7 @@ notify: true
 | `merge_method` | merge の方式 | `squash` | `squash` / `merge` / `rebase` |
 | `editor` | 回答の下書きを開くコマンド。環境変数を展開してから空白で分割し、シェルを通さずに実行する | `$EDITOR` | 例: `vim`、`code --wait` |
 | `notify` | デスクトップ通知を出すか | `true` | `true` / `false` |
+| `other_grace_min` | 「その他」の PR を `[3]進行中` に置く猶予（分）。最終更新（GitHub の `updatedAt`）からこの時間だけ `[1]今やる` に出さない。issue-label-driven のリポジトリの PR には当たらない（open PR は全件 `[1]今やる` に出す） | `30` | 0 以上の整数。`0` で猶予なし |
 | `claude_config_dir` | `repos` の要素ごとに書く、そのリポジトリの Routine を回している Claude のプロファイルのパス（`CLAUDE_CONFIG_DIR` に渡す値）。詳細画面の右ペインで使う | なし（省略可） | 例: `~/.claude-personal`。`~` と環境変数を展開する |
 
 `repos` の要素をマッピングで書くと、そのリポジトリだけ `merge_method` を上書きし、`claude_config_dir` を指定できます。
@@ -85,9 +87,9 @@ repos:
 
 `claude_config_dir` は s31 で足したキーです。これより前の版に戻すときは、未知のキーとして起動に失敗するのでこの行を消してください。
 
-TUI が実際に使うのは `repos` / `editor` / `refresh_interval_sec`（自動更新の間隔）/ `notify`（デスクトップ通知）/ `merge_method`（`m` の merge 方式）/ `claude_config_dir`（詳細画面の右ペイン）です。
+TUI が実際に使うのは `repos` / `editor` / `refresh_interval_sec`（自動更新の間隔）/ `notify`（デスクトップ通知）/ `merge_method`（`m` の merge 方式）/ `claude_config_dir`（詳細画面の右ペイン）/ `other_grace_min`（「その他」の PR の猶予）です。
 
-未知のキーはエラーになります。`repos` が空、`owner/name` 形式でない、`merge_method` が 3 つ以外、`refresh_interval_sec` が 0 以下のときも起動に失敗します。
+未知のキーはエラーになります。`repos` が空、`owner/name` 形式でない、`merge_method` が 3 つ以外、`refresh_interval_sec` が 0 以下、`other_grace_min` が負数のときも起動に失敗します。
 
 ## 画面とキー操作
 

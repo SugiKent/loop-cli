@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/SugiKent/loop-cli/internal/classify"
 	"github.com/SugiKent/loop-cli/internal/fetch"
 	"github.com/SugiKent/loop-cli/internal/model"
 	"github.com/SugiKent/loop-cli/internal/snapshot"
@@ -81,6 +82,29 @@ func TestAddedNowCountsSubjectChange(t *testing.T) {
 	}
 	if _, number, isPR, _, _ := Subject(added[0]); number != 108 || isPR {
 		t.Errorf("増えたカードの主体 = %d (PR=%v), want 108 (PR=false)", number, isPR)
+	}
+}
+
+// TestAddedNowCountsSettledOtherBecomingNow は、猶予（s30）で進行中に置かれていた
+// その他の PR が猶予明けに今やるタブへ現れたとき、差分が「増えた」と数えることを確かめる。
+func TestAddedNowCountsSettledOtherBecomingNow(t *testing.T) {
+	// 分類そのものを通す。猶予の実装が壊れたらこのテストも落ちる。
+	card := model.Card{PRs: []model.PR{{Repo: "org/app", Number: 61, Title: "手書き PR", State: "OPEN", UpdatedAt: at}}}
+	grace := 30 * time.Minute
+	prev := classify.Card(card, model.ModeSDD, at.Add(10*time.Minute), grace)
+	next := classify.Card(card, model.ModeSDD, at.Add(31*time.Minute), grace)
+
+	if prev.Result.Tab != model.TabInProgress || next.Result.Tab != model.TabNow {
+		t.Fatalf("前提が崩れています: prev.Tab = %q, next.Tab = %q", prev.Result.Tab, next.Result.Tab)
+	}
+
+	added := addedNow([]model.Card{prev}, []model.Card{next})
+
+	if len(added) != 1 {
+		t.Fatalf("増えたカード = %d 枚, want 1: %+v", len(added), added)
+	}
+	if repo, number, isPR, _, _ := Subject(added[0]); repo != "org/app" || number != 61 || !isPR {
+		t.Errorf("増えたカード = %s %d (PR=%v), want org/app 61 (PR=true)", repo, number, isPR)
 	}
 }
 

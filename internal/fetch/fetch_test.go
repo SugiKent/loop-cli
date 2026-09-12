@@ -29,7 +29,7 @@ var fetchNow = time.Date(2026, 9, 4, 10, 30, 0, 0, time.UTC)
 
 func fetchDir(t *testing.T, dir string) *Result {
 	t.Helper()
-	res, err := Fetch(t.Context(), gh.NewFake(dir), repos, fetchNow)
+	res, err := Fetch(t.Context(), gh.NewFake(dir), repos, fetchNow, 0)
 	if err != nil {
 		t.Fatalf("Fetch(%s): %v", dir, err)
 	}
@@ -82,7 +82,7 @@ func equalInts(a, b []int) bool {
 
 func TestFetchExample(t *testing.T) {
 	fake := gh.NewFake(exampleDir)
-	res, err := Fetch(t.Context(), fake, repos, fetchNow)
+	res, err := Fetch(t.Context(), fake, repos, fetchNow, 0)
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
@@ -184,7 +184,7 @@ func newLabelStub(dir string, labels map[string][]gh.RepoLabel) *labelStub {
 
 // board は To Do を持ち stage:todo を持たないので label と判定され、In Progress が段階になる。
 func TestFetchClassifiesWithDetectedMode(t *testing.T) {
-	res, err := Fetch(t.Context(), gh.NewFake(boardDir), []string{"org/board"}, fetchNow)
+	res, err := Fetch(t.Context(), gh.NewFake(boardDir), []string{"org/board"}, fetchNow, 0)
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestFetchClassifiesWithDetectedMode(t *testing.T) {
 // 判定できないリポジトリは表に入らず、カードはゼロ値（sdd）の語彙で分類される。
 func TestFetchUndetectedRepoClassifiesAsSDD(t *testing.T) {
 	stub := newLabelStub(boardDir, map[string][]gh.RepoLabel{"org/board": noModeLabel})
-	res, err := Fetch(t.Context(), stub, []string{"org/board"}, fetchNow)
+	res, err := Fetch(t.Context(), stub, []string{"org/board"}, fetchNow, 0)
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestFetchListsLabelsOncePerRepo(t *testing.T) {
 	stub := newLabelStub("testdata/multirepo", map[string][]gh.RepoLabel{
 		"org/app": sddLabels, "org/web": sddLabels,
 	})
-	if _, err := Fetch(t.Context(), stub, []string{"org/app", "org/web"}, fetchNow); err != nil {
+	if _, err := Fetch(t.Context(), stub, []string{"org/app", "org/web"}, fetchNow, 0); err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
 	got := append([]string(nil), stub.calls...)
@@ -239,7 +239,7 @@ func TestFetchDetectsModePerRepo(t *testing.T) {
 	stub := newLabelStub(boardDir, map[string][]gh.RepoLabel{
 		"org/app": sddLabels, "org/board": labelLabels,
 	})
-	res, err := Fetch(t.Context(), stub, []string{"org/app", "org/board"}, fetchNow)
+	res, err := Fetch(t.Context(), stub, []string{"org/app", "org/board"}, fetchNow, 0)
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
@@ -256,7 +256,7 @@ func TestFetchDetectsModePerRepo(t *testing.T) {
 func TestFetchListLabelsFailureKeepsCards(t *testing.T) {
 	stub := newLabelStub(boardDir, map[string][]gh.RepoLabel{"org/board": labelLabels})
 	stub.err = map[string]error{"org/app": errors.New("gh label list: exit 1")}
-	res, err := Fetch(t.Context(), stub, []string{"org/app", "org/board"}, fetchNow)
+	res, err := Fetch(t.Context(), stub, []string{"org/app", "org/board"}, fetchNow, 0)
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
@@ -287,7 +287,7 @@ func TestFetchRepoErrorSortsBeforeNumberedErrors(t *testing.T) {
 		labels: map[string][]gh.RepoLabel{},
 		err:    map[string]error{"org/app": errors.New("gh label list: exit 1")},
 	}
-	res, err := Fetch(t.Context(), &viewIssueFailure{labelStub: stub}, repos, fetchNow)
+	res, err := Fetch(t.Context(), &viewIssueFailure{labelStub: stub}, repos, fetchNow, 0)
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
@@ -402,7 +402,7 @@ func TestFetchLink(t *testing.T) {
 }
 
 func TestFetchMultiRepo(t *testing.T) {
-	res, err := Fetch(t.Context(), gh.NewFake("testdata/multirepo"), []string{"org/app", "org/web"}, fetchNow)
+	res, err := Fetch(t.Context(), gh.NewFake("testdata/multirepo"), []string{"org/app", "org/web"}, fetchNow, 0)
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
@@ -477,7 +477,7 @@ func TestFetchPartialFailure(t *testing.T) {
 }
 
 func TestFetchSearchIssuesFailure(t *testing.T) {
-	res, err := Fetch(t.Context(), gh.NewFake("testdata/nosearch"), repos, fetchNow)
+	res, err := Fetch(t.Context(), gh.NewFake("testdata/nosearch"), repos, fetchNow, 0)
 	if err == nil {
 		t.Fatalf("エラーを期待したが nil（Result = %+v）", res)
 	}
@@ -520,7 +520,7 @@ func TestFetchSearchCalledOnce(t *testing.T) {
 		searchIssues: func(context.Context, []string) ([]gh.SearchIssue, error) { issues++; return nil, nil },
 		searchPRs:    func(context.Context, []string) ([]gh.SearchPR, error) { prs++; return nil, nil },
 	}
-	if _, err := Fetch(t.Context(), c, repos, fetchNow); err != nil {
+	if _, err := Fetch(t.Context(), c, repos, fetchNow, 0); err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
 	if issues != 1 || prs != 1 {
@@ -539,7 +539,7 @@ func TestFetchParentDeadline(t *testing.T) {
 	defer cancel()
 
 	start := time.Now()
-	res, err := Fetch(ctx, c, repos, fetchNow)
+	res, err := Fetch(ctx, c, repos, fetchNow, 0)
 	if err == nil {
 		t.Fatalf("エラーを期待したが nil（Result = %+v）", res)
 	}
@@ -574,7 +574,7 @@ func TestFetchCanceledReturnsNoPartialResult(t *testing.T) {
 		},
 	}
 
-	res, err := Fetch(ctx, c, repos, fetchNow)
+	res, err := Fetch(ctx, c, repos, fetchNow, 0)
 	if err == nil {
 		t.Fatalf("エラーを期待したが nil（Result = %+v）", res)
 	}
@@ -649,4 +649,34 @@ func TestFetchCoversAllFixtureAliases(t *testing.T) {
 
 func key(repo string, number int) string {
 	return fmt.Sprintf("%s#%d", repo, number)
+}
+
+// TestFetchPassesGraceToClassify は取得時刻と猶予が classify.Card に届くことを、
+// testdata/link のラベル無し PR 61（updatedAt 2026-09-04T10:00:00Z）で確かめる。
+func TestFetchPassesGraceToClassify(t *testing.T) {
+	updatedAt := time.Date(2026, 9, 4, 10, 0, 0, 0, time.UTC)
+
+	t.Run("猶予内のその他は進行中になる", func(t *testing.T) {
+		res, err := Fetch(t.Context(), gh.NewFake("testdata/link"), repos, updatedAt.Add(10*time.Minute), 30*time.Minute)
+		if err != nil {
+			t.Fatalf("Fetch: %v", err)
+		}
+		pr := lonePR(t, res, 61)
+		if pr.Result.Situation != model.SituationInProgress {
+			t.Errorf("PR 61 の Situation = %q, want in-progress", pr.Result.Situation)
+		}
+		if want := "PR #61 はどの局面にも当たらない（更新から 30m は様子見）"; pr.Result.Summary != want {
+			t.Errorf("PR 61 の Summary = %q, want %q", pr.Result.Summary, want)
+		}
+	})
+
+	t.Run("猶予以上経った now ではその他に戻る", func(t *testing.T) {
+		res, err := Fetch(t.Context(), gh.NewFake("testdata/link"), repos, updatedAt.Add(31*time.Minute), 30*time.Minute)
+		if err != nil {
+			t.Fatalf("Fetch: %v", err)
+		}
+		if got := lonePR(t, res, 61).Result.Situation; got != model.SituationOther {
+			t.Errorf("PR 61 の Situation = %q, want other", got)
+		}
+	})
 }

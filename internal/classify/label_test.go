@@ -2,6 +2,7 @@ package classify
 
 import (
 	"testing"
+	"time"
 
 	"github.com/SugiKent/loop-cli/internal/gh"
 	"github.com/SugiKent/loop-cli/internal/model"
@@ -200,7 +201,7 @@ func TestLabelModePR(t *testing.T) {
 func TestLabelModeCard(t *testing.T) {
 	t.Run("カードの全要素が同じ方式で分類される", func(t *testing.T) {
 		is := labelIssue(12, model.LabelInProgress)
-		got := Card(model.Card{Issue: &is, PRs: []model.PR{closesPR(61)}}, model.ModeLabel, updatedNow)
+		got := Card(model.Card{Issue: &is, PRs: []model.PR{closesPR(61)}}, model.ModeLabel, updatedNow, 0)
 
 		if got.Issue.Result.Situation != model.SituationInProgress {
 			t.Errorf("Issue.Result = %+v, want in-progress", got.Issue.Result)
@@ -213,9 +214,21 @@ func TestLabelModeCard(t *testing.T) {
 		}
 	})
 
+	t.Run("猶予内のその他も今やるに残る", func(t *testing.T) {
+		// ILD の open PR は全件 [1]今やる に出す（差分 7）ので、s30 の猶予を当てない。
+		now := time.Date(2026, 9, 11, 10, 0, 0, 0, time.UTC)
+		pr := model.PR{Repo: "org/board", Number: 61, State: "OPEN", UpdatedAt: now.Add(-5 * time.Minute)}
+
+		got := Card(model.Card{PRs: []model.PR{pr}}, model.ModeLabel, now, 30*time.Minute)
+
+		if got.Result.Situation != model.SituationOther || got.Result.Tab != model.TabNow {
+			t.Errorf("Card.Result = %+v, want other / 今やる", got.Result)
+		}
+	})
+
 	t.Run("Canonical は立たない", func(t *testing.T) {
 		merged := model.PR{Repo: "org/board", Number: 61, State: "MERGED"}
-		got := Card(model.Card{PRs: []model.PR{merged}}, model.ModeLabel, updatedNow)
+		got := Card(model.Card{PRs: []model.PR{merged}}, model.ModeLabel, updatedNow, 0)
 		if got.PRs[0].Canonical {
 			t.Error("label 方式で Canonical が立っている")
 		}

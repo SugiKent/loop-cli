@@ -58,6 +58,9 @@ notify: true
 	if cfg.Editor != "nvim" {
 		t.Errorf("Editor = %q, want nvim", cfg.Editor)
 	}
+	if cfg.OtherGraceMin != 30 {
+		t.Errorf("OtherGraceMin = %d, want 30（例に無いので既定値）", cfg.OtherGraceMin)
+	}
 }
 
 func TestLoadDefaults(t *testing.T) {
@@ -78,6 +81,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Editor != "nvim" {
 		t.Errorf("Editor = %q, want nvim", cfg.Editor)
 	}
+	if cfg.OtherGraceMin != 30 {
+		t.Errorf("OtherGraceMin = %d, want 30", cfg.OtherGraceMin)
+	}
 }
 
 func TestLoadNotifyFalseIsKept(t *testing.T) {
@@ -90,12 +96,23 @@ func TestLoadNotifyFalseIsKept(t *testing.T) {
 	}
 }
 
+func TestLoadOtherGraceMinZeroIsKept(t *testing.T) {
+	cfg, err := config.Load(writeConfig(t, "repos:\n  - org/app\nother_grace_min: 0\n"))
+	if err != nil {
+		t.Fatalf("Load が失敗した: %v", err)
+	}
+	if cfg.OtherGraceMin != 0 {
+		t.Errorf("OtherGraceMin = %d, want 0（既定の 30 に戻さない）", cfg.OtherGraceMin)
+	}
+}
+
 func TestLoadExplicitValuesOverrideDefaults(t *testing.T) {
 	cfg, err := config.Load(writeConfig(t, `repos:
   - org/app
 refresh_interval_sec: 30
 merge_method: rebase
 editor: vim
+other_grace_min: 5
 `))
 	if err != nil {
 		t.Fatalf("Load が失敗した: %v", err)
@@ -108,6 +125,9 @@ editor: vim
 	}
 	if cfg.Editor != "vim" {
 		t.Errorf("Editor = %q, want vim", cfg.Editor)
+	}
+	if cfg.OtherGraceMin != 5 {
+		t.Errorf("OtherGraceMin = %d, want 5", cfg.OtherGraceMin)
 	}
 }
 
@@ -201,6 +221,7 @@ func TestLoadInvalidConfig(t *testing.T) {
 		{name: "merge_method が不正", body: "repos:\n  - org/app\nmerge_method: fast-forward\n", contains: []string{"merge_method", "fast-forward"}},
 		{name: "リポジトリ別 merge_method が不正", body: "repos:\n  - name: org/web\n    merge_method: ff\n", contains: []string{"org/web", "ff"}},
 		{name: "refresh_interval_sec が 0", body: "repos:\n  - org/app\nrefresh_interval_sec: 0\n", contains: []string{"refresh_interval_sec"}},
+		{name: "other_grace_min が負数", body: "repos:\n  - org/app\nother_grace_min: -1\n", contains: []string{"other_grace_min"}},
 		{name: "未知のトップレベルキー", body: "repos:\n  - org/app\nrefresh_interval: 60\n", contains: []string{"refresh_interval"}},
 		{name: "repos 要素の未知のキー", body: "repos:\n  - name: org/web\n    merge_methd: rebase\n", contains: []string{"merge_methd"}},
 		{name: "repos 要素に name が無い", body: "repos:\n  - merge_method: rebase\n", contains: []string{"repos"}},
