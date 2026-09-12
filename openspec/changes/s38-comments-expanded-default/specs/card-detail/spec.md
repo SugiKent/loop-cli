@@ -25,12 +25,12 @@ PR リスク評価、grill の質問）そのものである。それを既定�
 キュー画面のプレビュー（`queue-screen`「プレビューは選択行の 1 行目・本文・コメントを出す」）と review thread 内のコメント（Requirement「PR 詳細は 1 行目判定・紐づけ・本文・会話・review thread・checks を出す」）は元からこの書式で、この change でも変わらない。
 
 #### Scenario: AI コメントも人のコメントも全文が出る
-- **WHEN** `example` の issue 108 の Card（コメント 1 件目が AI で `Body` が `<!-- routine -->\nQ1: セッションの寿命は何日にしますか。\nQ2: 失効時はログイン画面へ戻しますか。`、`CreatedAt` `2026-09-04T09:00:00Z`。2 件目が `user-2` の `寿命は 30 日で。`、`2026-09-04T09:12:00Z`）の詳細を、最終更新時刻 `2026-09-05T12:04:00+09:00` で開き、`View` から ANSI エスケープを除いて読む
+- **WHEN** 幅 161・高さ 40 のサイズメッセージを与えた後、`example` の issue 108 の Card（コメント 1 件目が AI で `Body` が `<!-- routine -->\nQ1: セッションの寿命は何日にしますか。\nQ2: 失効時はログイン画面へ戻しますか。`、`CreatedAt` `2026-09-04T09:00:00Z`。2 件目が `user-2` の `寿命は 30 日で。`、`2026-09-04T09:12:00Z`）の詳細を、最終更新時刻 `2026-09-05T12:04:00+09:00` で開き、`View` から ANSI エスケープを除いて読む（`Q2:` の行が折り返されずに 1 行に収まる幅である）
 - **THEN** `▌AI  18:00` の行と、`▌` で始まり `Q2: 失効時はログイン画面へ戻しますか。` を含む行があり、`user-2  18:12` の行と `寿命は 30 日で。` の行はどちらも `▌` で始まらない。`<!-- routine -->` と `(+1 行)` は含まれない
 
 #### Scenario: x を押しても表示は変わらない
-- **WHEN** 上の `Model` に `x` を与えて `View` を読み、`Esc`、`Enter` の順で与えてもう一度 `View` を読む
-- **THEN** どちらも `x` を与える前と同じ行で、`▌` で始まり `Q2: 失効時はログイン画面へ戻しますか。` を含む行があり、`(+1 行)` は含まれない。`x` でコマンドは返らず、画面はカード詳細のままである
+- **WHEN** 上の `Model` に `x` を与えて `View` を読み、`Esc`、`Enter` の順で与えてもう一度 `View` を読む。続けて `Enter` で PR 詳細に移り、そこでも `x` を与えて `View` を読む
+- **THEN** どちらも `x` を与える前と同じ行で、`▌` で始まり `Q2: 失効時はログイン画面へ戻しますか。` を含む行があり、`(+1 行)` は含まれない。`x` でコマンドは返らず、画面はカード詳細のままである。PR 詳細でも `x` の前後で行は変わらず、コマンドは返らず、画面は PR 詳細のままである
 
 #### Scenario: PR リスク評価の見出しを持つコメントも AI として全文が出る
 - **WHEN** `Comments` が `Author` `user-2`、`Body` `PR #131 の評価です。\n\n## PR リスク評価\n\n- 影響範囲: 小` のコメント（`CommentFrom` で `AI` true）1 件の PR の詳細を開き、`View` を読む
@@ -127,7 +127,7 @@ PR 詳細画面で `g` は、カードに `Issue` があればカード詳細画
 
 #### Scenario: PR 131 の詳細
 - **WHEN** `example` の issue 108 のカード詳細で `Enter` を与え（PR 131 が選択中）、`View` から ANSI エスケープを除いて読む
-- **THEN** `org/app PR#131`、`[propose] open  labels: propose question`、`1 行目に未確定の判断が無い`、`紐づく issue: #108`、`mergeable: UNKNOWN BLOCKED`、`checks: 緑以外`、`test: SUCCESS`、`ci/legacy: PENDING`、`── 本文 `、本文の `issue #108 の提案`、`── コメント `、`▌AI  19:31`、`── review thread `、`thread 未 resolve` がこの順で含まれ、`checks: 取得失敗` と `review thread: 取得失敗` は含まれない（s20 で全 PR の merge 状態と review thread を取るので、`example` の PR 131 はどちらも埋まる）
+- **THEN** `org/app PR#131`、`[propose] open  labels: propose question`、`1 行目に未確定の判断が無い`、`紐づく issue: #108`、`mergeable: UNKNOWN BLOCKED`、`checks: 緑以外`、`test: SUCCESS`、`ci/legacy: PENDING`、`── 本文 `、本文の `issue #108 の提案`、`── コメント `、`▌AI  19:31`、`Q1: マイグレーションを分けますか。`、`── review thread `、`thread 未 resolve` がこの順で含まれ、`checks: 取得失敗` と `review thread: 取得失敗` は含まれない（s20 で全 PR の merge 状態と review thread を取るので、`example` の PR 131 はどちらも埋まる）
 
 #### Scenario: 長い PR タイトルは折り返して全文出す
 - **WHEN** 幅 40・高さ 40 のサイズメッセージを与えた後、`Repo` が `org/app`、`Number` が 131、`Title` が表示幅 60 の PR の詳細を開き、`View` から ANSI エスケープを除いて読む。タイトル行は 1 行目と、それに続く行頭が `org/app PR#131  ` と同じ表示幅の空白である行とする

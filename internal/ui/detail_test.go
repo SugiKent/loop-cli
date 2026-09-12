@@ -606,6 +606,20 @@ func TestXDoesNothingInDetail(t *testing.T) {
 	if strings.Contains(plainText(m), "(+1 行)") {
 		t.Error("開き直した後に (+1 行) がある")
 	}
+
+	// PR 詳細でも x は何もしない（ADDED Requirement が両画面を名指ししている）。
+	m, _ = send(m, enterKey)
+	beforePR := linesOf(m)
+	m, cmd = send(m, runeKey('x'))
+	if cmd != nil {
+		t.Error("PR 詳細の x でコマンドが返った")
+	}
+	if m.screen != screenPR {
+		t.Errorf("PR 詳細の x の後の画面 = %v, want %v", m.screen, screenPR)
+	}
+	if got := linesOf(m); !slices.Equal(got, beforePR) {
+		t.Errorf("PR 詳細の x で表示が変わった:\n%s", strings.Join(got, "\n"))
+	}
 }
 
 // detailBodyLines は詳細画面の本文領域の行を、左ペインだけにして行末の空白を落として返す。
@@ -769,6 +783,7 @@ func TestPRDetailOfPR131(t *testing.T) {
 		"issue #108 の提案",
 		"── コメント ",
 		"▌AI  19:31",
+		"Q1: マイグレーションを分けますか。",
 		"── review thread ",
 		"thread 未 resolve",
 	)

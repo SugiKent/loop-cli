@@ -24,8 +24,9 @@
   他のキーの並びと文言はそのまま残す
 - [x] 2.2 `card-detail` の MODIFIED Requirement「詳細の本文領域はスクロールし、ヘッダ領域は固定する」に
   合わせて、`TestDetailFooters`（`:998`）と `TestFooterWithoutPRs`（`:1029`）から `x 展開` の期待を外して通す。
-  あわせて 3 つのヒントの表示幅が spec の書いた 136 / 101 / 88 になっていることを、テストの中で
-  `ansi.StringWidth` を使って 1 本だけ確かめる
+  3 つのヒントの表示幅は既存の `TestHintWidths`（`internal/ui/view_test.go:538`）が `ansi.StringWidth` で
+  見ているので、その期待値を 136 / 101 / 88 と `? ヘルプ` 57 列目 / `u URL` 64 列目に引き直す
+  （幅の検証を別テストで重複させない）
 
 ## 3. ヘルプ画面
 
@@ -48,6 +49,8 @@
 
 - [x] 5.1 `README.md` の「画面とキー操作」にある `x` の行を 2 か所（カード詳細 `:172`、PR 詳細 `:192`）
   消す。表の他の行は変えない
+- [x] 5.2 `docs/domain/issue-driven-sdd/human-turn-signals.md` の「詳細画面ではコメントを畳み、…」の
+  1 行を、全文表示を前提にした文へ直す（`docs/mvp` は凍結だが `docs/domain` は現在の振る舞いを述べる）
 
 ## 6. 通し確認
 
