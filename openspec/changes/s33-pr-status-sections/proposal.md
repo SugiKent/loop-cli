@@ -15,13 +15,13 @@ PR 本文へ、区切りなく地続きで流れる。checks の各行は 2 文�
 
 - PR 詳細の本文領域を、status / 本文 / コメント / review thread のセクションに分け、境目が目で追える形にする
 - カード詳細の本文領域（Issue 本文 / blocked-by / コメント）も同じ形に分ける
-- checks の一覧に、それが checks の一覧であると分かる見出しを与える
-- checks の状態（SUCCESS / FAILURE / IN_PROGRESS など）を、赤が一目で見つかるように出す
+- checks の一覧に、それが checks の一覧であると分かる見出しを与え、その `緑` / `緑以外` を
+  s33 `colorful-labels` が定めた状態語の色で出す
 - 取得（s20）・分類（`internal/classify`）・書き込み（`internal/action`）には触れない。変わるのは
   `internal/ui` の表示だけで、キー操作も増やさない
 
 区切りの記法・checks の見出し・色の有無・適用範囲は PR #40 で問い、4 件とも推奨案で決まった（「確定した判断」の
-最後の 4 項目）。
+最後の 4 項目）。check の行の色は、その後 issue #35 で #34 の規則に寄せる決定が出て取り下げた（同じ節の末尾）。
 
 ## Capabilities
 
@@ -33,17 +33,16 @@ PR 本文へ、区切りなく地続きで流れる。checks の各行は 2 文�
 
 - `card-detail`: PR 詳細の本文領域（Requirement「PR 詳細は 1 行目判定・紐づけ・本文・会話・review thread・checks を出す」）と
   カード詳細の本文領域（Requirement「本文領域は Issue 本文・最新 blocked-by の要約・コメント時系列を出す」）の
-  並べ方を変える。セクションの区切りを入れ、checks の見出しと状態の色を定める
+  並べ方を変える。セクションの区切りを入れ、checks の見出しを定める
+- `card-detail`: 色を塗る位置の一覧（Requirement「カード詳細と PR 詳細はラベル名と状態語に色を付ける」）に、
+  新しく出る `checks: 緑` / `checks: 緑以外` の値を足す
 
 ## Impact
 
 - `internal/ui/detail.go`: `prBodyLines` / `cardBodyLines` / `checkLines`
-- `internal/ui/view.go`: 色の定義を置く場所
 - `internal/ui/detail_test.go`: 上の 3 つを読む既存テスト
-- `internal/ui/testdata/`: 状態の混ざった checks を持つ PR fixture を 1 つ足す。
-  `internal/gh/testdata/fixtures/example` は 10 以上のテストが共有しているので触らない
 - `README.md`: 「PR 詳細」の節
-- `openspec/specs/card-detail/spec.md`: 上の 2 Requirement
+- `openspec/specs/card-detail/spec.md`: 上の 3 Requirement
 
 ## 確定した判断
 
@@ -73,8 +72,15 @@ PR 本文へ、区切りなく地続きで流れる。checks の各行は 2 文�
   review thread の境目を解かない。design.md D1 / D2 がこの決定を書く。
 - **Q2 の答えは「`checks: 緑` / `checks: 緑以外` の見出しを付ける」である。** 判定は `classify.ChecksGreen` を
   そのまま使い、merge の確認画面と同じ語にする。内訳の件数（選択肢 C）は採らない。design.md D3 がこの決定を書く。
-- **Q3 の答えは「色を付ける」である。** 成功の行を緑 `#0E8A16`、失敗の行を赤 `#B60205`、それ以外は色なしにする。
-  design.md D4 が `Typename` ごとの集合を書く。
+- **Q3（check の行に色を付けるか）の答えは取り下げた。** PR #40 では「成功の行を緑 `#0E8A16`、失敗の行を赤 `#B60205`」と
+  決めたが、この change を実装する前に #34（change `s33-colorful-labels`）が main に入り、「チェック名は塗らず、
+  それに続く状態語だけを良し悪しの 4 色で塗る」という規則を同じ `checkLines` に定めた。両立しないので issue #35 で
+  どちらを採るかを問い、2026-09-12 に「A（#34 の規則を採る）」と回答を得た。よって check の行の色はこの change の
+  対象外にし、ADDED Requirement「checks の行は成功を緑・失敗を赤で出す」と design.md の D4 を落とす。
+  この change が色について定めるのは、新しく出す `checks: 緑` / `checks: 緑以外` の値だけである。
+- **`checks: 緑` / `checks: 緑以外` の値は `m.stateWord` で塗る。** 上の決定に伴う扱い。`緑` / `緑以外` は
+  PR 一覧行（`internal/ui/detail.go`）と merge の確認画面（`internal/ui/merge.go`）が既に状態語として塗っており、
+  同じ語を詳細の本文でだけ塗らないと、画面ごとに規則が分かれる。見出しの `checks:` とチェック名は #34 のとおり塗らない。
 - **Q4 の答えは「PR 詳細とカード詳細の両方」である。** キュー画面下段のプレビューは対象外のままにする。
 
 ## 明示的に延期した判断と残るリスク
