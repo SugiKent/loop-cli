@@ -317,17 +317,83 @@ func TestInProgressRules(t *testing.T) {
 		}
 	})
 
-	t.Run("規則 2: question 無し PR で最新コメントが人", func(t *testing.T) {
-		pr := withComments(openPR(151, model.LabelApply), model.Comment{Body: "この分岐を消してください"})
-		pr.Body = "未確定の判断: 0 件"
-		pr.MergeState = mergeable()
+	// now は時間切れ（StaleAfter）と「反映を終えた印」の時刻を書くための基準時刻。
+	now := time.Date(2026, 9, 12, 0, 0, 0, 0, time.UTC)
 
-		got := PR(pr, model.ModeSDD, updatedNow)
+	t.Run("規則 2: question 無し PR で最新コメントが人", func(t *testing.T) {
+		// 人がレビューを書いただけで PR 自身は動いていないので、反映を終えた印は立たない。
+		updated := now.Add(-10 * time.Minute)
+		pr := withComments(openPR(151, model.LabelApply), model.Comment{Body: "この分岐を消してください", CreatedAt: updated})
+		pr.Body = "未確定の判断: 0 件 — レビューをお願いします"
+		pr.MergeState = mergeable()
+		pr.UpdatedAt = updated
+
+		got := PR(pr, model.ModeSDD, now)
 		if got.Situation != model.SituationInProgress {
 			t.Errorf("Situation = %q, want in-progress（C を満たしていても進行中が先）", got.Situation)
 		}
 		if got.Summary != "PR #151 は auto-fix が受け取り中" {
 			t.Errorf("Summary = %q", got.Summary)
+		}
+	})
+
+	// reflectedPR は「人の最新コメントの後に worker が PR を動かした」形の PR を作る。
+	reflectedPR := func(number int, body string, labels ...string) model.PR {
+		pr := withComments(openPR(number, labels...), model.Comment{Body: "この分岐を消してください", CreatedAt: now.Add(-61 * time.Minute)})
+		pr.Body = body
+		pr.UpdatedAt = now.Add(-59 * time.Minute)
+		pr.MergeState = mergeable()
+		return pr
+	}
+
+	t.Run("規則 2: 反映を終えた印があれば最新コメントが人でも判定表へ流す", func(t *testing.T) {
+		pr := reflectedPR(152, "未確定の判断: 0 件 — レビューをお願いします", model.LabelPropose)
+
+		got := PR(pr, model.ModeSDD, now)
+		if got.Situation != model.SituationC || got.Summary != "PR #152 を merge する" {
+			t.Errorf("Result = %+v, want C / PR #152 を merge する（worker が本文とラベルだけ更新した PR を 3 時間隠さない）", got)
+		}
+	})
+
+	t.Run("規則 2: 未確定が残る PR は反映を終えた印にならない", func(t *testing.T) {
+		pr := reflectedPR(153, "未確定の判断: 2 件 — このまま merge すると worker が推奨案で進めます", model.LabelApply)
+
+		got := PR(pr, model.ModeSDD, now)
+		if got.Situation != model.SituationInProgress || got.Summary != "PR #153 は auto-fix が受け取り中" {
+			t.Errorf("Result = %+v, want in-progress / auto-fix が受け取り中", got)
+		}
+	})
+
+	t.Run("規則 2: 1 行目が未確定の判断で始まらない PR は反映を終えた印にならない", func(t *testing.T) {
+		pr := reflectedPR(154, "Closes #46", model.LabelDocs)
+
+		got := PR(pr, model.ModeSDD, now)
+		if got.Situation != model.SituationInProgress || got.Summary != "PR #154 は auto-fix が受け取り中" {
+			t.Errorf("Result = %+v, want in-progress / auto-fix が受け取り中（G を満たしていても進行中が先）", got)
+		}
+	})
+
+	t.Run("規則 2: 反映を終えた印があり判定表のどの行にも当たらない PR はその他", func(t *testing.T) {
+		pr := reflectedPR(155, "未確定の判断: 0 件 — レビューをお願いします", model.LabelApply)
+		pr.Comments[0].CreatedAt = now.Add(-5 * time.Hour)
+		pr.UpdatedAt = now.Add(-4 * time.Hour)
+		pr.MergeState = &gh.PRMergeState{
+			Mergeable:         "MERGEABLE",
+			StatusCheckRollup: []gh.StatusCheck{{Typename: "CheckRun", Conclusion: "FAILURE"}},
+		}
+
+		got := PR(pr, model.ModeSDD, now)
+		if got.Situation != model.SituationOther || got.Summary != "PR #155 はどの局面にも当たらない" {
+			t.Errorf("Result = %+v, want other / どの局面にも当たらない（規則 2 に当たらないので時間切れの要約にしない）", got)
+		}
+	})
+
+	t.Run("規則 3: question PR は本文が未確定 0 件でも規則 3 のまま", func(t *testing.T) {
+		pr := reflectedPR(156, "未確定の判断: 0 件 — レビューをお願いします", model.LabelPropose, model.LabelQuestion)
+
+		got := PR(pr, model.ModeSDD, now)
+		if got.Situation != model.SituationInProgress || got.Summary != "PR #156 は回答済み。worker が受け取り中" {
+			t.Errorf("Result = %+v, want in-progress / 回答済み。worker が受け取り中（question が落ちるまでは反映済みとみなさない）", got)
 		}
 	})
 
@@ -405,13 +471,13 @@ func TestInProgressRules(t *testing.T) {
 		}
 	})
 
-	now := time.Date(2026, 9, 12, 0, 0, 0, 0, time.UTC)
-
 	t.Run("規則 2: 最新コメントが人のまま 3 時間動かなければ応答なしのその他", func(t *testing.T) {
-		pr := withComments(openPR(151, model.LabelApply), model.Comment{Body: "この分岐を消してください"})
+		// 人のコメントの後に PR が動いていないので、3 時間経っても反映を終えた印は立たない。
+		updated := now.Add(-StaleAfter)
+		pr := withComments(openPR(151, model.LabelApply), model.Comment{Body: "この分岐を消してください", CreatedAt: updated})
 		pr.Body = "未確定の判断: 0 件"
 		pr.MergeState = mergeable()
-		pr.UpdatedAt = now.Add(-StaleAfter)
+		pr.UpdatedAt = updated
 
 		got := PR(pr, model.ModeSDD, now)
 		if got.Situation != model.SituationOther || got.Summary != "PR #151 は人のコメントに AI が応答していない" {

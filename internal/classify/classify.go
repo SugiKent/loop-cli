@@ -96,10 +96,14 @@ func PR(pr model.PR, mode model.Mode, now time.Time) model.Result {
 	fresh := now.Sub(pr.UpdatedAt) < StaleAfter
 	assess := model.HasLabel(pr.Labels, model.LabelAIAssess)
 
+	// worker は反映し終えたことを本文 1 行目と question を外すことで表し、そのたびにコメントを返すとは限らない。
+	// question が付いているあいだは反映を終えていないので、規則 3 には適用しない。
+	reflected := !question && hasComments && isReflected(pr)
+
 	// 規則 2 / 3: 最新コメントが人。question の有無で文言だけ変える。
 	// label では適用しない（1 issue = 1 PR を人が捌く方式なので、キューから外すと人の出番が見えなくなる）。
 	// ai-assess:requested は worker が人の回答を反映し終えてから付けるので、付いていれば規則 7 に任せる。
-	if mode != model.ModeLabel && !assess && hasComments && !aiLatest {
+	if mode != model.ModeLabel && !assess && hasComments && !aiLatest && !reflected {
 		if !fresh {
 			// 判定表に流すと未反映の依頼が merge 候補に見えるので、その他に出す。
 			return result(model.SituationOther, fmt.Sprintf("PR #%d は人のコメントに AI が応答していない", pr.Number))
@@ -138,6 +142,17 @@ func PR(pr model.PR, mode model.Mode, now time.Time) model.Result {
 		return result(model.SituationG, fmt.Sprintf("docs PR #%d を merge する", pr.Number))
 	}
 	return result(model.SituationOther, fmt.Sprintf("PR #%d はどの局面にも当たらない", pr.Number))
+}
+
+// isReflected は worker が人の回答を反映し終えた印があるかを返す。印は本文 1 行目が
+// `未確定の判断: 0 件` であることと、人の最新コメントより後に PR 自身が動いていること。
+// 1 行目が `未確定の判断:` でない PR（外部から来た PR、docs PR）は反映し終えたと宣言していない。
+// 呼び出し側が Comments が空でないことを保証する。
+func isReflected(pr model.PR) bool {
+	if n, ok := model.ParseUndecided(pr.Body); !ok || n != 0 {
+		return false
+	}
+	return pr.UpdatedAt.After(pr.Comments[len(pr.Comments)-1].CreatedAt)
 }
 
 // isC は行 C（question 無し・mergeable・checks 緑）を判定する。対象の絞り込みは方式で分かれ、
