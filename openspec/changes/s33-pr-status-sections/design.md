@@ -25,7 +25,8 @@
 - キュー画面下段のプレビューの書式を変えること（proposal.md「確定した判断」に理由がある。範囲を問うた Q4 でも対象外に決まった）
 - ヘッダ領域（タイトル行・labels 行・PR 一覧）の書式を変えること
 - 高さの配分・スクロールの規則・キー操作を変えること
-- `mergeable` 行への着色。緑・赤の 2 色を check の行だけに使い、画面の中で色の意味を 1 つに保つ
+- check の行の色。`s33-colorful-labels`（#34）が定めた「チェック名は塗らず、続く状態語だけを良し悪しの 4 色で塗る」
+  規則をそのまま使う（proposal.md「確定した判断」の Q3 の項）
 
 ## Decisions
 
@@ -73,30 +74,12 @@ PR 詳細の 1 つ目のセクション（1 行目判定から checks まで）�
 内訳の件数（proposal.md Q2 の選択肢 C）は採らない。どの conclusion を成功・実行中・失敗に数えるかという分類を
 新たに決めることになり、`classify.ChecksGreen` と二重の基準が生まれる。
 
-### D4. check の行は行全体に色を付ける
+見出しの `緑` / `緑以外` は `m.stateWord` で塗る（`緑` は緑、`緑以外` は赤。`internal/ui/color.go`）。この 2 語は
+PR 一覧行（`internal/ui/detail.go:271-273`）と merge の確認画面（`internal/ui/merge.go:222-224`）が既に状態語として
+同じ色で出しており、詳細の本文でだけ塗らないと同じ語の扱いが画面ごとに分かれる。見出しの `checks:` と
+チェック名を塗らないのは `s33-colorful-labels`（#34）のとおりで、各 check の行に付く色はこの change で変えない。
 
-キューの行が種別ごとの色を行全体に付けているのと同じ形にする（`internal/ui/view.go:248-252`）。状態の語だけを
-染めると、赤の面積が数文字になって一覧の中で見つけにくい。
-
-色の対応は次のとおり。値は mvp.md がキューの行に決めた色（`docs/mvp/mvp.md:79-80`）を流用する。
-
-| 区分 | `CheckRun` の状態 | `StatusContext` の `State` | 色 |
-| --- | --- | --- | --- |
-| 成功 | `SUCCESS` / `SKIPPED` / `NEUTRAL` | `SUCCESS` | 緑 `#0E8A16` |
-| 失敗 | `FAILURE` / `TIMED_OUT` / `CANCELLED` / `ACTION_REQUIRED` / `STARTUP_FAILURE` | `FAILURE` / `ERROR` | 赤 `#B60205` |
-| それ以外 | 上のどちらでもない（`QUEUED` / `IN_PROGRESS` / 空 など） | 上のどちらでもない（`PENDING` / `EXPECTED` など） | 色を付けない |
-
-緑にする集合を `Typename` ごとに分けるのは、`classify.ChecksGreen` がそう分けているからである
-（`CheckRun` は `SUCCESS` / `SKIPPED` / `NEUTRAL`、`StatusContext` は `SUCCESS` だけ。
-`internal/classify/classify.go:187-196`）。`StatusContext` の `SKIPPED` を緑に塗ると、その 1 件しか無い PR で
-行が緑なのに D3 の見出しが `checks: 緑以外` になり、読み手はどちらを信じるか分からなくなる。
-失敗の集合は GitHub の check conclusion と commit status state の語のうち、赤で出す価値があるものを挙げた。
-どちらにも無い語は、増えたときに黙って赤や緑にならないよう、色を付けない側に落とす。
-
-見出しの `checks: 緑` / `checks: 緑以外` には色を付けない。`緑以外` は失敗と実行中の両方で出るので、
-赤にすると実行中を失敗と読ませてしまう。
-
-### D5. 表示だけを変え、取得と分類には触れない
+### D4. 表示だけを変え、取得と分類には触れない
 
 変えるのは `internal/ui/detail.go` の `prBodyLines` / `cardBodyLines` / `checkLines` と、区切り線を作る小さな
 ヘルパーだけにする。`internal/gh`・`internal/fetch`・`internal/classify`・`internal/action` は変えない。
@@ -111,18 +94,18 @@ PR 詳細の 1 つ目のセクション（1 行目判定から checks まで）�
   スクロールしなければ PR 本文が 1 行も見えない（今は 1 行見える）。キュー画面下段のプレビューを対象外にしたのと
   同じ性質の劣化が、狭い高さの詳細画面では残る。詳細はスクロールを持つのでプレビューと違って読む手立てはあるが、
   この劣化は Q1 で選択肢 A を選んだ判断に含まれるものとして受け入れる（proposal.md「明示的に延期した判断と残るリスク」）。
-- **[色の付いた行が 2 ペインの結合で崩れる]** → `joinPanes` は `pad`（`ansi.Truncate` + 空白埋め）で左ペインを
-  揃える（`internal/ui/view.go:101-111`, `internal/ui/view.go:287-293`）。`ansi.Truncate` はエスケープを保つ実装で、
-  既にキューの行の色付きテキストがこの経路を通っている。tasks に幅の検証を入れる。
-- **[色を出さない端末で情報が落ちる]** → 状態の語（`SUCCESS` / `FAILURE` など）は今までどおり文字で出るので、
+- **[見出し行が 2 ペインの結合で崩れる]** → `joinPanes` は `pad`（`ansi.Truncate` + 空白埋め）で左ペインを
+  揃える（`internal/ui/view.go:101-111`, `internal/ui/view.go:287-293`）。見出し行は左ペインの幅ちょうどなので
+  切り詰めも空白埋めも起きないが、幅の取り違えは目で見つけにくいので tasks に幅の検証を入れる。
+- **[色を出さない端末で情報が落ちる]** → 見出しの語（`緑` / `緑以外`）は今までどおり文字で出るので、
   色は補助にとどまる。色だけが伝える情報は作らない。
-- **[GitHub が新しい conclusion を足すと色が付かない]** → D4 のとおり、未知の語は色を付けない側に落ちる。
-  誤って緑や赤に見せるより安全な壊れ方を選ぶ。
 
 ## 未決事項
 
 `docs/mvp` が沈黙していた 4 点（詳細画面のセクションの区切り方・checks の見出し・状態の色・適用範囲）は、
 PR #40 で人に問い、4 件とも推奨案で決着した（2026-09-11 の PR コメント「質問の回答はすべて推奨で」）。
-D1〜D5 はその決定を書いている。この change に未決の点は残っていない。
+そのうち check の行の色は、#34 が同じ場所に別の規則を入れたため issue #35 で問い直し、2026-09-12 に
+「#34 の規則を採る」と回答を得て、この change の対象から外した（proposal.md「確定した判断」）。
+D1〜D4 は決着した内容を書いている。この change に未決の点は残っていない。
 
 延期した判断と残るリスクは proposal.md の「明示的に延期した判断と残るリスク」にある。

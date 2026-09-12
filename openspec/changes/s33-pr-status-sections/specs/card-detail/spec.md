@@ -42,7 +42,7 @@ PR 詳細画面の `View` は、対象の `model.PR` について MUST 次を上
 2. `[<段階>] <状態>  labels: <Labels を空白区切り>`（段階と状態は Requirement「紐づく PR 一覧は段階順に 1 行ずつ出し、選択中の PR に印を付ける」と同じ表記）
 3. 1 行目判定: `model.ParseUndecided(Body)` が `n, true` なら `未確定の判断: <n> 件`、false なら `1 行目に未確定の判断が無い`
 4. 紐づけ: s07 の `fetch.LinkedIssue(Title, Body)` が `n, true` なら `紐づく issue: #<n>`、false なら `紐づく issue: なし`（mvp.md「`Refs #n` / `Closes #n`」）
-5. checks と merge 状態: `MergeState` が nil なら `checks: 取得失敗` の 1 行（s20 は全 PR の merge 状態を取るので、nil は取得に失敗したことを意味する）。non-nil なら `mergeable: <Mergeable> <MergeStateStatus>` の 1 行に続けて、字下げの無い checks の見出し 1 行を出す。見出しは `StatusCheckRollup` が 0 件なら `checks: なし`、1 件以上なら `classify.ChecksGreen(MergeState)` が true で `checks: 緑`、false で `checks: 緑以外`（s02 `human-turn-classify` が定める関数をそのまま使う。merge の確認画面 s14 と同じ語にする）。1 件以上なら見出しに続けて `StatusCheckRollup` の各要素を 1 行ずつ（`Typename` が `CheckRun` なら `  <Name>: <Conclusion>`（`Conclusion` が空なら `<Status>`）、`StatusContext` なら `  <Context>: <State>`）。各要素の行には Requirement「checks の行は成功を緑・失敗を赤で出す」が定める色を付ける
+5. checks と merge 状態: `MergeState` が nil なら `checks: 取得失敗` の 1 行（s20 は全 PR の merge 状態を取るので、nil は取得に失敗したことを意味する）。non-nil なら `mergeable: <Mergeable> <MergeStateStatus>` の 1 行に続けて、字下げの無い checks の見出し 1 行を出す。見出しは `StatusCheckRollup` が 0 件なら `checks: なし`、1 件以上なら `classify.ChecksGreen(MergeState)` が true で `checks: 緑`、false で `checks: 緑以外`（s02 `human-turn-classify` が定める関数をそのまま使う。merge の確認画面 s14 と同じ語にする。`緑` / `緑以外` の色は Requirement「カード詳細と PR 詳細はラベル名と状態語に色を付ける」が定める）。1 件以上なら見出しに続けて `StatusCheckRollup` の各要素を 1 行ずつ（`Typename` が `CheckRun` なら `  <Name>: <Conclusion>`（`Conclusion` が空なら `<Status>`）、`StatusContext` なら `  <Context>: <State>`）
 6. セクションの見出し行 `本文` に続けて、`Body` を Glamour でレンダリングした文字列（Issue 本文と同じ扱い）
 7. セクションの見出し行 `コメント` に続けて会話コメント: `Comments` が nil なら `コメント: 取得失敗`、長さ 0 なら `コメント: なし`、1 件以上なら Requirement「routine コメントは折りたたみ、x で展開する」の書式
 8. セクションの見出し行 `review thread` に続けて review thread: `ReviewThreads` が nil なら `review thread: 取得失敗`（s20 は全 PR の review thread を取るので、nil は取得に失敗したことを意味する）、長さ 0 なら `review thread: なし`、1 件以上なら `IsResolved` が false の thread を先に、true の thread を後に（それぞれ元の順を保つ）並べ、各 thread を見出し `thread 未 resolve` / `thread resolved` の 1 行と、その `Comments` の各件（Requirement「routine コメントは折りたたみ、x で展開する」の展開時の書式。`model.IsAI(Body)` が true なら `▌AI  HH:MM` と `▌` 付きの全行、false なら `<Author.Login>  HH:MM` と全行。折りたたまない）で出す。thread の選択と `A` 返信は s16 が担当する
@@ -91,6 +91,53 @@ PR 詳細画面で `g` は、カードに `Issue` があればカード詳細画
 - **WHEN** `Issue` が nil の Card から直接開いた PR 詳細の `Model` に `g` を与える
 - **THEN** 画面は PR 詳細のままで、コマンドは返らない
 
+### Requirement: カード詳細と PR 詳細はラベル名と状態語に色を付ける
+
+カード詳細画面と PR 詳細画面は、次の位置に出るラベル名を `queue-screen`「ラベル名は GitHub のラベル色を背景に、輝度で選んだ黒か白を文字にして描く」のとおり MUST 色を付ける。色はその Issue / PR のリポジトリのラベル色の表から引く。
+
+- ヘッダの `段階: <段階ラベル>` の段階ラベル名（`段階なし` には色を付けない）
+- ヘッダの `[blocked]` / `[wip]` / `[question]` の badge。角括弧は塗らず、中の名前だけを塗る
+- PR 一覧行の `[<段階>]` の段階ラベル名。段階ラベルが無い PR の `[-]` と、その段階の PR が無い行の `[<段階>] なし` の `なし` には色を付けない（`なし` はラベル名ではない。`[<段階>]` の中の段階ラベル名は塗る）
+- PR 一覧行の `labels: <Labels を空白区切り>` の各ラベル名
+- PR 詳細のヘッダの `[<段階>]` の段階ラベル名と `labels: <Labels を空白区切り>` の各ラベル名
+
+続けて、次の位置に出る状態語を `queue-screen`「状態を表す語は良し悪しの 4 色を文字色にして描き、色は端末の背景に追随する」のとおり MUST 色を付ける。見出しの語（`mergeable`、`checks`、`labels:`、チェック名）には色を付けない。
+
+- PR 一覧行では、PR の状態（`open` / `merged` / `closed`）と、`checks` に続く値（`緑` / `緑以外` / `取得失敗`）と、`mergeable` に続く値を塗る
+- PR 詳細のヘッダでは、PR の状態を塗る
+- PR 詳細の本文では、`mergeable: <Mergeable> <MergeStateStatus>` の 2 つの値と、checks の見出し（Requirement「PR 詳細は 1 行目判定・紐づけ・本文・会話・review thread・checks を出す」の 5）に続く値（`緑` / `緑以外` / `取得失敗`）を塗る。`checks: なし` の `なし` は状態を表す語ではないので塗らない（PR 一覧行の `[<段階>] なし` と同じ扱い）
+- PR 詳細の本文の checks の各行では、チェック名に続く値を塗る（`CheckRun` なら `Conclusion`、空なら `Status`。`StatusContext` なら `State`）
+- 本文では、`コメント: 取得失敗` と `review thread: 取得失敗` の `取得失敗` を塗る
+- セクションの見出し行（Requirement「本文領域のセクションは見出し行で区切る」）には色を付けない
+
+色を付けたことで ANSI エスケープを除いた表示が変わっては MUST ならない。色は文字を差し替えず、ヘッダ領域の行数・本文領域の高さ・折り返し・切り詰めの規則にも影響しない。
+
+色が付いたことは、「色を指定するエスケープ・その語・リセット」がこの順で**連続して**現れることで確かめる。エスケープが行のどこかにあることだけを見ると、幅で切り詰められて 1 文字も描かれていない語について偽の合格が出る（切り詰めは切り捨てた範囲のエスケープを行末に残すため）。PR 一覧行は表示幅 91 列に達するので、末尾の `mergeable` の値を見る Scenario は 1 ペインで幅 92 以上（端末幅 120 以上は 2 ペインに分かれて左ペインが 79 列になるので、120 未満）を使う。
+
+#### Scenario: PR 一覧行のラベルと状態に色が付く
+- **WHEN** `example` の fixture（PR 131 は `propose` `0e8a16` と `question` `d876e3` が付き、`mergeable` は `UNKNOWN`）でカード詳細を開いた `Model`（幅 100・高さ 24。1 ペインで PR 一覧行の末尾まで入る）の `View` を読む
+- **THEN** PR 131 の行の `[propose]` の `propose` は背景色 `0e8a16`、`question` は背景色 `d876e3` で描かれ、`open` は暗い端末の緑、`UNKNOWN` は暗い端末の黄の文字色で描かれ、角括弧・`labels:` の見出し・`checks` と `mergeable` の見出しに色は付かない
+
+#### Scenario: ヘッダの段階ラベルと badge に色が付く
+- **WHEN** `stage:propose`（`0e8a16`）と `question`（`d876e3`）が付いた issue のカード詳細を開いた `Model`（幅 100・高さ 24）の `View` を読む
+- **THEN** `段階: ` の後の `stage:propose` は背景色 `0e8a16`、`[question]` の中の `question` は背景色 `d876e3` で描かれ、`段階: ` と角括弧に色は付かない
+
+#### Scenario: checks の各行の状態に色が付く
+- **WHEN** `test` が `SUCCESS`、`ci/legacy` が `PENDING` の PR 詳細を開いた `Model`（幅 100・高さ 24）の `View` を読む
+- **THEN** `SUCCESS` は暗い端末の緑、`PENDING` は暗い端末の黄の文字色で描かれ、`test` と `ci/legacy` のチェック名に色は付かない
+
+#### Scenario: checks の見出しの値に色が付く
+- **WHEN** `test` が `SUCCESS`、`ci/legacy` が `PENDING` の PR 詳細を開いた `Model`（幅 100・高さ 24）の `View` を読む
+- **THEN** `checks: ` に続く `緑以外` は暗い端末の赤の文字色で描かれ、`checks` の見出しに色は付かない
+
+#### Scenario: 取得失敗は赤で出る
+- **WHEN** `MergeState` が nil の PR を持つカード詳細を開いた `Model`（幅 100・高さ 24）の `View` を読む
+- **THEN** PR 一覧行の `checks 取得失敗` と `mergeable 取得失敗` の `取得失敗` は暗い端末の赤の文字色で描かれ、`checks` と `mergeable` の見出しに色は付かない
+
+#### Scenario: ANSI を除いた表示は変わらない
+- **WHEN** `example` の fixture でカード詳細と PR 詳細を開いた `Model`（既存の Scenario と同じ幅 80 と幅 120）の `View` から ANSI エスケープを除いて読む
+- **THEN** `card-detail` の既存の Scenario が定める行（`[propose] PR#131 open`、`labels: propose question`、`mergeable: UNKNOWN BLOCKED`、`test: SUCCESS` など）がそのまま得られる
+
 ## ADDED Requirements
 
 ### Requirement: 本文領域のセクションは見出し行で区切る
@@ -124,30 +171,3 @@ PR 詳細画面で `g` は、カードに `Issue` があればカード詳細画
 - **WHEN** 幅 100・高さ 40 のサイズメッセージを与えた後、`Body` が空文字列で `Comments` が長さ 0、`blocked-by:` を持つコメントが無い issue の Card の詳細を開き、`View` から ANSI エスケープを除いて読む
 - **THEN** 本文領域の 1 行目は `コメント: なし` であり、`── コメント ` で始まる行は含まれない
 
-### Requirement: checks の行は成功を緑・失敗を赤で出す
-PR 詳細画面の本文領域が出す `StatusCheckRollup` の各要素の行は、その状態（`CheckRun` なら `Conclusion`、
-`Conclusion` が空なら `Status`。`StatusContext` なら `State`）に応じて MUST 行全体に次の色を付ける。
-キューの表が種別ごとの色を行全体に付けているのと同じ形にする（mvp.md「行の色は種別で固定」）。
-
-| 区分 | `CheckRun` の状態 | `StatusContext` の `State` | 色 |
-| --- | --- | --- | --- |
-| 成功 | `SUCCESS` / `SKIPPED` / `NEUTRAL` | `SUCCESS` | 緑 `#0E8A16` |
-| 失敗 | `FAILURE` / `TIMED_OUT` / `CANCELLED` / `ACTION_REQUIRED` / `STARTUP_FAILURE` | `FAILURE` / `ERROR` | 赤 `#B60205` |
-| それ以外 | 上のどちらにも無い状態（`QUEUED` / `IN_PROGRESS` / 空 など） | 上のどちらにも無い状態（`PENDING` / `EXPECTED` など） | 色を付けない |
-
-緑にする集合は、`Typename` ごとに s02 `human-turn-classify` の `ChecksGreen` が緑とみなす集合と一致させる
-（`CheckRun` は 3 語、`StatusContext` は `SUCCESS` だけ）。ここをずらすと、緑の行しか無いのに見出しが `checks: 緑以外` になる。
-表に無い状態に色を付けないのは、GitHub が状態を増やしたときに、その状態を黙って成功や失敗に見せないためである。
-色は状態の文字を読まなくても赤を見つけられるようにする補助であり、状態の語は今までどおり文字で出す。
-
-#### Scenario: 失敗した check の行だけが赤になる
-- **WHEN** `MergeState` が `{Mergeable: MERGEABLE, MergeStateStatus: UNSTABLE, StatusCheckRollup: [CheckRun static SUCCESS, CheckRun tests FAILURE, CheckRun image (Conclusion 空、Status IN_PROGRESS)]}` の PR の詳細を開き、`View` を ANSI エスケープごと読む
-- **THEN** `static: SUCCESS` の行には緑 `#0E8A16` の指定があり、`tests: FAILURE` の行には赤 `#B60205` の指定があり、`image: IN_PROGRESS` の行には色の指定が無い
-
-#### Scenario: StatusContext の SKIPPED は緑にしない
-- **WHEN** `MergeState` が `{Mergeable: MERGEABLE, MergeStateStatus: UNSTABLE, StatusCheckRollup: [StatusContext ci/legacy SKIPPED]}` の PR の詳細を開き、`View` を ANSI エスケープごと読む
-- **THEN** `ci/legacy: SKIPPED` の行には色の指定が無く、ANSI エスケープを除いた `View` は `checks: 緑以外` を含む（`ChecksGreen` は `StatusContext` の `SKIPPED` を緑とみなさないので、行の色と見出しが食い違わない）
-
-#### Scenario: 色を落としても状態の語は読める
-- **WHEN** 「失敗した check の行だけが赤になる」と同じ PR の詳細を開き、`View` から ANSI エスケープを除いて読む
-- **THEN** `static: SUCCESS`、`tests: FAILURE`、`image: IN_PROGRESS` がこの順で含まれる

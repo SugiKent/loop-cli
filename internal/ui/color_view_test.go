@@ -225,10 +225,12 @@ func TestPRDetailHeaderAndCheckRowsAreColored(t *testing.T) {
 		"ヘッダの labels")
 	// 本文: mergeable の 2 値と checks の各行。チェック名と見出しは塗らない。
 	wantIn(t, view, "mergeable: "+coloredState("UNKNOWN")+" "+coloredState("BLOCKED"), "mergeable の 2 つの値")
+	wantIn(t, view, "checks: "+coloredState("緑以外"), "checks の見出しの値")
 	wantIn(t, view, "test: "+coloredState("SUCCESS"), "CheckRun の結果")
 	wantIn(t, view, "ci/legacy: "+coloredState("PENDING"), "StatusContext の状態")
 	wantPlain(t, view, "test:", "チェック名")
 	wantPlain(t, view, "mergeable:", "mergeable の見出し")
+	notIn(t, view, "mchecks", "checks の見出し")
 }
 
 func TestFetchFailureWordsAreColored(t *testing.T) {

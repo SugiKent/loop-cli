@@ -596,6 +596,152 @@ func TestReopenCollapsesAgain(t *testing.T) {
 	}
 }
 
+// detailBodyLines は詳細画面の本文領域の行を、左ペインだけにして行末の空白を落として返す。
+// 本文領域はヘッダとの区切り線（無地の `─` の行）の次から、フッタの 1 行手前まで。
+func detailBodyLines(t *testing.T, m Model) []string {
+	t.Helper()
+	var left []string
+	for _, l := range plain(m) {
+		if pane, _, ok := strings.Cut(l, "│"); ok {
+			l = pane
+		}
+		left = append(left, strings.TrimRight(l, " "))
+	}
+	for i, l := range left {
+		if l != "" && strings.Trim(l, "─") == "" {
+			return left[i+1 : len(left)-1]
+		}
+	}
+	t.Fatalf("ヘッダとの区切り線が無い:\n%s", strings.Join(left, "\n"))
+	return nil
+}
+
+// headingOf は prefix で始まる見出し行を本文領域から探す。
+func headingOf(t *testing.T, lines []string, prefix string) (string, bool) {
+	t.Helper()
+	for _, l := range lines {
+		if strings.HasPrefix(l, prefix) {
+			return l, true
+		}
+	}
+	return "", false
+}
+
+// wantHeadingFitsWidth は見出し行が幅いっぱいに引かれ、名前の後が `─` だけであることを見る。
+func wantHeadingFitsWidth(t *testing.T, lines []string, prefix string, width int) {
+	t.Helper()
+	line, ok := headingOf(t, lines, prefix)
+	if !ok {
+		t.Fatalf("%q で始まる見出し行が無い:\n%s", prefix, strings.Join(lines, "\n"))
+	}
+	if w := ansi.StringWidth(line); w != width {
+		t.Errorf("%q の見出し行の表示幅 = %d, want %d: %q", prefix, w, width, line)
+	}
+	if rest := strings.TrimPrefix(line, prefix); strings.Trim(rest, "─") != "" {
+		t.Errorf("%q の見出し行の名前の後に `─` 以外がある: %q", prefix, line)
+	}
+}
+
+func TestSectionHeadingFillsWidth(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		width int
+		want  string
+	}{
+		{"幅 100", 100, "── 本文 " + strings.Repeat("─", 92)},
+		{"幅 99", 99, "── 本文 " + strings.Repeat("─", 91)},
+		{"名前が入らない幅", 5, "── 本"},
+		{"幅 0", 0, ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := sectionHeading("本文", tt.width); got != tt.want {
+				t.Errorf("sectionHeading(本文, %d) = %q, want %q", tt.width, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestPRDetailSectionHeadings は 1 ペインの見出し行が本文領域の幅いっぱいに引かれることを見る
+// （viewport は各行を幅まで空白で埋めるので、末尾の空白を落としてから幅を測る）。
+func TestPRDetailSectionHeadings(t *testing.T) {
+	m, _ := send(detailModel(100, 40, exampleResult(t).Cards), enterKey, enterKey)
+	lines := detailBodyLines(t, m)
+
+	wantOrder(t, lines, "── 本文 ", "── コメント ", "── review thread ")
+	for _, prefix := range []string{"── 本文 ", "── コメント ", "── review thread "} {
+		wantHeadingFitsWidth(t, lines, prefix, 100)
+	}
+}
+
+// TestPRDetailSectionHeadingsInTwoPanes は 2 ペインで見出し行が左ペインの幅で引かれることを見る。
+func TestPRDetailSectionHeadingsInTwoPanes(t *testing.T) {
+	m, _ := send(detailModel(140, 40, exampleResult(t).Cards), enterKey, enterKey)
+	wantHeadingFitsWidth(t, detailBodyLines(t, m), "── 本文 ", 99)
+}
+
+// TestCardSectionHeadings は blocked-by とコメントの手前に見出し行が出ることを見る。
+func TestCardSectionHeadings(t *testing.T) {
+	body := "<!-- routine -->\nblocked-by: human\nunblock-when: comment\n方針を教えてください"
+	m, _ := send(detailModel(100, 40, []model.Card{blockedCard(body)}), enterKey)
+	lines := detailBodyLines(t, m)
+
+	wantOrder(t, lines, "── blocked-by ", "blocked-by: human", "── コメント ")
+	wantHeadingFitsWidth(t, lines, "── blocked-by ", 100)
+}
+
+// TestCardEmptyBodyDropsFirstHeading は、本文領域の 1 行目になる見出しを出さないことを見る
+// （直上のヘッダとの区切り線と 2 行続いて、どちらの境目か読めなくなる）。
+func TestCardEmptyBodyDropsFirstHeading(t *testing.T) {
+	card := blockedCard("<!-- routine -->\nblocked-by: human\nunblock-when: comment\n方針を教えてください")
+	card.Issue.Body = ""
+	m, _ := send(detailModel(100, 40, []model.Card{card}), enterKey)
+	lines := detailBodyLines(t, m)
+
+	if lines[0] != "blocked-by: human" {
+		t.Errorf("本文領域の 1 行目 = %q, want blocked-by: human", lines[0])
+	}
+	if _, ok := headingOf(t, lines, "── blocked-by "); ok {
+		t.Error("本文領域の 1 行目に blocked-by の見出しが出ている")
+	}
+	if _, ok := headingOf(t, lines, "── コメント "); !ok {
+		t.Error("コメントの見出しが出ていない")
+	}
+}
+
+// TestCardWithoutBodyAndCommentsHasNoHeading は、本文もコメントも無い issue で見出しが 1 本も
+// 出ないことを見る（`コメント: なし` の 1 行が本文領域の 1 行目になる）。
+func TestCardWithoutBodyAndCommentsHasNoHeading(t *testing.T) {
+	issue := &model.Issue{Number: 401, Title: "空の issue", UpdatedAt: at, Comments: []model.Comment{}}
+	m, _ := send(detailModel(100, 40, []model.Card{issueCard(issue, nil, "見る")}), enterKey)
+	lines := detailBodyLines(t, m)
+
+	if lines[0] != "コメント: なし" {
+		t.Errorf("本文領域の 1 行目 = %q, want コメント: なし", lines[0])
+	}
+	if _, ok := headingOf(t, lines, "── コメント "); ok {
+		t.Error("本文領域の 1 行目にコメントの見出しが出ている")
+	}
+}
+
+// TestChecksHeadingIsGreenWhenAllSucceed は checks の見出しが ChecksGreen に従うことを見る。
+func TestChecksHeadingIsGreenWhenAllSucceed(t *testing.T) {
+	pr := prOf(154, "OPEN", []string{model.LabelApply})
+	pr.MergeState = &gh.PRMergeState{
+		Mergeable: "MERGEABLE", MergeStateStatus: "CLEAN",
+		StatusCheckRollup: []gh.StatusCheck{
+			{Typename: "CheckRun", Name: "test", Conclusion: "SUCCESS"},
+			{Typename: "CheckRun", Name: "lint", Conclusion: "SKIPPED"},
+		},
+	}
+	issue := &model.Issue{Number: 503, Title: "全部成功", UpdatedAt: at}
+	m, _ := send(detailModel(120, 40, []model.Card{issueCard(issue, []model.PR{pr}, "見る")}), enterKey, enterKey)
+
+	text := plainText(m)
+	if !strings.Contains(text, "checks: 緑") || strings.Contains(text, "checks: 緑以外") {
+		t.Errorf("全部成功の checks の見出しが 緑 になっていない:\n%s", text)
+	}
+}
+
 func TestPRDetailOfPR131(t *testing.T) {
 	m, _ := send(detailModel(120, 40, exampleResult(t).Cards), enterKey, enterKey)
 	wantOrder(t, linesOf(m),
@@ -604,10 +750,14 @@ func TestPRDetailOfPR131(t *testing.T) {
 		"1 行目に未確定の判断が無い",
 		"紐づく issue: #108",
 		"mergeable: UNKNOWN BLOCKED",
+		"checks: 緑以外",
 		"test: SUCCESS",
 		"ci/legacy: PENDING",
+		"── 本文 ",
 		"issue #108 の提案",
+		"── コメント ",
 		"▌AI  19:31  Q1: マイグレーションを分けますか。  (+0 行)",
+		"── review thread ",
 		"thread 未 resolve",
 	)
 	// s20 で全 PR の merge 状態と review thread を取るので、どちらも埋まる。
@@ -624,8 +774,9 @@ func TestPRDetailFetchFailed(t *testing.T) {
 	card := issueCard(issue, []model.PR{prOf(131, "OPEN", []string{model.LabelPropose})}, "確認する")
 	m, _ := send(detailModel(120, 40, []model.Card{card}), enterKey, enterKey)
 
-	wantOrder(t, linesOf(m), "checks: 取得失敗", "コメント: 取得失敗", "review thread: 取得失敗")
-	for _, ng := range []string{"checks: なし", "コメント: なし", "review thread: なし"} {
+	// prOf の Body は空なのでレンダリング結果が 0 行になり、本文のセクションは見出しごと出ない。
+	wantOrder(t, linesOf(m), "checks: 取得失敗", "── コメント ", "コメント: 取得失敗", "── review thread ", "review thread: 取得失敗")
+	for _, ng := range []string{"checks: なし", "コメント: なし", "review thread: なし", "── 本文 "} {
 		if strings.Contains(plainText(m), ng) {
 			t.Errorf("取得失敗の PR 詳細に %q がある", ng)
 		}
@@ -649,7 +800,7 @@ func TestPRDetailReviewThreadsAndChecks(t *testing.T) {
 	m, _ := send(detailModel(120, 40, []model.Card{issueCard(issue, []model.PR{pr}, "見る")}), enterKey, enterKey)
 
 	lines := linesOf(m)
-	wantOrder(t, lines, "mergeable: MERGEABLE CLEAN", "test: SUCCESS", "ci/legacy: PENDING")
+	wantOrder(t, lines, "mergeable: MERGEABLE CLEAN", "checks: 緑以外", "test: SUCCESS", "ci/legacy: PENDING")
 	wantOrder(t, lines, "thread 未 resolve", "thread resolved")
 
 	line, ok := lineWith(lines, "この分岐は残しますか")
@@ -675,6 +826,10 @@ func TestPRDetailWithEmptyChecksAndThreads(t *testing.T) {
 		if !strings.Contains(text, want) {
 			t.Errorf("%q が無い:\n%s", want, text)
 		}
+	}
+	// checks が 0 件なら緑かどうかを問わない（`checks: 緑` は `checks: 緑以外` の部分文字列）。
+	if strings.Contains(text, "checks: 緑") {
+		t.Errorf("checks が 0 件なのに緑の見出しが出ている:\n%s", text)
 	}
 }
 
@@ -801,16 +956,17 @@ func TestNarrowTerminalKeepsOnePane(t *testing.T) {
 	lines := plain(m)
 	text := strings.Join(lines, "\n")
 
+	// 無地の線だけを数える。セクションの見出し行も `──` で始まるが、名前を挟むので混ざらない。
 	seps := 0
 	sep := -1
 	for i, l := range lines {
-		if strings.HasPrefix(l, "──") {
+		if l != "" && strings.Trim(l, "─") == "" {
 			seps++
 			sep = i
 		}
 	}
 	if seps != 1 {
-		t.Fatalf("区切り線が %d 本ある, want 1（ヘッダ領域 / 区切り線 / 本文領域 の 1 ペイン）:\n%s", seps, text)
+		t.Fatalf("無地の区切り線が %d 本ある, want 1（ヘッダ領域 / 区切り線 / 本文領域 の 1 ペイン）:\n%s", seps, text)
 	}
 
 	// ヘッダ領域は区切り線の上、本文は下。

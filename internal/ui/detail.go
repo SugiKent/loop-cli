@@ -293,15 +293,39 @@ func (m Model) cardBodyLines() []string {
 	issue := m.detail.card.Issue
 	lines := renderMarkdown(issue.Body, m.leftWidth())
 	if c, value, ok := model.LatestBlockedBy(issue.Comments); ok {
-		lines = append(lines, "blocked-by: "+value)
+		blocked := []string{"blocked-by: " + value}
 		if value == "human" {
 			if when, ok := model.UnblockWhen(c.Body); ok {
-				lines = append(lines, "unblock-when: "+when)
+				blocked = append(blocked, "unblock-when: "+when)
 			}
-			lines = append(lines, questionLines(c.Body)...)
+			blocked = append(blocked, questionLines(c.Body)...)
 		}
+		lines = m.appendSection(lines, "blocked-by", blocked)
 	}
-	return append(lines, m.commentSection(issue.Comments)...)
+	return m.appendSection(lines, "コメント", m.commentSection(issue.Comments))
+}
+
+// appendSection はセクションを見出し行付きで足す。見出しは、中身が 1 行以上あり、かつ上に行が
+// あるときだけ置く（中身の無い見出しは次の見出しと 2 行続き、本文領域の 1 行目の見出しは
+// ヘッダとの区切り線と 2 行続く）。
+func (m Model) appendSection(lines []string, name string, body []string) []string {
+	if len(body) == 0 {
+		return lines
+	}
+	if len(lines) > 0 {
+		lines = append(lines, sectionHeading(name, m.leftWidth()))
+	}
+	return append(lines, body...)
+}
+
+// sectionHeading は `── <名前> ` を幅まで `─` で継ぎ足した 1 行。名前が収まらない幅では
+// 切った跡が線に見えるよう `…` を付けずに切る。幅が 0 以下なら空行にする。
+func sectionHeading(name string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	head := "── " + name + " "
+	return ansi.Truncate(head, width, "") + strings.Repeat("─", max(width-ansi.StringWidth(head), 0))
 }
 
 // questionLines は blocked-by: human のコメントから質問と選択肢を作る。
@@ -382,9 +406,9 @@ func (m Model) prBodyLines() []string {
 		lines = append(lines, "紐づく issue: なし")
 	}
 	lines = append(lines, m.checkLines(pr.MergeState)...)
-	lines = append(lines, renderMarkdown(pr.Body, m.leftWidth())...)
-	lines = append(lines, m.commentSection(pr.Comments)...)
-	return append(lines, m.reviewThreadLines(pr.ReviewThreads)...)
+	lines = m.appendSection(lines, "本文", renderMarkdown(pr.Body, m.leftWidth()))
+	lines = m.appendSection(lines, "コメント", m.commentSection(pr.Comments))
+	return m.appendSection(lines, "review thread", m.reviewThreadLines(pr.ReviewThreads))
 }
 
 // checkLines は merge 状態と checks。s20 は全 PR に取りに行くので nil は取得失敗を意味する。
@@ -395,8 +419,14 @@ func (m Model) checkLines(ms *gh.PRMergeState) []string {
 	}
 	lines := []string{strings.TrimSpace("mergeable: " + m.stateWord(ms.Mergeable) + " " + m.stateWord(ms.MergeStateStatus))}
 	if len(ms.StatusCheckRollup) == 0 {
-		return append(lines, "  checks: なし")
+		return append(lines, "checks: なし")
 	}
+	// 一覧が checks であることを見出しで示す。語は merge の確認画面と同じ（s14）。
+	green := "緑以外"
+	if classify.ChecksGreen(ms) {
+		green = "緑"
+	}
+	lines = append(lines, "checks: "+m.stateWord(green))
 	for _, c := range ms.StatusCheckRollup {
 		switch c.Typename {
 		case "CheckRun":
