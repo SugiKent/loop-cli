@@ -113,7 +113,8 @@ func TestUnimplementedKeysDoNothing(t *testing.T) {
 		"esc": codeKey(tea.KeyEscape),
 		"v":   runeKey('v'),
 		"s":   runeKey('s'), "A": runeKey('A'), "g": runeKey('g'), "x": runeKey('x'),
-		"/": runeKey('/'), "p": runeKey('p'),
+		"/": runeKey('/'), "p": runeKey('p'), "l": runeKey('l'),
+		"G": runeKey('G'), "home": codeKey(tea.KeyHome), "end": codeKey(tea.KeyEnd),
 	}
 	for name, k := range keys {
 		t.Run(name, func(t *testing.T) {
